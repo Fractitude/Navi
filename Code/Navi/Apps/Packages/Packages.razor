@@ -107,7 +107,10 @@
 		}
 		else
 		{
-			var visible = Apps.Where( x => Matches( AppFilter, x.Type, StoreAppIds.Contains( x.Id ) ) );
+			var visible = Apps
+				.Select( x => (App: x, FromStore: StoreAppIds.Contains( x.Id )) )
+				.Where( x => IsListed( x.App.Installed, x.FromStore ) && Matches( AppFilter, x.App.Type, x.FromStore ) )
+				.Select( x => x.App );
 
 			@if ( !visible.Any() )
 			{
@@ -457,6 +460,13 @@
 	}
 
 	/// <summary>
+	/// Is the app in the list at all? An installed one is. So is one that ships with the game or a library: the
+	/// Store is no way to get it back, so this list is, and it can be installed and uninstalled here. A Store app
+	/// that isn't installed is left to the Store tab, where it's installed from.
+	/// </summary>
+	static bool IsListed( bool installed, bool fromStore ) => installed || !fromStore;
+
+	/// <summary>
 	/// Does an app belong in the list under <paramref name="filter"/>? Store apps came from the Store, core apps are
 	/// part of the OS, and system apps ask for full system access, whether they ship with the game or with a Store
 	/// package, so an app can match more than one of these. All matches every app, and nothing else does.
@@ -474,7 +484,7 @@
 	/// </summary>
 	string EmptyText => AppFilter switch
 	{
-		"store" => "No apps have come from the Store.",
+		"store" => "No Store apps are installed.",
 		"core" => "No apps are part of the OS.",
 		"system" => "No apps ask for full system access.",
 		_ => "No apps.",
