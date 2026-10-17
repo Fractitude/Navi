@@ -61,7 +61,6 @@ public sealed class NaviAppSnapshot
 	public bool CanMinimize { get; set; }
 	public bool CanMaximize { get; set; }
 	public bool CanResize { get; set; }
-	public bool CapturesInput { get; set; }
 	public bool Shared { get; set; }
 	public bool IsPrepackaged { get; set; }
 	public bool IsSystem { get; set; }

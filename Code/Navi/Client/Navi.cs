@@ -68,7 +68,7 @@ public static class Navi
 	public static Task<bool> ToggleMaximize( Panel app ) => Call<bool>( app, "window.maximize" );
 
 	/// <summary>
-	/// True while the app's window has the player's controls (apps with CapturesInput). Pause when it doesn't.
+	/// True while the app's window has the player's controls (it is in front while the player sits at the computer). Pause when it doesn't.
 	/// </summary>
 	public static bool HasInput( Panel app ) => app.HasClass( "navi-input" );
 

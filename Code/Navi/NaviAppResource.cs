@@ -51,11 +51,6 @@ public sealed class NaviAppResource : GameResource
 	[Property] public bool CanResize { get; set; } = true;
 
 	/// <summary>
-	/// Takes over the player's controls while its window is in front. See <see cref="NaviInputCapture"/>.
-	/// </summary>
-	[Property] public bool CapturesInput { get; set; }
-
-	/// <summary>
 	/// In multiplayer, every player sees the same app: it runs on the host, and other clients only draw what it publishes.
 	/// The app must be written for it, with <c>Navi.Publish</c>, <c>Navi.GetState</c> and <c>Navi.Act</c>. Without it, each
 	/// client runs its own copy, so players see different things in the window.

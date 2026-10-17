@@ -94,7 +94,7 @@ public sealed class NaviAppHost : Panel
 
 		// A shared app's copy on the host runs for whoever is using the computer.
 		var capture = Computer?.InputCapture == Process;
-		app.SetClass( NaviEvents.HasInputClass, capture && (Computer.IsUser || IsShared) );
+		app.SetClass( NaviEvents.HasInputClass, capture && (Computer.IsSeated || IsShared) );
 
 		if ( IsShared && Computer is not null )
 		{

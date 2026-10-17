@@ -1,10 +1,10 @@
 namespace Sandbox;
 
 /// <summary>
-/// Gives the player's input to an app that captures input (<see cref="NaviAppResource.CapturesInput"/>) while its window is in front.
-/// The camera flies to the screen so it fills the view, and the player's movement and look stop, so apps can read keys like WASD
-/// with <see cref="Input"/>. Once there, the mouse cursor is free to point and click anywhere on the screen. Pressing Escape several
-/// times quickly force-quits the app. When the window closes, minimizes or loses focus, everything goes back.
+/// Takes the player to the screen while they have the computer's seat (<see cref="NaviComputer.IsSeated"/>). The camera flies
+/// to the screen so it fills the view, and the player's movement and look stop, so the app in front can read keys like WASD
+/// with <see cref="Input"/>. Once there, the mouse cursor is free to point and click anywhere on the screen. Escape stands the
+/// player up, and everything goes back.
 /// </summary>
 public sealed class NaviInputCapture : Component
 {
@@ -27,20 +27,9 @@ public sealed class NaviInputCapture : Component
 
 	/// <summary>
 	/// Show the mouse cursor once the screen fills the view, so the player can point and click on it. <see cref="WorldInput"/>
-	/// aims with the cursor while it's visible. Off, clicks stop entirely while an app has the controls.
+	/// aims with the cursor while it's visible. Off, clicks stop entirely while the player is seated.
 	/// </summary>
 	[Property] public bool FreeCursor { get; set; } = true;
-
-	/// <summary>
-	/// Escape presses in a row that force-quit the app. Not a hold: s&box tells games when Escape goes down,
-	/// but not whether it's still held.
-	/// </summary>
-	[Property, Range( 2, 10 )] public int QuitPresses { get; set; } = 5;
-
-	/// <summary>
-	/// Seconds allowed between presses. A longer gap starts the count over.
-	/// </summary>
-	[Property, Range( 0.3f, 3f )] public float QuitWindow { get; set; } = 1f;
 
 	/// <summary>
 	/// The input actions sent to the host while a shared app has the player's controls, so its host copy can read them
@@ -87,8 +76,6 @@ public sealed class NaviInputCapture : Component
 
 	State state;
 	float flight; // 0 at the player's view, 1 at the screen
-	RealTimeSince sinceEscapePressed = 100;
-	int escapePresses;
 	Transform playerView;
 	MouseVisibility playerMouse;
 
@@ -99,7 +86,7 @@ public sealed class NaviInputCapture : Component
 	protected override void OnUpdate()
 	{
 		// Only the player using the computer gets pulled in. Everyone else watches from where they stand.
-		var wanted = Computer.InputCapture is not null && Computer.IsUser;
+		var wanted = Computer.IsSeated;
 
 		if ( wanted && state is State.Idle or State.FlyingOut )
 			Begin();
@@ -109,7 +96,7 @@ public sealed class NaviInputCapture : Component
 		if ( state == State.Idle )
 			return;
 
-		UpdateQuit();
+		UpdateLeave();
 		ForwardInput();
 
 		foreach ( var c in controllers )
@@ -162,27 +149,16 @@ public sealed class NaviInputCapture : Component
 	}
 
 	/// <summary>
-	/// An Escape press is swallowed, so the game menu doesn't open. <see cref="QuitPresses"/> presses in a row, each within
-	/// <see cref="QuitWindow"/> of the last, force-quit the app. Escape never reaches <see cref="Input.Keyboard"/>: the
-	/// engine keeps it for its menu.
+	/// An Escape press is swallowed, so the game menu doesn't open, and stands the player up from the seat. Escape never
+	/// reaches <see cref="Input.Keyboard"/>: the engine keeps it for its menu.
 	/// </summary>
-	void UpdateQuit()
+	void UpdateLeave()
 	{
-		if ( escapePresses > 0 && sinceEscapePressed > QuitWindow )
-			escapePresses = 0;
-
 		if ( !Input.EscapePressed )
 			return;
 
 		Input.EscapePressed = false;
-		sinceEscapePressed = 0;
-		escapePresses++;
-
-		if ( escapePresses >= QuitPresses && Computer.InputCapture is { } capture )
-		{
-			escapePresses = 0;
-			Computer.UserClose( capture.App.Id );
-		}
+		Computer.UserLeave();
 	}
 
 	protected override void OnPreRender()
@@ -251,7 +227,6 @@ public sealed class NaviInputCapture : Component
 		controllers.Clear();
 		worldInputs.Clear();
 		flight = 0;
-		escapePresses = 0;
 		state = State.Idle;
 		ForwardInput();
 

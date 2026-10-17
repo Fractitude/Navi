@@ -82,13 +82,27 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	public bool IsUser => !Networking.IsActive || (UserId != default && UserId == Connection.Local?.Id);
 
 	/// <summary>
+	/// The local player has taken the seat: <see cref="NaviInputCapture"/> pulls the camera to the screen and gives them the
+	/// mouse. Online it is the seat itself. Offline there is no one to share with, so the first thing they do on the screen
+	/// sits them down. <see cref="UserLeave"/> stands them up.
+	/// </summary>
+	public bool IsSeated => Networking.IsActive ? UserId != default && UserId == Connection.Local?.Id : seatedOffline;
+
+	bool seatedOffline;
+
+	/// <summary>
+	/// Someone has the seat. Offline, that is the local player once they have sat down.
+	/// </summary>
+	public bool HasUser => Networking.IsActive ? UserId != default : seatedOffline;
+
+	/// <summary>
 	/// The local player can use the screen: they have the seat, or it is free.
 	/// </summary>
 	public bool CanUse => IsUser || UserId == default;
 
 	/// <summary>
 	/// Seconds the user can leave the computer alone before the seat is freed. It isn't freed while a permission prompt
-	/// is open or a window has their controls.
+	/// is open.
 	/// </summary>
 	[Property] public float SeatTimeout { get; set; } = 5f;
 
@@ -387,7 +401,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		if ( UserId == default )
 			return;
 
-		var idle = sinceUserActed > SeatTimeout && permissionRequests.Count == 0 && InputCapture is null;
+		var idle = sinceUserActed > SeatTimeout && permissionRequests.Count == 0;
 		if ( User is null || idle )
 			SetUser( default );
 	}
@@ -402,6 +416,11 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return;
 
 		UserId = id;
+		ResetSession();
+	}
+
+	void ResetSession()
+	{
 		sinceUserActed = 0;
 		userInput.Clear();
 
@@ -422,7 +441,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return false;
 
 		if ( !Networking.IsActive )
+		{
+			seatedOffline |= take;
 			return true;
+		}
 
 		var caller = Rpc.Caller ?? Connection.Local;
 		if ( caller is null )
@@ -538,6 +560,26 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		Authorize( take: false );
 	}
 
+	/// <summary>
+	/// The user stands up and gives the seat back.
+	/// </summary>
+	[Rpc.Host]
+	public void UserLeave()
+	{
+		if ( !Authorize( take: false ) )
+			return;
+
+		if ( Networking.IsActive )
+		{
+			SetUser( default );
+		}
+		else if ( seatedOffline )
+		{
+			seatedOffline = false;
+			ResetSession();
+		}
+	}
+
 	// Shared apps (NaviAppInfo.Shared). The host's copy of each runs the app and publishes its state; the others draw it.
 
 	/// <summary>
@@ -644,7 +686,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
-	/// On the host: the input actions the user holds while a window has their controls (<see cref="NaviInputCapture"/>).
+	/// On the host: the input actions the user holds while they sit at the computer (<see cref="NaviInputCapture"/>).
 	/// </summary>
 	readonly HashSet<string> userInput = new();
 

@@ -7,7 +7,6 @@
   "CanMinimize": true,
   "CanMaximize": true,
   "CanResize": true,
-  "CapturesInput": false,
   "Shared": true,
   "Permissions": [
     "navi.settings.change"

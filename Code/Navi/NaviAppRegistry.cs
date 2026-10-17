@@ -15,7 +15,6 @@ public sealed class NaviAppInfo
 	public bool CanMinimize { get; init; }
 	public bool CanMaximize { get; init; }
 	public bool CanResize { get; init; }
-	public bool CapturesInput { get; init; }
 
 	/// <summary>
 	/// Runs on the host, and other clients draw what it publishes. See <see cref="NaviAppResource.Shared"/>.
@@ -72,7 +71,6 @@ public sealed class NaviAppInfo
 			CanMinimize = resource.CanMinimize,
 			CanMaximize = resource.CanMaximize,
 			CanResize = resource.CanResize,
-			CapturesInput = resource.CapturesInput,
 			Shared = resource.Shared,
 			IsPrepackaged = prepackaged,
 			IsSystem = resource.IsSystem,
@@ -92,7 +90,6 @@ public sealed class NaviAppInfo
 		CanMinimize = CanMinimize,
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
-		CapturesInput = CapturesInput,
 		Shared = Shared,
 		IsPrepackaged = IsPrepackaged,
 		IsSystem = IsSystem,
@@ -123,7 +120,6 @@ public sealed class NaviAppInfo
 			CanMinimize = app.CanMinimize,
 			CanMaximize = app.CanMaximize,
 			CanResize = app.CanResize,
-			CapturesInput = app.CapturesInput,
 			Shared = app.Shared,
 			IsPrepackaged = app.IsPrepackaged,
 			IsSystem = app.IsSystem,

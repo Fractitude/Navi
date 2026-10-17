@@ -94,7 +94,6 @@ The full contract — where each kind of rule goes, async and threads, the optio
 | `CanMinimize` | Has a minimize button. Default `true`. |
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
-| `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
 | `Shared` | In multiplayer every player sees the same app: the host runs it, the others draw it. The app must be written for it. See "Multiplayer". Default `false`. |
 | `Permissions` | The permissions the app may have. It is never granted others. See below. |
 | `IsSystem` | A system app: it asks for full system access (root), which allows everything. See "System apps" below. |
@@ -143,7 +142,7 @@ Each `NaviComputer` saves what the player changed on it: installed apps and Stor
 
 The host runs every computer, and other clients draw what it sends. Set the computer's GameObject to **Network Mode: Object** in the scene. Scene objects default to Snapshot, which is sent to clients only once, as they join, so they never see the screen change. The host logs a warning when a computer isn't a network object. A computer made at runtime must be network-spawned by the game (`GameObject.NetworkSpawn()`).
 
-- **One user at a time.** The first player to click a free computer takes the seat (`NaviComputer.UserId`). Only they can click, drag windows, answer permission prompts and get the controls of an app that captures input. Everyone else sees an "In use by ..." badge, and their clicks are ignored. The seat frees itself when the user leaves the game, or after `SeatTimeout` seconds without them using or pointing at the screen (never while a prompt is open or an app has their controls). When the seat changes, open prompts are dismissed.
+- **One user at a time.** The first player to click a free computer takes the seat (`NaviComputer.UserId`). Only they can click, drag windows, answer permission prompts and get pulled in to the screen. Everyone else sees an "In use by ..." badge, and their clicks are ignored. The seat frees itself when the user leaves the game, or after `SeatTimeout` seconds without them using or pointing at the screen (never while a prompt is open; it stays while they are pulled in to the screen). When the seat changes, open prompts are dismissed.
 - **The desktop is the same everywhere.** Windows, positions, focus, installed apps, settings and prompts come from the host as a snapshot, in parts that are sent only when they change (`NetworkApps`, `NetworkState`, `NetworkWindows`, `NetworkSession`): moving a window sends only the windows. What the user does goes to the host as an RPC (`UserLaunch`, `UserClose`, `UserMoveWindow`...), which checks the caller is the user. On other clients every method that changes the computer (`Install`, `Launch`, `Close`...) does nothing: call them on the host. Saves are written and loaded on the host only.
 - **Only nearby players get it.** The host sends a computer's state only to players within `NaviComputer.NetworkRange` world units (default 1500), and always to its user. A player who comes back in range gets the latest state. The computer turns off its GameObject's Always Transmit for this; set `NetworkRange` to 0 to send to everyone. Out of range, the engine turns the whole computer off for that player, so the host spawns a plane over the screen (`NaviScreenStandIn`, colored `OutOfRangeColor`, black by default) that they see instead.
 - **Store apps follow the host.** A client downloads the Store apps the host has, so it can draw them.
@@ -179,16 +178,15 @@ An app with `IsSystem` in its manifest asks for full system access: root. Root h
 - Accepted apps are kept in `NaviComputer.RootApps`. Uninstalling forgets them.
 - `Navi.HasRoot( this )` tells an app whether it has root.
 
-## Apps that take over the controls
+## Sitting at the computer
 
-An app with `CapturesInput = true` gets the player's controls while its window is in front. The Pac-Man Store app (`fractitude.napp_pacman`) uses it.
+Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for every app. `NaviComputer.IsSeated` says whether the local player has it. Offline, the first click on the screen sits the player down.
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
 - The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself with `Navi.InputDown( this, "Forward" )` for W (or `Input.Down`, in an app that isn't shared). In multiplayer only the computer's user is pulled in.
 - Once the screen fills the view, the mouse cursor is shown, and `WorldInput` aims with it, so the player can point and click anywhere on the computer (`FreeCursor`). Game code that hides the cursor every frame, like a crosshair, should skip that while `NaviInputCapture.Current` isn't null.
-- An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
-- Closing, minimizing or focusing another window gives control back, and the camera flies back.
-- `Navi.HasInput( this )` is true while the app has the controls (its panel has the `navi-input` class). Pause when it isn't.
+- An Escape press is swallowed so the game menu doesn't open, and stands the player up (`NaviComputer.UserLeave`): the camera flies back and the controls return.
+- `Navi.HasInput( this )` is true while the app is in front and the player sits at the computer (its panel has the `navi-input` class). Pause when it isn't. Closing or minimizing the window doesn't stand the player up.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
 
 `NaviInputCapture` is added to the computer automatically by `NaviDesktop`. The camera move needs a `WorldPanel`; with a `ScreenPanel` only the controls are taken.
