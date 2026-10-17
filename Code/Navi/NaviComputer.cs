@@ -119,6 +119,13 @@ public sealed class NaviComputer : Component
 	[Property] public List<string> RootApps { get; set; } = new();
 
 	/// <summary>
+	/// Asset folders of this game whose app manifests ship with it, so their system apps are part of the OS: always installed,
+	/// root without asking. Manifests anywhere else (except the library's own <see cref="NaviAppRegistry.BuiltInFolder"/>)
+	/// are normal apps, and a system one asks the player for root. Folders are trusted from when the computer is enabled.
+	/// </summary>
+	[Property] public List<string> SystemAppFolders { get; set; } = new() { "navi/system/" };
+
+	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
 	public int Version { get; private set; }
@@ -134,6 +141,12 @@ public sealed class NaviComputer : Component
 	/// App id to the Store package it came from.
 	/// </summary>
 	readonly Dictionary<string, string> appPackages = new();
+
+	protected override void OnEnabled()
+	{
+		foreach ( var folder in SystemAppFolders ?? [] )
+			NaviAppRegistry.AddSystemAppFolder( folder );
+	}
 
 	protected override void OnStart()
 	{

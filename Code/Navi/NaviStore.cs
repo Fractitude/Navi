@@ -24,12 +24,13 @@ public static class NaviStore
 	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && OfficialOrgs.Contains( org );
 
 	/// <summary>
-	/// Resource paths of the apps downloaded from the Store. Every other app shipped with the game or a library.
+	/// Resource paths of the apps downloaded from the Store. They are never trusted as shipped with the game, even in one
+	/// of the <see cref="NaviAppRegistry.SystemAppFolders"/>.
 	/// </summary>
 	static readonly HashSet<string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
 
 	/// <summary>
-	/// Was this app downloaded from the Store, rather than shipped with the game or a library?
+	/// Was this app downloaded from the Store? A false doesn't mean it shipped with the game: see <see cref="NaviAppRegistry.IsPrepackaged"/>.
 	/// </summary>
 	public static bool IsDownloaded( NaviAppResource resource ) => resource?.ResourcePath is { } path && downloaded.Contains( path );
 

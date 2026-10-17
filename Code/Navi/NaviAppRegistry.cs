@@ -18,7 +18,8 @@ public sealed class NaviAppInfo
 	public bool CapturesInput { get; init; }
 
 	/// <summary>
-	/// Shipped with the game or a library, rather than downloaded from the Store.
+	/// Shipped with the game or a library: its manifest is in one of the <see cref="NaviAppRegistry.SystemAppFolders"/>, and
+	/// it wasn't downloaded from the Store. Anything else, including a manifest from an unknown source, is not.
 	/// </summary>
 	public bool IsPrepackaged { get; init; }
 
@@ -54,7 +55,7 @@ public sealed class NaviAppInfo
 
 	internal static NaviAppInfo FromResource( NaviAppResource resource, TypeDescription panelType )
 	{
-		var prepackaged = !NaviStore.IsDownloaded( resource );
+		var prepackaged = NaviAppRegistry.IsPrepackaged( resource );
 
 		return new()
 		{
@@ -83,14 +84,63 @@ public sealed class NaviAppInfo
 public static class NaviAppRegistry
 {
 	/// <summary>
-	/// Every app, sorted by name. If two apps share an id, a prepackaged one wins over a Store one.
+	/// The library's own apps, such as Packages and Calculator (<c>Assets/navi/apps/</c>).
+	/// </summary>
+	public const string BuiltInFolder = "navi/apps/";
+
+	static readonly HashSet<string> systemAppFolders = new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder };
+
+	/// <summary>
+	/// Asset folders whose manifests count as shipped with the game or a library, so their system apps are part of the OS.
+	/// <see cref="BuiltInFolder"/>, plus the folders games list in <see cref="NaviComputer.SystemAppFolders"/>.
+	/// </summary>
+	public static IReadOnlyCollection<string> SystemAppFolders => systemAppFolders;
+
+	/// <summary>
+	/// Trust manifests in an asset folder, e.g. "navi/system/", as shipped with the game. Ignored if it isn't a plain
+	/// relative folder.
+	/// </summary>
+	public static void AddSystemAppFolder( string folder )
+	{
+		if ( NormalizeFolder( folder ) is { } normalized )
+			systemAppFolders.Add( normalized );
+	}
+
+	/// <summary>
+	/// Was this manifest shipped with the game or a library? Only if it is in one of the <see cref="SystemAppFolders"/> and
+	/// wasn't downloaded from the Store. Anything else fails safe: it is a normal app, and a system one has to ask for root.
+	/// </summary>
+	public static bool IsPrepackaged( NaviAppResource resource )
+	{
+		if ( resource?.ResourcePath is not { } path || NaviStore.IsDownloaded( resource ) )
+			return false;
+
+		path = path.Replace( '\\', '/' ).TrimStart( '/' );
+		if ( path.Split( '/' ).Contains( ".." ) )
+			return false;
+
+		return systemAppFolders.Any( x => path.StartsWith( x, System.StringComparison.OrdinalIgnoreCase ) );
+	}
+
+	static string NormalizeFolder( string folder )
+	{
+		var normalized = folder?.Trim().Replace( '\\', '/' ).Trim( '/' );
+		if ( string.IsNullOrEmpty( normalized ) || normalized.Contains( ':' ) || normalized.Split( '/' ).Any( x => x is "" or "." or ".." ) )
+			return null;
+
+		return normalized + "/";
+	}
+
+	/// <summary>
+	/// Every app, sorted by name. If two apps share an id, a core app wins, then a prepackaged one, so a Store app can
+	/// never replace an app that ships with the game.
 	/// </summary>
 	public static IEnumerable<NaviAppInfo> All => ResourceLibrary.GetAll<NaviAppResource>()
 		.Where( x => !string.IsNullOrWhiteSpace( x.AppId ) )
 		.Select( x => (Resource: x, Panel: x.FindPanelType()) )
 		.Where( x => x.Panel is not null )
 		.Select( x => NaviAppInfo.FromResource( x.Resource, x.Panel ) )
-		.OrderBy( x => x.IsPrepackaged ? 0 : 1 )
+		.OrderBy( x => x.IsCore ? 0 : x.IsPrepackaged ? 1 : 2 )
 		.DistinctBy( x => x.Id )
 		.OrderBy( x => x.Name );
 
