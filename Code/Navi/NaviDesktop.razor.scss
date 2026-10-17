@@ -8,6 +8,19 @@ NaviDesktop
 	color: #e8e4d8;
 }
 
+// The title bar shield's tooltip, drawn on the desktop so the windows can't cover it and the app's content can't clip it.
+.shield-hint
+{
+	position: absolute;
+	padding: 3px 6px;
+	font-size: 11px;
+	color: #f2eee2;
+	background-color: #2a2840;
+	border: 1px solid #f2eee2;
+	white-space: nowrap;
+	pointer-events: none;
+}
+
 .screen
 {
 	position: relative;

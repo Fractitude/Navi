@@ -137,6 +137,12 @@
 	/// </summary>
 	string MenuApp;
 
+	/// <summary>
+	/// The shield tooltip being drawn, or null. The engine places its own tooltips from screen-space mouse
+	/// coordinates, which a world panel does not share, so they land outside the screen; Navi draws its own.
+	/// </summary>
+	Label shieldHint;
+
 
 	/// <summary>
 	/// How far in front of the screen the secure layer floats, in world units. Less than 1 and the screen can still draw
@@ -206,6 +212,7 @@
 
 		CapTaskbar( taskbar );
 		ClampTooltips( taskbar );
+		UpdateShieldHint();
 	}
 
 	/// <summary>
@@ -457,6 +464,52 @@
 
 			tooltip.Style.Left = Length.Pixels( (x - appRect.Left) * app.ScaleFromScreen );
 		}
+	}
+
+	/// <summary>
+	/// Show the title bar shield's tooltip under it while the cursor is on the shield. The hint is a panel of its own,
+	/// added last so it draws over the windows; one in the title bar would be covered by the app's content, which draws
+	/// after it.
+	/// </summary>
+	void UpdateShieldHint()
+	{
+		// MousePosition is in panel units and Box.Rect in screen pixels, so the cursor needs ScaleToScreen to land in
+		// the same space as the rects it is tested against.
+		var bounds = Panel.Box.Rect;
+		var point = bounds.Position + Panel.MousePosition * Panel.ScaleToScreen;
+
+		Panel shield = null;
+		foreach ( var panel in Panel.Descendants )
+		{
+			if ( panel.HasClass( "shield" ) && panel.Box.Rect.IsInside( point ) )
+			{
+				shield = panel;
+				break;
+			}
+		}
+
+		if ( shield is null || string.IsNullOrEmpty( shield.Tooltip ) )
+		{
+			shieldHint?.Delete();
+			shieldHint = null;
+			return;
+		}
+
+		if ( shieldHint is null || !shieldHint.IsValid() )
+		{
+			shieldHint = new Label { Text = shield.Tooltip };
+			shieldHint.AddClass( "shield-hint" );
+			Panel.AddChild( shieldHint );
+		}
+
+		if ( shieldHint.Text != shield.Tooltip )
+			shieldHint.Text = shield.Tooltip;
+
+		// Box.Rect is in screen pixels and Style takes panel units, hence ScaleFromScreen.
+		var rect = shield.Box.Rect;
+		var scale = Panel.ScaleFromScreen;
+		shieldHint.Style.Left = Length.Pixels( ( rect.Left - bounds.Left ) * scale );
+		shieldHint.Style.Top = Length.Pixels( ( rect.Bottom - bounds.Top + 4f ) * scale );
 	}
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
