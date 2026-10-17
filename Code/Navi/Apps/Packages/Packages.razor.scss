@@ -60,12 +60,16 @@ Packages
 	}
 }
 
+// Scrolling is the panel's own styling, like the web: auto puts a bar there only when the entries don't all fit.
 .list
 {
 	flex-grow: 1;
 	flex-direction: column;
 	gap: 4px;
-	overflow-y: scroll;
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: #8a8472 transparent;
+	scrollbar-gutter: stable;
 }
 
 // A message about the last action, e.g. a denied permission. Click to dismiss.
