@@ -196,13 +196,11 @@
 
 @code
 {
-	PackagesViewModel viewModel;
-
 	/// <summary>
 	/// The app's logic and its state. Made on first use, because every call it makes to the computer is made with the
 	/// app's own panel, which is this.
 	/// </summary>
-	PackagesViewModel ViewModel => viewModel ??= new(this);
+	PackagesViewModel ViewModel => field ??= new(this);
 
 	/// <summary>
 	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw.
@@ -211,7 +209,7 @@
 
 	/// <summary>
 	/// The Store search field binds to this. Typing isn't a reason to redraw the list: Enter, or the refresh button,
-	/// is what searches for what it holds.
+	/// is what searches for what it holds. It needs the setter: the binding assigns to it.
 	/// </summary>
 	string SearchText
 	{
@@ -245,7 +243,7 @@
 
 			var scrolling = false;
 			foreach ( var bar in child.Children )
-				scrolling |= bar is Sandbox.UI.ScrollBar;
+				scrolling |= bar is ScrollBar;
 
 			child.SetClass( "scrolling", scrolling );
 		}
