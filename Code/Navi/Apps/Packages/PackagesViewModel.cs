@@ -63,10 +63,8 @@ public sealed class PackagesViewModel
 	HashSet<string> installedPackages = new();
 	HashSet<string> installingPackages = new();
 
-	/// <summary>The Store entries fetched so far, and how many match the current search in all.</summary>
+	/// <summary>The Store entries fetched so far. The backend pages them, so the list grows with "More".</summary>
 	(Package Package, bool Official)[] storePackages = [];
-
-	int storeTotal;
 
 	/// <summary>The computer's version when the lists were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -80,10 +78,10 @@ public sealed class PackagesViewModel
 	bool storeLoaded;
 
 	/// <summary>Idents of the Store entries showing their details.</summary>
-	HashSet<string> expanded = new();
+	readonly HashSet<string> expanded = new();
 
 	/// <summary>Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.</summary>
-	Dictionary<string, Package> details = new();
+	readonly Dictionary<string, Package> details = new();
 
 	public PackagesViewModel( Panel app )
 	{
@@ -118,7 +116,7 @@ public sealed class PackagesViewModel
 
 	/// <summary>
 	/// Called every frame by the panel. Nothing here is a click: the lists are refetched when the computer's version
-	/// changes, so an install made anywhere else shows up without the player doing anything.
+	/// changes, so an installation made anywhere else shows up without the player doing anything.
 	/// </summary>
 	public void Tick()
 	{
@@ -225,6 +223,10 @@ public sealed class PackagesViewModel
 
 			Update( uiState => uiState with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
 		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: couldn't refresh the lists: {e.Message}" );
+		}
 		finally
 		{
 			polling = false;
@@ -249,16 +251,19 @@ public sealed class PackagesViewModel
 
 		var text = UiState.SearchText.Trim();
 		var skip = append ? storePackages.Length : 0;
+
+		// A failed search leaves the page that is already listed, so the total it came with stays too.
+		var total = UiState.StoreTotal;
 		string status;
 
 		try
 		{
 			// The old entries stay on screen while the page loads: the status above says it's a refresh.
-			var (packages, total) = await Navi.SearchStore( app, text, skip, StorePageSize );
+			var (packages, found) = await Navi.SearchStore( app, text, skip, StorePageSize );
 
 			storePackages = append ? storePackages.Concat( packages ).ToArray() : packages;
-			storeTotal = total;
-			status = total > 0 ? null
+			total = found;
+			status = found > 0 ? null
 				: text.Length > 0 ? "No apps found matching your filter."
 				: "No apps have been published yet.";
 		}
@@ -277,7 +282,7 @@ public sealed class PackagesViewModel
 		refreshing = false;
 		Update( uiState => uiState with
 		{
-			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = storeTotal,
+			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = total,
 		} );
 	}
 
@@ -306,6 +311,10 @@ public sealed class PackagesViewModel
 	/// changed reaches the panel through <see cref="PollAsync"/>: the computer's version goes up, and the lists are
 	/// fetched again.
 	/// </summary>
+	/// <remarks>
+	/// <c>async void</c> on purpose: its callers are click handlers, which can't await, and both outcomes are caught
+	/// below and turned into a notice, so no exception escapes the task.
+	/// </remarks>
 	async void Run( string what, System.Func<Task<bool>> call )
 	{
 		DismissNotice();
@@ -335,10 +344,10 @@ public sealed class PackagesViewModel
 	// What the state is built from.
 
 	IReadOnlyList<PackageRow> BuildStoreRows() => storePackages
-		.Select( x => BuildRow( x.Package, x.Official ) )
+		.Select( x => BuildStoreRow( x.Package, x.Official ) )
 		.ToArray();
 
-	PackageRow BuildRow( Package package, bool official )
+	PackageRow BuildStoreRow( Package package, bool official )
 	{
 		var ident = package.FullIdent;
 		var isExpanded = expanded.Contains( ident );
@@ -369,11 +378,11 @@ public sealed class PackagesViewModel
 		return apps
 			.Select( x => (App: x, FromStore: storeAppIds.Contains( x.Id )) )
 			.Where( x => Matches( kind, x.App.Installed, x.App.Type, x.FromStore ) )
-			.Select( x => BuildRow( x.App ) )
+			.Select( x => BuildAppRow( x.App ) )
 			.ToArray();
 	}
 
-	static AppRow BuildRow(
+	static AppRow BuildAppRow(
 		(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type) app )
 	{
 		var shielded = app.Type is "core" or "system";
