@@ -105,6 +105,9 @@ public sealed record PackagesUiState
 	/// </summary>
 	public int Revision { get; init; }
 
+	/// <summary>What a viewer draws until the host's state arrives.</summary>
+	public static PackagesUiState Empty { get; } = new();
+
 	/// <summary>The Store tab is up, rather than the Apps tab.</summary>
 	public bool ShowStore { get; init; }
 
@@ -140,6 +143,12 @@ public sealed record PackagesUiState
 
 	/// <summary>How many entries match the current search in all, not how many are listed.</summary>
 	public int StoreTotal { get; init; }
+
+	/// <summary>
+	/// Goes up with every search that starts the Store list over (a new query or a refresh, not "More"). The panel
+	/// scrolls the list back to the top when it changes.
+	/// </summary>
+	public int StoreSearch { get; init; }
 
 	public int StoreShown => StoreRows.Count;
 

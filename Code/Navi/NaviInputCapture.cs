@@ -43,6 +43,37 @@ public sealed class NaviInputCapture : Component
 	[Property, Range( 0.3f, 3f )] public float QuitWindow { get; set; } = 1f;
 
 	/// <summary>
+	/// The input actions sent to the host while a shared app has the player's controls, so its host copy can read them
+	/// with <c>Navi.InputDown</c>. Games can add their own.
+	/// </summary>
+	public static HashSet<string> ForwardedActions { get; } = new()
+	{
+		"Forward", "Backward", "Left", "Right", "Jump", "Run", "Walk", "Duck", "Attack1", "Attack2", "Reload", "Use",
+	};
+
+	/// <summary>
+	/// What was last sent to the host, sorted and joined, so it is only sent again when it changes.
+	/// </summary>
+	string sentInput;
+
+	/// <summary>
+	/// Tell the host which <see cref="ForwardedActions"/> the player holds, while a shared app has their controls.
+	/// </summary>
+	void ForwardInput()
+	{
+		var down = state == State.Captured && Computer.InputCapture is { App.Shared: true }
+			? ForwardedActions.Where( x => Input.Down( x ) ).OrderBy( x => x ).ToArray()
+			: [];
+
+		var joined = string.Join( ",", down );
+		if ( joined == sentInput )
+			return;
+
+		sentInput = joined;
+		Computer.UserHoldInput( down );
+	}
+
+	/// <summary>
 	/// The capture that has the player's input right now, or null. Game code can check it, e.g. to hide a crosshair.
 	/// </summary>
 	public static NaviInputCapture Current { get; private set; }
@@ -67,7 +98,8 @@ public sealed class NaviInputCapture : Component
 
 	protected override void OnUpdate()
 	{
-		var wanted = Computer.InputCapture is not null;
+		// Only the player using the computer gets pulled in. Everyone else watches from where they stand.
+		var wanted = Computer.InputCapture is not null && Computer.IsUser;
 
 		if ( wanted && state is State.Idle or State.FlyingOut )
 			Begin();
@@ -78,6 +110,7 @@ public sealed class NaviInputCapture : Component
 			return;
 
 		UpdateQuit();
+		ForwardInput();
 
 		foreach ( var c in controllers )
 		{
@@ -148,7 +181,7 @@ public sealed class NaviInputCapture : Component
 		if ( escapePresses >= QuitPresses && Computer.InputCapture is { } capture )
 		{
 			escapePresses = 0;
-			Computer.Close( capture.App.Id );
+			Computer.UserClose( capture.App.Id );
 		}
 	}
 
@@ -220,6 +253,7 @@ public sealed class NaviInputCapture : Component
 		flight = 0;
 		escapePresses = 0;
 		state = State.Idle;
+		ForwardInput();
 
 		if ( Current == this )
 			Current = null;

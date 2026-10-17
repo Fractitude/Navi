@@ -10,17 +10,17 @@
 
 <root>
 	<div class="tabs">
-		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => ViewModel.OpenApps() )>
+		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => Navi.Act( this, PackagesViewModel.OpenAppsAction ) )>
 			Apps
 		</div>
-		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => ViewModel.OpenStore() )>
+		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => Navi.Act( this, PackagesViewModel.OpenStoreAction ) )>
 			Store
 		</div>
 		<div class="spacer"></div>
 
 		@if ( UiState.ShowStore )
 		{
-			<div class="button @( UiState.Refreshing ? "disabled" : "" )" @onclick=@( () => ViewModel.SubmitSearch() )>
+			<div class="button @( UiState.Refreshing ? "disabled" : "" )" @onclick=@( () => Navi.Act( this, PackagesViewModel.SubmitSearchAction ) )>
 				<i>refresh</i>
 			</div>
 		}
@@ -29,7 +29,7 @@
 			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button *@
 			@* here instead. *@
 			<div class="filter" tooltip="Show: @UiState.FilterName"
-			     @onclick=@( () => ViewModel.ToggleFilterMenu() )>
+			     @onclick=@( () => Navi.Act( this, PackagesViewModel.ToggleFilterMenuAction ) )>
 				<i>filter_list</i>
 			</div>
 		}
@@ -39,17 +39,17 @@
 	@if ( UiState.ShowStore )
 	{
 		<div class="search">
-			<TextEntry Icon="search" Value=@( UiState.SearchText ) Placeholder="Search apps, then press Enter"
+			<TextEntry @ref="SearchEntry" Icon="search" Value=@( UiState.SearchText ) Placeholder="Search apps, then press Enter"
 			           HasClearButton=@true MaxLength=@( 80 )
 			           OnTextEdited=@SearchEdited
-			           onsubmit=@( () => ViewModel.SubmitSearch() )/>
+			           onsubmit=@( () => Navi.Act( this, PackagesViewModel.SubmitSearchAction ) )/>
 		</div>
 	}
 
 	<div class="list">
 		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+			<div class="notice" @onclick=@( () => Navi.Act( this, PackagesViewModel.DismissNoticeAction ) )>
 				@UiState.Notice
 			</div>
 		}
@@ -91,13 +91,13 @@
 							}
 							else
 							{
-								<div class="button install" @onclick=@( () => ViewModel.InstallPackage( entry.Ident ) )>
+								<div class="button install" @onclick=@( () => Navi.Act( this, PackagesViewModel.InstallPackageAction, entry.Ident ) )>
 									Install
 								</div>
 							}
 
 							<div class="expand" tooltip=@( entry.Expanded ? "Less" : "More" )
-							     @onclick=@( () => ViewModel.ToggleDetails( entry.Ident ) )>
+							     @onclick=@( () => Navi.Act( this, PackagesViewModel.ToggleDetailsAction, entry.Ident ) )>
 								<i>@( entry.Expanded ? "expand_less" : "expand_more" )</i>
 							</div>
 						</div>
@@ -147,13 +147,13 @@
 
 					@if ( app.Action == AppAction.Uninstall )
 					{
-						<div class="button" @onclick=@( () => ViewModel.UninstallApp( app.Id ) )>
+						<div class="button" @onclick=@( () => Navi.Act( this, PackagesViewModel.UninstallAppAction, app.Id ) )>
 							Uninstall
 						</div>
 					}
 					else if ( app.Action == AppAction.Install )
 					{
-						<div class="button install" @onclick=@( () => ViewModel.InstallApp( app.Id ) )>
+						<div class="button install" @onclick=@( () => Navi.Act( this, PackagesViewModel.InstallAppAction, app.Id ) )>
 							Install
 						</div>
 					}
@@ -166,13 +166,13 @@
 	@* backdrop starts under the tabs row, so the tabs and this button stay clickable while the menu is up. *@
 	@if ( UiState.FilterOpen && !UiState.ShowStore )
 	{
-		<div class="filter-backdrop" @onmousedown=@( () => ViewModel.CloseFilterMenu() )></div>
+		<div class="filter-backdrop" @onmousedown=@( () => Navi.Act( this, PackagesViewModel.CloseFilterMenuAction ) )></div>
 
 		<div class="filter-menu">
 			@foreach ( var kind in UiState.Filters )
 			{
 				<div class="item @( kind.Selected ? "active" : "" )"
-				     @onclick=@( () => ViewModel.ChooseFilter( kind.Key ) )>
+				     @onclick=@( () => Navi.Act( this, PackagesViewModel.ChooseFilterAction, kind.Key ) )>
 					<i>@( kind.Selected ? "check" : "" )</i>
 					<div class="label">@kind.Label</div>
 				</div>
@@ -188,7 +188,7 @@
 
 			@if ( UiState.HasMore )
 			{
-				<div class="button" @onclick=@( () => ViewModel.LoadMore() )>
+				<div class="button" @onclick=@( () => Navi.Act( this, PackagesViewModel.LoadMoreAction ) )>
 					More
 				</div>
 			}
@@ -205,23 +205,44 @@
 	PackagesViewModel ViewModel => field ??= new(this);
 
 	/// <summary>
-	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw.
+	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw. On
+	/// a viewer (the app is shared) it is what the host's copy published, and the host's copy alone has a view model.
 	/// </summary>
-	PackagesUiState UiState => ViewModel.UiState;
+	PackagesUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<PackagesUiState>( this ) ?? PackagesUiState.Empty : ViewModel.UiState;
 
 	public override void Tick()
 	{
 		base.Tick();
 
 		FitScrollbarGutter();
+		ScrollToTopOnNewSearch();
+
+		if ( Navi.IsViewer( this ) )
+			return;
 
 		ViewModel.Tick();
+		Navi.Publish( this, ViewModel.UiState );
+	}
+
+	/// <summary>
+	/// The host's copy runs what the player did, from whichever client they're on.
+	/// </summary>
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsAction( e, out var action, out var args ) )
+		{
+			ViewModel.Act( action, args );
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
 	}
 
 	/// <summary>
 	/// The Store search field reports every edit here. Typing doesn't redraw the list; Enter does.
 	/// </summary>
-	void SearchEdited( string text ) => ViewModel.SetSearchText( text );
+	void SearchEdited( string text ) => Navi.Act( this, PackagesViewModel.SetSearchTextAction, text );
 
 	/// <summary>
 	/// The engine draws the scrollbar over the list instead of taking room from it, and scrollbar-gutter keeps room
@@ -246,5 +267,34 @@
 		}
 	}
 
-	protected override int BuildHash() => ViewModel.Revision;
+	/// <summary>The <see cref="PackagesUiState.StoreSearch"/> the list was last scrolled to the top for.</summary>
+	int scrolledForSearch;
+
+	/// <summary>
+	/// A search that starts the Store list over shows it from the top. Where the list is scrolled is the panel's own,
+	/// like the scrollbar gutter, so it is done here when the state says a new list came in.
+	/// </summary>
+	void ScrollToTopOnNewSearch()
+	{
+		if ( UiState.StoreSearch == scrolledForSearch )
+			return;
+
+		scrolledForSearch = UiState.StoreSearch;
+
+		foreach ( var list in Children.Where( x => x.HasClass( "list" ) ) )
+		{
+			list.ScrollVelocity = Vector2.Zero;
+			list.ScrollOffset = Vector2.Zero;
+		}
+	}
+
+	TextEntry SearchEntry;
+
+	/// <summary>
+	/// Typing doesn't bump the revision, so the list isn't redrawn on every key. The search field still follows the
+	/// text as the host has it, so other players see it being typed, except where it has focus: that is where the player
+	/// is typing, and the host's text is a keystroke or so behind it.
+	/// </summary>
+	protected override int BuildHash() =>
+		System.HashCode.Combine( UiState.Revision, SearchEntry is { HasFocus: true } ? null : UiState.SearchText );
 }

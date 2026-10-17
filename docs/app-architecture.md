@@ -259,6 +259,57 @@ Rules for it, if it's added:
    nothing. From `run_csharp`, find the panel and print `ViewModel.UiState` to see what it would
    draw.
 
+## Sharing an app in multiplayer
+
+With `Shared` in its `.napp`, the same panel class runs on every client, in one of two roles. The split above is
+what makes it work: `UiState` is pure data, so the host can send it, and the panel draws one value, so it can draw the
+host's.
+
+- **The host's copy** (offline, the only one) owns the view model. Its `Tick` runs the view model and calls
+  `Navi.Publish( this, ViewModel.UiState )`. Publishing the same object again sends nothing, which is why `Update`
+  replaces the record instead of changing it.
+- **A viewer's copy** (`Navi.IsViewer( this )`) has no view model and makes no calls: `NaviAppHost` refuses them.
+  It draws `Navi.GetState<TUiState>( this )`, or an `Empty` state until the first one arrives. The class is set
+  before the panel's first tick, so a viewer never creates a view model by accident.
+- **Controls are actions.** `@onclick=@( () => Navi.Act( this, CalculatorViewModel.PressAction, key.Label ) )`.
+  The host's copy gets it in `OnEvent` (`Navi.IsAction( e, out var action, out var args )`) and the view model's
+  `Act` turns it back into a method call, one case per control. Arguments are strings; parse them there, and ignore
+  what doesn't parse, as if the player had clicked nothing. Keep action names as constants on the view model.
+- **The state is sent to every player.** Keep it small (Pac-Man packs its dots into one string), leave out what
+  never changes (Calculator's keypad is a static property), and remember that viewers get it a tick or so late
+  (Pac-Man's board glides its actors to where the state puts them).
+- **Text fields send every edit as an action**, so others see the text being typed. If the state holds the text
+  without bumping `Revision` (so typing doesn't redraw lists), put the text in `BuildHash` too, except while the
+  field has focus: there the player is typing, and the host's text is a keystroke behind. Packages' search field
+  does this.
+
+```csharp
+CalculatorUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<CalculatorUiState>( this ) ?? CalculatorUiState.Empty : ViewModel.UiState;
+
+public override void Tick()
+{
+	base.Tick();
+
+	if ( !Navi.IsViewer( this ) )
+		Navi.Publish( this, ViewModel.UiState );
+}
+
+protected override void OnEvent( PanelEvent e )
+{
+	if ( Navi.IsAction( e, out var action, out var args ) )
+	{
+		ViewModel.Act( action, args );
+		e.StopPropagation();
+		return;
+	}
+
+	base.OnEvent( e );
+}
+```
+
+An action is what the player could have clicked, not data to trust: the host checks only that it came from the
+computer's user. Whatever the action does still goes through the computer's permissions, as the click always did.
+
 ## If you come from Kotlin
 
 - `record` ≈ `data class`: `equals`/`hashCode`/`toString` by value, `with` ≈ `copy( x = … )`. A

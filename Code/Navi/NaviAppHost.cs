@@ -22,6 +22,21 @@ public static class NaviEvents
 	/// Class on an app's panel while it has the player's input (see <see cref="NaviInputCapture"/>), e.g. <c>HasClass( "navi-input" )</c>.
 	/// </summary>
 	public const string HasInputClass = "navi-input";
+
+	/// <summary>
+	/// Class on a shared app's panel on a client whose copy only draws. See <c>Navi.IsViewer</c>.
+	/// </summary>
+	public const string ViewerClass = "navi-viewer";
+
+	/// <summary>
+	/// The player did something in a shared app (<c>Navi.Act</c>). Bubbles up from the app to its window.
+	/// </summary>
+	public const string Act = "navi.act";
+
+	/// <summary>
+	/// An action for the host's copy of a shared app, raised on the app's panel. See <c>Navi.IsAction</c>.
+	/// </summary>
+	public const string Action = "navi.action";
 }
 
 /// <summary>
@@ -36,30 +51,227 @@ public sealed class NaviAppHost : Panel
 	Panel app;
 	string appId;
 
+	/// <summary>
+	/// The app is shared and this client isn't the host, so its copy only draws (<c>Navi.IsViewer</c>).
+	/// </summary>
+	bool viewer;
+
+	// What was last passed between the app and the computer, so each is only passed on when it changes.
+	string lastPublished;
+	string lastState;
+
+	bool IsShared => Process?.App.Shared ?? false;
+
 	public override void Tick()
 	{
 		base.Tick();
 
-		if ( app is null || !app.IsValid || appId != Process?.App.Id )
+		var wantViewer = IsShared && Computer is { IsAuthority: false };
+
+		// The host left and this client took over (or the other way round): the copy starts over in its new role.
+		if ( app is null || !app.IsValid || appId != Process?.App.Id || viewer != wantViewer )
 		{
 			app?.Delete();
+			Computer?.UnregisterAppHost( appId, this );
 			app = null;
 			appId = null;
+			lastPublished = null;
+			lastState = null;
+			knownScroll = "";
+			lastRemoteScroll = null;
 
 			if ( Process is null )
 				return;
 
 			app = Process.App.Create();
 			appId = Process.App.Id;
+			viewer = wantViewer;
+
+			// Before the app's first tick, so it never runs as the host's copy here.
+			app.SetClass( NaviEvents.ViewerClass, viewer );
 			AddChild( app );
 		}
 
-		app.SetClass( NaviEvents.HasInputClass, Computer?.InputCapture == Process );
+		// A shared app's copy on the host runs for whoever is using the computer.
+		var capture = Computer?.InputCapture == Process;
+		app.SetClass( NaviEvents.HasInputClass, capture && (Computer.IsUser || IsShared) );
+
+		if ( IsShared && Computer is not null )
+		{
+			TickShared( capture );
+			TickScroll();
+		}
 
 		// A window with a set size decides the app's size. Otherwise the window fits the app.
 		var fill = Process.Size is not null || Process.IsMaximized;
 		app.Style.Width = fill ? Length.Percent( 100 ) : null;
 		app.Style.Height = fill ? Length.Percent( 100 ) : null;
+	}
+
+	/// <summary>
+	/// Pass a shared app's state on. The host's copy publishes and gets the user's input; a viewer's copy gets what the
+	/// host published.
+	/// </summary>
+	void TickShared( bool capture )
+	{
+		if ( viewer )
+		{
+			var state = Computer.GetAppState( appId ) ?? "";
+			if ( state != lastState )
+			{
+				lastState = state;
+				app.SetAttribute( "navi-state", state );
+			}
+
+			return;
+		}
+
+		Computer.RegisterAppHost( appId, this );
+
+		var published = app.GetAttribute( "navi-published", null );
+		if ( published is not null && published != lastPublished )
+		{
+			lastPublished = published;
+			Computer.SetAppState( appId, published );
+		}
+
+		var (down, pressed) = Computer.UserInput;
+		app.SetAttribute( "navi-input-down", capture ? string.Join( ",", down ) : "" );
+		app.SetAttribute( "navi-input-pressed", capture ? string.Join( ",", pressed ) : "" );
+	}
+
+	// Scrolling. Each copy scrolls its own panels, so the user's client sends where its lists are, and every other client
+	// scrolls its copy to match. A list is named by the path of child indexes from the app's panel, e.g. "0/3".
+
+	/// <summary>How often the user's scrolling is sent, in seconds.</summary>
+	const float ScrollSendInterval = 0.1f;
+
+	RealTimeSince sinceScrollSent;
+
+	/// <summary>How often a watcher checks its lists are where the user's are, in seconds.</summary>
+	const float ScrollRecheckInterval = 0.5f;
+
+	RealTimeSince sinceScrollChecked;
+
+	/// <summary>Where this copy's lists were, as last sent or applied. A change from it is the local player scrolling.</summary>
+	string knownScroll = "";
+
+	/// <summary>The scrolling the host passed on last.</summary>
+	string lastRemoteScroll;
+
+	void TickScroll()
+	{
+		var remote = Computer.GetAppScroll( appId );
+		if ( remote != lastRemoteScroll )
+		{
+			lastRemoteScroll = remote;
+
+			// The user's own client is where it came from, and may have scrolled on since.
+			if ( !Computer.IsUser && remote is not null )
+			{
+				ApplyScroll( remote );
+				knownScroll = EncodeScroll();
+			}
+		}
+
+		// A watcher's list may fill in after the scrolling arrived, or clamp it while it was shorter: catch up now and
+		// then. Only while someone else has the seat, so it never fights the local player's own scrolling.
+		if ( !Computer.CanUse && remote is not null && sinceScrollChecked > ScrollRecheckInterval )
+		{
+			sinceScrollChecked = 0;
+
+			if ( EncodeScroll() != remote )
+			{
+				ApplyScroll( remote );
+				knownScroll = EncodeScroll();
+			}
+		}
+
+		if ( !Computer.CanUse || sinceScrollSent < ScrollSendInterval )
+			return;
+
+		sinceScrollSent = 0;
+
+		var scroll = EncodeScroll();
+		if ( scroll == knownScroll )
+			return;
+
+		knownScroll = scroll;
+		Computer.UserScroll( appId, scroll );
+	}
+
+	/// <summary>
+	/// The app's scrollable panels and where they are scrolled to, in panel pixels so screen scaling doesn't matter:
+	/// "0/3:0,120;1:0,40".
+	/// </summary>
+	string EncodeScroll()
+	{
+		var parts = new List<string>();
+		var culture = System.Globalization.CultureInfo.InvariantCulture;
+
+		foreach ( var (path, panel) in Scrollables( app, "" ) )
+		{
+			var offset = panel.ScrollOffset * panel.ScaleFromScreen;
+			parts.Add( $"{path}:{System.MathF.Round( offset.x ).ToString( culture )},{System.MathF.Round( offset.y ).ToString( culture )}" );
+		}
+
+		return string.Join( ";", parts );
+	}
+
+	void ApplyScroll( string scroll )
+	{
+		var panels = Scrollables( app, "" ).ToDictionary( x => x.Path, x => x.Panel );
+		var culture = System.Globalization.CultureInfo.InvariantCulture;
+
+		foreach ( var part in scroll.Split( ';', System.StringSplitOptions.RemoveEmptyEntries ) )
+		{
+			if ( part.Split( ':' ) is not [var path, var value] || !panels.TryGetValue( path, out var panel )
+				|| value.Split( ',' ) is not [var xs, var ys] )
+				continue;
+
+			if ( !float.TryParse( xs, System.Globalization.NumberStyles.Float, culture, out var x ) || !float.IsFinite( x )
+				|| !float.TryParse( ys, System.Globalization.NumberStyles.Float, culture, out var y ) || !float.IsFinite( y ) )
+				continue;
+
+			panel.ScrollVelocity = Vector2.Zero;
+			panel.ScrollOffset = new Vector2( x, y ) * panel.ScaleToScreen;
+		}
+	}
+
+	/// <summary>
+	/// The panels under <paramref name="panel"/> that scroll, with their paths.
+	/// </summary>
+	static IEnumerable<(string Path, Panel Panel)> Scrollables( Panel panel, string path )
+	{
+		if ( panel is null || !panel.IsValid )
+			yield break;
+
+		if ( panel.HasScrollX || panel.HasScrollY )
+			yield return (path, panel);
+
+		var index = 0;
+		foreach ( var child in panel.Children )
+		{
+			foreach ( var found in Scrollables( child, path == "" ? $"{index}" : $"{path}/{index}" ) )
+				yield return found;
+
+			index++;
+		}
+	}
+
+	/// <summary>
+	/// On the host: give a shared app's copy an action the user took (<c>Navi.Act</c>).
+	/// </summary>
+	internal void DeliverAction( string action, string[] args )
+	{
+		if ( app is not null && app.IsValid && !viewer )
+			app.CreateEvent( new PanelEvent( NaviEvents.Action, app ) { Value = (action, args) } );
+	}
+
+	public override void OnDeleted()
+	{
+		base.OnDeleted();
+		Computer?.UnregisterAppHost( appId, this );
 	}
 
 	/// <summary>
@@ -73,23 +285,42 @@ public sealed class NaviAppHost : Panel
 		{
 			switch ( e.Name )
 			{
+				// A viewer's copy of a shared app only draws. Calls never cross the network, so no client can make one
+				// as an app on the host.
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call && viewer:
+					call.Item3.TrySetException( new System.NotSupportedException( "This copy of the app only draws. Calls run on the host's copy." ) );
+					e.StopPropagation();
+					return;
+
 				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call:
 					_ = NaviSystemCalls.RunAsync( Computer, Process, call.Item1, call.Item2, call.Item3 );
 					e.StopPropagation();
 					return;
 
+				// A shared app's action goes to the host's copy. An app that isn't shared runs here alone, so its copy here
+				// gets it.
+				case NaviEvents.Act when e.Value is System.ValueTuple<string, string[]> act:
+					if ( IsShared )
+						Computer.UserAct( id, act.Item1, act.Item2 );
+					else
+						DeliverAction( act.Item1, act.Item2 );
+
+					e.StopPropagation();
+					return;
+
+				// The app's copy on this client asks, so it counts as the local player's request.
 				case NaviEvents.Close:
-					Computer.Close( id );
+					Computer.UserClose( id );
 					e.StopPropagation();
 					return;
 
 				case NaviEvents.Minimize:
-					Computer.Minimize( id );
+					Computer.UserMinimize( id );
 					e.StopPropagation();
 					return;
 
 				case NaviEvents.ToggleMaximize:
-					Computer.ToggleMaximized( id );
+					Computer.UserToggleMaximized( id );
 					e.StopPropagation();
 					return;
 			}

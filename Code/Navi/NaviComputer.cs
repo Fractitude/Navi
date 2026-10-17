@@ -54,6 +54,11 @@ public sealed class NaviProcess
 /// </summary>
 public sealed class NaviPermissionRequest
 {
+	/// <summary>
+	/// Names the request across the network, so another client's answer can say which one it is for.
+	/// </summary>
+	public int Id { get; init; }
+
 	public NaviAppInfo App { get; init; }
 
 	/// <summary>
@@ -89,8 +94,10 @@ public sealed class NaviPermissionRequest
 /// <summary>
 /// The operating system of a Navi computer: which apps are installed and which are open.
 /// Gameplay code can call <see cref="Install"/> / <see cref="Uninstall"/> directly.
+/// In multiplayer the host runs it (<see cref="IsAuthority"/>), and other clients draw what it sends: see
+/// <c>NaviComputer.Network.cs</c>. Every method that changes the computer does nothing on them.
 /// </summary>
-public sealed class NaviComputer : Component
+public sealed partial class NaviComputer : Component
 {
 	/// <summary>
 	/// Ids of the installed apps. System apps are always installed and don't need to be listed.
@@ -142,13 +149,15 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public bool SetDisplayScale( float scale )
 	{
-		if ( !DisplayScales.Any( x => System.MathF.Abs( x - scale ) < 0.001f ) )
+		if ( !IsAuthority || !IsDisplayScale( scale ) )
 			return false;
 
 		DisplayScale = scale;
 		Version++;
 		return true;
 	}
+
+	static bool IsDisplayScale( float scale ) => DisplayScales.Any( x => System.MathF.Abs( x - scale ) < 0.001f );
 
 	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
@@ -159,6 +168,7 @@ public sealed class NaviComputer : Component
 	int topZIndex;
 
 	readonly List<NaviPermissionRequest> permissionRequests = new();
+	int lastRequestId;
 
 	readonly HashSet<string> downloading = new();
 
@@ -175,6 +185,10 @@ public sealed class NaviComputer : Component
 
 	protected override void OnStart()
 	{
+		// Other clients get all of it from the host.
+		if ( !IsAuthority )
+			return;
+
 		// A save replaces what the scene set up, and downloads its own packages.
 		if ( !AutoSave || !Load() )
 			_ = DownloadInstalledPackagesAsync();
@@ -236,6 +250,10 @@ public sealed class NaviComputer : Component
 	protected override void OnUpdate()
 	{
 		UpdateSolid();
+		UpdateNetwork();
+
+		if ( !IsAuthority )
+			return;
 
 		// The delay counts from the latest change.
 		if ( changedVersion != Version )
@@ -255,7 +273,7 @@ public sealed class NaviComputer : Component
 
 		solidCollider = null;
 
-		if ( AutoSave && savedVersion != Version )
+		if ( AutoSave && IsAuthority && savedVersion != Version )
 			Save();
 	}
 
@@ -291,6 +309,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void Save()
 	{
+		if ( !IsAuthority )
+			return;
+
 		savedVersion = Version;
 
 		var save = CaptureSave();
@@ -308,7 +329,7 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public bool Load()
 	{
-		if ( NaviSaveData.Read( SaveKey ) is not { } save )
+		if ( !IsAuthority || NaviSaveData.Read( SaveKey ) is not { } save )
 			return false;
 
 		foreach ( var process in running.ToList() )
@@ -344,14 +365,19 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void RestoreSave( NaviComputerSave save )
 	{
+		if ( IsAuthority )
+			ApplySave( save );
+	}
+
+	void ApplySave( NaviComputerSave save )
+	{
 		InstalledApps = save.InstalledApps?.Distinct().ToList() ?? new();
 		InstalledPackages = save.InstalledPackages?.Distinct().ToList() ?? new();
 		GrantedPermissions = save.GrantedPermissions?.Where( x => NaviPermissions.IsKnown( x.Split( ' ' ).Last() ) ).Distinct().ToList() ?? new();
 		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();
 		RootApps = save.RootApps?.Distinct().ToList() ?? new();
 
-		if ( !SetDisplayScale( save.DisplayScale ) )
-			DisplayScale = 1f;
+		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
 
 		Version++;
 	}
@@ -428,7 +454,7 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public async Task<bool> InstallPackageAsync( string packageIdent )
 	{
-		if ( IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
+		if ( !IsAuthority || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
 			return false;
 
 		var app = await DownloadPackageAsync( packageIdent );
@@ -479,6 +505,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public bool Install( string id )
 	{
+		if ( !IsAuthority )
+			return false;
+
 		var app = NaviAppRegistry.Find( id );
 		if ( app is null )
 		{
@@ -501,6 +530,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public bool Uninstall( string id )
 	{
+		if ( !IsAuthority )
+			return false;
+
 		var app = NaviAppRegistry.Find( id );
 		if ( app is not null && app.IsCore )
 			return false;
@@ -527,6 +559,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public bool Launch( string id )
 	{
+		if ( !IsAuthority )
+			return false;
+
 		if ( GetProcess( id ) is not null )
 		{
 			Focus( id );
@@ -573,7 +608,7 @@ public sealed class NaviComputer : Component
 
 	public void Close( string id )
 	{
-		if ( running.RemoveAll( x => x.App.Id == id ) == 0 )
+		if ( !IsAuthority || running.RemoveAll( x => x.App.Id == id ) == 0 )
 			return;
 
 		// Nobody is left to answer these.
@@ -605,6 +640,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void SetPermissions( NaviAppInfo app, IEnumerable<string> permissions )
 	{
+		if ( !IsAuthority )
+			return;
+
 		var granted = permissions?.Where( app.Permissions.Contains ).Distinct().ToArray() ?? [];
 
 		GrantedPermissions ??= new();
@@ -629,9 +667,9 @@ public sealed class NaviComputer : Component
 		var asked = permissions?.Distinct().ToArray() ?? [];
 		var missing = asked.Where( x => process.App.Permissions.Contains( x ) && !process.HasPermission( x ) ).ToArray();
 
-		if ( missing.Length > 0 && running.Contains( process ) )
+		if ( IsAuthority && missing.Length > 0 && running.Contains( process ) )
 		{
-			var request = new NaviPermissionRequest { App = process.App, Permissions = missing, Ticked = missing };
+			var request = new NaviPermissionRequest { Id = ++lastRequestId, App = process.App, Permissions = missing, Ticked = missing };
 			permissionRequests.Add( request );
 			Version++;
 
@@ -647,6 +685,9 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void ReviewPermissions( string id )
 	{
+		if ( !IsAuthority )
+			return;
+
 		var app = NaviAppRegistry.Find( id );
 		if ( app is null || !IsInstalled( app ) || app.IsSystem || app.Permissions.Count == 0 )
 			return;
@@ -656,6 +697,7 @@ public sealed class NaviComputer : Component
 
 		permissionRequests.Add( new NaviPermissionRequest
 		{
+			Id = ++lastRequestId,
 			App = app,
 			Permissions = app.Permissions,
 			Ticked = NeedsReview( app ) ? app.Permissions : GetPermissions( app ).ToArray(),
@@ -675,10 +717,13 @@ public sealed class NaviComputer : Component
 		if ( HasRoot( app ) )
 			return true;
 
+		if ( !IsAuthority )
+			return false;
+
 		var request = permissionRequests.FirstOrDefault( x => x.App.Id == app.Id && x.IsRoot );
 		if ( request is null )
 		{
-			request = new NaviPermissionRequest { App = app, Permissions = [], Ticked = [], IsRoot = true, Launch = launch };
+			request = new NaviPermissionRequest { Id = ++lastRequestId, App = app, Permissions = [], Ticked = [], IsRoot = true, Launch = launch };
 			permissionRequests.Add( request );
 			Version++;
 		}
@@ -692,7 +737,7 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void DismissPermissionRequest( NaviPermissionRequest request )
 	{
-		if ( !permissionRequests.Remove( request ) )
+		if ( !IsAuthority || !permissionRequests.Remove( request ) )
 			return;
 
 		request.Answer.TrySetResult( [] );
@@ -704,7 +749,7 @@ public sealed class NaviComputer : Component
 	/// </summary>
 	public void AnswerPermissionRequest( NaviPermissionRequest request, IEnumerable<string> ticked )
 	{
-		if ( !permissionRequests.Remove( request ) )
+		if ( !IsAuthority || !permissionRequests.Remove( request ) )
 			return;
 
 		var answer = ticked?.Where( request.Permissions.Contains ).ToArray() ?? [];
@@ -750,7 +795,7 @@ public sealed class NaviComputer : Component
 	public void Focus( string id )
 	{
 		var process = GetProcess( id );
-		if ( process is null || process == Focused )
+		if ( !IsAuthority || process is null || process == Focused )
 			return;
 
 		process.IsMinimized = false;
@@ -764,7 +809,7 @@ public sealed class NaviComputer : Component
 	public bool Minimize( string id )
 	{
 		var process = GetProcess( id );
-		if ( process is null || process.IsMinimized || !process.App.CanMinimize )
+		if ( !IsAuthority || process is null || process.IsMinimized || !process.App.CanMinimize )
 			return false;
 
 		process.IsMinimized = true;
@@ -778,7 +823,7 @@ public sealed class NaviComputer : Component
 	public bool SetMaximized( string id, bool maximized )
 	{
 		var process = GetProcess( id );
-		if ( process is null || !process.App.CanMaximize )
+		if ( !IsAuthority || process is null || !process.App.CanMaximize )
 			return false;
 
 		Focus( id );

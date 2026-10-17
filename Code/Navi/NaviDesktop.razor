@@ -13,7 +13,7 @@
 			var state = (process == Computer.Focused ? "focused " : "") + (process.IsMinimized ? "minimized " : "") + (process.IsMaximized ? "maximized" : "");
 
 			@* Position and size are set every frame in UpdateWindows, so dragging doesn't rebuild the tree. *@
-			<div @key=@app.Id class="window @state" @onmousedown=@(() => Computer.Focus( app.Id ))>
+			<div @key=@app.Id class="window @state" @onmousedown=@(() => Computer.UserFocus( app.Id ))>
 				@* The body comes before the title bar in markup, so the title bar draws after it and the shield's tooltip
 				@* lands over the app's content instead of under it. Its order pulls it in front in the column, so it still
 				@* sits on top on screen. *@
@@ -33,17 +33,25 @@
 						</div>
 					}
 
+					@if ( !app.Shared && Networking.IsActive )
+					{
+						<div class="shield">
+							<i class="glyph">sync_disabled</i>
+							<div class="tooltip">Not shared: each player sees their own copy</div>
+						</div>
+					}
+
 					@if ( app.CanMinimize )
 					{
-						<div class="button" @onclick=@(() => Computer.Minimize( app.Id ))><i>remove</i></div>
+						<div class="button" @onclick=@(() => Computer.UserMinimize( app.Id ))><i>remove</i></div>
 					}
 
 					@if ( app.CanMaximize )
 					{
-						<div class="button" @onclick=@(() => Computer.ToggleMaximized( app.Id ))><i>@(process.IsMaximized ? "filter_none" : "crop_square")</i></div>
+						<div class="button" @onclick=@(() => Computer.UserToggleMaximized( app.Id ))><i>@(process.IsMaximized ? "filter_none" : "crop_square")</i></div>
 					}
 
-					<div class="button close" @onclick=@(() => Computer.Close( app.Id ))><i>close</i></div>
+					<div class="button close" @onclick=@(() => Computer.UserClose( app.Id ))><i>close</i></div>
 				</div>
 
 				@if ( app.CanResize && !process.IsMaximized )
@@ -64,7 +72,7 @@
 	}
 
 	<div class="taskbar">
-		<div class="start" @onclick=@(() => Computer.Launch( NaviAppRegistry.PackagesApp ))>NAVI</div>
+		<div class="start" @onclick=@(() => Computer.UserLaunch( NaviAppRegistry.PackagesApp ))>NAVI</div>
 
 		@foreach ( var app in Computer.Installed )
 		{
@@ -81,24 +89,32 @@
 				@if ( MenuApp == app.Id )
 				{
 					<div class="menu">
-						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.Launch( app.Id ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
+						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserLaunch( app.Id ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
 
 						@if ( app.Permissions.Count > 0 && !app.IsSystem )
 						{
-							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.ReviewPermissions( app.Id ) ))>
+							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserReviewPermissions( app.Id ) ))>
 								<i>tune</i>@(process is null ? "Open with permissions..." : "Permissions...")
 							</div>
 						}
 
 						@if ( process is not null )
 						{
-							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.Close( app.Id ) ))><i>close</i>Close</div>
+							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserClose( app.Id ) ))><i>close</i>Close</div>
 						}
 					</div>
 				}
 			</div>
 		}
 	</div>
+
+	@if ( !Computer.CanUse )
+	{
+		@* Another player has the seat. Catches every click, so watchers can't work the screen. *@
+		<div class="in-use">
+			<div class="badge"><i>person</i>In use by @( Computer.User?.DisplayName ?? "another player" )</div>
+		</div>
+	}
 
 </root>
 
@@ -159,6 +175,9 @@
 
 		var layer = new GameObject( GameObject, true, "Navi Secure Layer" );
 		layer.Flags |= GameObjectFlags.NotSaved;
+
+		// Every client makes its own, for its own desktop. The host's mustn't be sent to them with the computer.
+		layer.NetworkMode = NetworkMode.Never;
 		layer.WorldRotation = WorldRotation;
 		layer.WorldPosition = WorldPosition + WorldRotation.Forward * SecureLayerOffset;
 
@@ -182,7 +201,7 @@
 			panel.Enabled = true;
 
 			worldPanels = [world, panel];
-			baseScale = world.RenderScale;
+			baseScale = Unscaled( world.RenderScale );
 		}
 		else if ( Components.TryGet<ScreenPanel>( out var screen ) )
 		{
@@ -194,7 +213,7 @@
 			panel.Enabled = true;
 
 			screenPanels = [screen, panel];
-			baseScale = screen.Scale;
+			baseScale = Unscaled( screen.Scale );
 		}
 
 		var prompt = layer.Components.Create<NaviSecurePrompt>( false );
@@ -206,6 +225,15 @@
 	WorldPanel[] worldPanels = [];
 	ScreenPanel[] screenPanels = [];
 	float baseScale = 1f;
+
+	/// <summary>
+	/// The panel's scale before the display scale was applied to it. On the host it hasn't been yet. A client gets the
+	/// computer from the host as it is at that moment, with the host's display scale already in the panel's scale, and the
+	/// computer's <see cref="NaviComputer.DisplayScale"/> from the same moment, so that comes back out. Otherwise the
+	/// client applies it twice, and its screen holds a different number of panel pixels than the host's.
+	/// </summary>
+	float Unscaled( float scale ) =>
+		Computer.IsAuthority || Computer.DisplayScale <= 0f ? scale : scale / Computer.DisplayScale;
 
 	/// <summary>
 	/// Draw the desktop and the secure layer at the computer's <see cref="NaviComputer.DisplayScale"/>. A world panel's
@@ -231,6 +259,7 @@
 	protected override void OnUpdate()
 	{
 		ApplyDisplayScale();
+		KeepSeat();
 
 		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
 			MenuApp = null;
@@ -253,12 +282,7 @@
 	void OnTaskbarClick( NaviAppInfo app )
 	{
 		MenuApp = null;
-
-		var process = Computer.GetProcess( app.Id );
-		if ( process is not null && process == Computer.Focused && Computer.Minimize( app.Id ) )
-			return;
-
-		Computer.Launch( app.Id );
+		Computer.UserTaskbarClick( app.Id );
 	}
 
 	/// <summary>
@@ -274,7 +298,7 @@
 	void OnTitleDoubleClick( NaviProcess process, PanelEvent e )
 	{
 		if ( !IsOnButton( e ) )
-			Computer.ToggleMaximized( process.App.Id );
+			Computer.UserToggleMaximized( process.App.Id );
 	}
 
 	/// <summary>
@@ -309,6 +333,9 @@
 
 	void StartDrag( NaviProcess process, Panel handle, Vector2 direction )
 	{
+		if ( !Computer.CanUse )
+			return;
+
 		var window = handle.Parent;
 		var screen = window?.Parent;
 		if ( screen is null )
@@ -333,6 +360,7 @@
 		{
 			if ( dragHandle is null || !dragHandle.IsValid || !dragHandle.HasActive || dragging.IsMaximized || !Computer.Running.Contains( dragging ) )
 			{
+				SendDrag();
 				dragging = null;
 				dragHandle = null;
 			}
@@ -395,6 +423,52 @@
 		}
 
 		StackWindows( screen );
+
+		if ( dragging is not null && sinceDragSent > DragSendInterval )
+			SendDrag();
+	}
+
+	/// <summary>
+	/// How often a window being dragged is sent to the host, in seconds, so others see it move. The end of the drag is
+	/// always sent.
+	/// </summary>
+	const float DragSendInterval = 0.1f;
+
+	RealTimeSince sinceDragSent;
+
+	/// <summary>
+	/// Tell the host where the dragged window is. On the host itself it is already there.
+	/// </summary>
+	void SendDrag()
+	{
+		sinceDragSent = 0;
+
+		if ( dragging is null || Computer.IsAuthority )
+			return;
+
+		Computer.UserMoveWindow( dragging.App.Id, dragging.Position, dragging.Size ?? default, dragging.Size is not null );
+	}
+
+	/// <summary>
+	/// How often the user's client tells the host they're still at the screen, in seconds.
+	/// </summary>
+	const float KeepSeatInterval = 1f;
+
+	RealTimeSince sinceKeptSeat;
+
+	/// <summary>
+	/// Keep the seat while the user points at the screen or a window has their controls, even if they don't click.
+	/// </summary>
+	void KeepSeat()
+	{
+		if ( !Networking.IsActive || Computer.UserId == default || !Computer.IsUser || sinceKeptSeat < KeepSeatInterval )
+			return;
+
+		if ( Panel?.HasHovered != true && !InputCapture.IsCapturing )
+			return;
+
+		sinceKeptSeat = 0;
+		Computer.UserKeepSeat();
 	}
 
 	/// <summary>
@@ -499,5 +573,6 @@
 	}
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
-	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp );
+	protected override int BuildHash() =>
+		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, Computer?.CanUse, Computer?.UserId );
 }

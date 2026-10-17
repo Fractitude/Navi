@@ -23,6 +23,9 @@ public sealed record ScaleOption( float Scale, string Label, bool Selected );
 /// </summary>
 public sealed record SettingsUiState
 {
+	/// <summary>What a viewer draws until the host's state arrives.</summary>
+	public static SettingsUiState Empty { get; } = new();
+
 	/// <summary>Goes up whenever anything else here changes. The panel's BuildHash is this.</summary>
 	public int Revision { get; init; }
 

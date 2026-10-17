@@ -8,6 +8,7 @@
   "CanMaximize": true,
   "CanResize": true,
   "CapturesInput": false,
+  "Shared": true,
   "Permissions": [
     "navi.apps.install",
     "navi.store.install"

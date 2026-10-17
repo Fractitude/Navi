@@ -56,15 +56,20 @@
 				</div>
 			}
 
+			@if ( !Computer.IsUser )
+			{
+				<div class="dialog-text">Only @( Computer.User?.DisplayName ?? "the player using this computer" ) can answer this.</div>
+			}
+
 			<div class="dialog-buttons">
 				<div class="button"
 					@onmousedown=@(( PanelEvent e ) => Press( e ))
-					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.DismissPermissionRequest( request ) ))>
+					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.UserDismissPermissionRequest( request.Id ) ))>
 					@(request.IsReview || request.IsRoot ? "Cancel" : "Deny all")
 				</div>
 				<div class="button primary"
 					@onmousedown=@(( PanelEvent e ) => Press( e ))
-					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.AnswerPermissionRequest( request, request.Permissions.Except( Unticked ) ) ))>
+					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.UserAnswerPermissionRequest( request.Id, request.Permissions.Except( Unticked ).ToArray() ) ))>
 					@(request.IsRoot ? (request.Launch ? "Allow and open" : "Install") : request.IsReview ? (request.Launch ? "Open" : "Save") : "Allow ticked")
 				</div>
 			</div>
@@ -86,7 +91,11 @@
 
 	NaviPermissionRequest Request => Computer.IsValid() ? Computer.PermissionRequests.FirstOrDefault() : null;
 
-	bool Armed => sinceShown > ArmTime;
+	/// <summary>
+	/// The controls react: the prompt has been up for <see cref="ArmTime"/>, and the local player is the computer's user.
+	/// Everyone else at the screen sees the prompt but can't answer it.
+	/// </summary>
+	bool Armed => sinceShown > ArmTime && Computer.IsValid() && Computer.IsUser;
 
 	NaviPermissionRequest shownRequest;
 	RealTimeSince sinceShown;
@@ -140,5 +149,6 @@
 			Unticked.Add( permission );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Request, Armed, Unticked.Count, string.Join( ",", Unticked ) );
+	protected override int BuildHash() =>
+		System.HashCode.Combine( Request, Armed, Computer?.IsUser, Unticked.Count, string.Join( ",", Unticked ) );
 }

@@ -2,21 +2,22 @@
 @inherits Panel
 @namespace NaviApps
 
-@* A Navi app like any other: a plain panel, described by Assets/navi/apps/calculator.napp. *@
+@* A Navi app like any other: a plain panel, described by Assets/navi/apps/calculator.napp. It is shared, so the panel *@
+@* only draws CalculatorUiState, and its keys are actions (Navi.Act) that the host's copy runs. *@
 
 <root>
 	<div class="display">
-		<div class="expression">@Expression</div>
-		<div class="entry">@Entry</div>
+		<div class="expression">@UiState.Expression</div>
+		<div class="entry">@UiState.Entry</div>
 	</div>
 
 	<div class="keys">
-		@foreach ( var row in Keys )
+		@foreach ( var row in CalculatorUiState.Keys )
 		{
 			<div class="row">
-				@foreach ( var label in row )
+				@foreach ( var key in row )
 				{
-					<div class="key @KeyClass( label )" @onclick=@( () => Press( label ) )>@label</div>
+					<div class="key @key.Class" @onclick=@( () => Navi.Act( this, CalculatorViewModel.PressAction, key.Label ) )>@key.Label</div>
 				}
 			</div>
 		}
@@ -25,170 +26,35 @@
 
 @code
 {
-	static readonly string[][] Keys =
-	{
-		new[] { "C", "←" },
-		new[] { "7", "8", "9", "÷" },
-		new[] { "4", "5", "6", "×" },
-		new[] { "1", "2", "3", "−" },
-		new[] { "0", ".", "=", "+" },
-	};
-
-	const int MaxDigits = 12;
+	/// <summary>
+	/// The app's logic and its state, in the host's copy only.
+	/// </summary>
+	CalculatorViewModel ViewModel => field ??= new();
 
 	/// <summary>
-	/// The number being typed, or the last result.
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	string Entry = "0";
+	CalculatorUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<CalculatorUiState>( this ) ?? CalculatorUiState.Empty : ViewModel.UiState;
 
-	/// <summary>
-	/// Left-hand side of the pending operation.
-	/// </summary>
-	double? Accumulator;
-
-	string PendingOperator;
-
-	/// <summary>
-	/// True when the next digit starts a new number instead of extending <see cref="Entry"/>.
-	/// </summary>
-	bool StartNewEntry = true;
-
-	bool HasError;
-
-	string Expression => PendingOperator is null ? "" : $"{Format( Accumulator ?? 0 )} {PendingOperator}";
-
-	static string KeyClass( string key ) => key switch
+	public override void Tick()
 	{
-		"C" or "←" => "function",
-		"=" => "equals",
-		"+" or "−" or "×" or "÷" => "operator",
-		_ => "",
-	};
+		base.Tick();
 
-	void Press( string key )
-	{
-		if ( HasError && key != "←" )
-			Clear();
-
-		switch ( key )
-		{
-			case "C": Clear(); break;
-			case "←": Backspace(); break;
-			case ".": Decimal(); break;
-			case "=": Calculate(); break;
-			case "+" or "−" or "×" or "÷": Operator( key ); break;
-			default: Digit( key ); break;
-		}
-
-		StateHasChanged();
+		if ( !Navi.IsViewer( this ) )
+			Navi.Publish( this, ViewModel.UiState );
 	}
 
-	void Digit( string digit )
+	protected override void OnEvent( PanelEvent e )
 	{
-		if ( StartNewEntry )
+		if ( Navi.IsAction( e, out var action, out var args ) )
 		{
-			Entry = digit;
-			StartNewEntry = false;
-		}
-		else if ( Entry.Count( char.IsDigit ) < MaxDigits )
-		{
-			Entry = Entry == "0" ? digit : Entry + digit;
-		}
-	}
-
-	void Decimal()
-	{
-		if ( StartNewEntry )
-		{
-			Entry = "0.";
-			StartNewEntry = false;
-		}
-		else if ( !Entry.Contains( '.' ) )
-		{
-			Entry += ".";
-		}
-	}
-
-	void Backspace()
-	{
-		if ( StartNewEntry || HasError )
-			return;
-
-		Entry = Entry[..^1];
-		if ( Entry is "" or "-" )
-			Entry = "0";
-	}
-
-	void Operator( string op )
-	{
-		// Chained operations evaluate as they go: 2 + 3 × shows 5.
-		// Pressing an operator right after another one just swaps it.
-		if ( PendingOperator is null )
-		{
-			Accumulator = Parse( Entry );
-		}
-		else if ( !StartNewEntry && !Evaluate() )
-		{
+			ViewModel.Act( action, args );
+			e.StopPropagation();
 			return;
 		}
 
-		PendingOperator = op;
-		StartNewEntry = true;
+		base.OnEvent( e );
 	}
 
-	void Calculate()
-	{
-		if ( PendingOperator is null )
-			return;
-
-		if ( !Evaluate() )
-			return;
-
-		PendingOperator = null;
-		StartNewEntry = true;
-	}
-
-	/// <summary>
-	/// Apply the pending operator to the accumulator and the entry. Shows the result.
-	/// </summary>
-	bool Evaluate()
-	{
-		var lhs = Accumulator ?? 0;
-		var rhs = Parse( Entry );
-
-		double result = PendingOperator switch
-		{
-			"+" => lhs + rhs,
-			"−" => lhs - rhs,
-			"×" => lhs * rhs,
-			"÷" => lhs / rhs,
-			_ => rhs,
-		};
-
-		if ( double.IsNaN( result ) || double.IsInfinity( result ) )
-		{
-			Clear();
-			Entry = "ERROR";
-			HasError = true;
-			return false;
-		}
-
-		Accumulator = result;
-		Entry = Format( result );
-		return true;
-	}
-
-	void Clear()
-	{
-		Entry = "0";
-		Accumulator = null;
-		PendingOperator = null;
-		StartNewEntry = true;
-		HasError = false;
-	}
-
-	static double Parse( string text ) => double.Parse( text, System.Globalization.CultureInfo.InvariantCulture );
-
-	static string Format( double value ) =>
-		value.ToString( $"G{MaxDigits}", System.Globalization.CultureInfo.InvariantCulture );
+	protected override int BuildHash() => UiState.Revision;
 }

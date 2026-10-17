@@ -3,14 +3,15 @@
 @namespace NaviApps
 
 @* The computer's settings: a sidebar of pages, and the page that is open. A core app (Assets/navi/apps/settings.napp), *@
-@* so it has root and can change them. Like Packages, the panel only draws SettingsUiState and calls the view model. *@
+@* so it has root and can change them. Like Packages, the panel only draws SettingsUiState, and its controls are *@
+@* actions (Navi.Act) the view model runs: it is shared, so in multiplayer only the host's copy has a view model. *@
 
 <root>
 	<div class="sidebar">
 		@foreach ( var category in UiState.Categories )
 		{
 			<div class="category @( category.Selected ? "active" : "" )"
-			     @onclick=@( () => ViewModel.OpenCategory( category.Key ) )>
+			     @onclick=@( () => Navi.Act( this, SettingsViewModel.OpenCategoryAction, category.Key.ToString() ) )>
 				<i>@category.Icon</i>
 				<div class="label">@category.Label</div>
 			</div>
@@ -20,7 +21,7 @@
 	<div class="page">
 		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+			<div class="notice" @onclick=@( () => Navi.Act( this, SettingsViewModel.DismissNoticeAction ) )>
 				@UiState.Notice
 			</div>
 		}
@@ -38,7 +39,7 @@
 						@foreach ( var option in UiState.ScaleOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => ViewModel.ChooseScale( option.Scale ) )>
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseScaleAction, option.Scale.ToString( System.Globalization.CultureInfo.InvariantCulture ) ) )>
 								@option.Label
 							</div>
 						}
@@ -52,21 +53,37 @@
 @code
 {
 	/// <summary>
-	/// The app's logic and its state. Made on first use: calls need the panel, which is this.
+	/// The app's logic and its state, in the host's copy only. Made on first use: calls need the panel, which is this.
 	/// </summary>
 	SettingsViewModel ViewModel => field ??= new(this);
 
 	/// <summary>
-	/// What is drawn above. Read only.
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	SettingsUiState UiState => ViewModel.UiState;
+	SettingsUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<SettingsUiState>( this ) ?? SettingsUiState.Empty : ViewModel.UiState;
 
 	public override void Tick()
 	{
 		base.Tick();
 
+		if ( Navi.IsViewer( this ) )
+			return;
+
 		ViewModel.Tick();
+		Navi.Publish( this, ViewModel.UiState );
 	}
 
-	protected override int BuildHash() => ViewModel.Revision;
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsAction( e, out var action, out var args ) )
+		{
+			ViewModel.Act( action, args );
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+
+	protected override int BuildHash() => UiState.Revision;
 }

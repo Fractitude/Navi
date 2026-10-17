@@ -33,6 +33,27 @@ public static class NaviSystemCalls
 	{
 		var self = process.App.Id;
 
+		// On a client that isn't the host, a copy of an app that isn't shared runs here alone. It can read the computer
+		// as the host has it, and work its own window as the local player would. Everything else that changes the
+		// computer does nothing here.
+		if ( !computer.IsAuthority )
+		{
+			switch ( method )
+			{
+				case "window.close":
+					computer.UserClose( self );
+					return null;
+
+				case "window.minimize":
+					computer.UserMinimize( self );
+					return process.App.CanMinimize;
+
+				case "window.maximize":
+					computer.UserToggleMaximized( self );
+					return process.App.CanMaximize;
+			}
+		}
+
 		switch ( method )
 		{
 			// The app's own window.

@@ -77,6 +77,9 @@ public sealed class PackagesViewModel
 
 	bool storeLoaded;
 
+	/// <summary>Counts the searches that started the Store list over. See <see cref="PackagesUiState.StoreSearch"/>.</summary>
+	int search;
+
 	/// <summary>Idents of the Store entries showing their details.</summary>
 	readonly HashSet<string> expanded = new();
 
@@ -109,7 +112,7 @@ public sealed class PackagesViewModel
 	/// replaces the state without going through <see cref="Update"/>; Enter (<see cref="SubmitSearch"/>) is what
 	/// searches.
 	/// </summary>
-	public void SetSearchText( string text ) => UiState = UiState with { SearchText = text ?? "" };
+	public void SetSearchText( string text ) => UiState = UiState with { SearchText = text is { Length: > 80 } ? text[..80] : text ?? "" };
 
 	/// <summary>
 	/// Called every frame by the panel. Nothing here is a click: the lists are refetched when the computer's version
@@ -196,6 +199,48 @@ public sealed class PackagesViewModel
 	/// <summary>Uninstall an app.</summary>
 	public void UninstallApp( string id ) => Run( "uninstall apps", () => Navi.Uninstall( app, id ) );
 
+	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
+
+	public const string SetSearchTextAction = "set-search-text";
+	public const string OpenAppsAction = "open-apps";
+	public const string OpenStoreAction = "open-store";
+	public const string ToggleFilterMenuAction = "toggle-filter-menu";
+	public const string CloseFilterMenuAction = "close-filter-menu";
+	public const string ChooseFilterAction = "choose-filter";
+	public const string DismissNoticeAction = "dismiss-notice";
+	public const string SubmitSearchAction = "submit-search";
+	public const string LoadMoreAction = "load-more";
+	public const string ToggleDetailsAction = "toggle-details";
+	public const string InstallPackageAction = "install-package";
+	public const string InstallAppAction = "install-app";
+	public const string UninstallAppAction = "uninstall-app";
+
+	/// <summary>
+	/// Run an action from the panel. One that is missing its argument is ignored, like a click on nothing. Installing
+	/// and uninstalling still go through the computer's permission checks, as a click here always did.
+	/// </summary>
+	public void Act( string action, string[] args )
+	{
+		var arg = args is { Length: > 0 } ? args[0] : null;
+
+		switch ( action )
+		{
+			case SetSearchTextAction: SetSearchText( arg ); break;
+			case OpenAppsAction: OpenApps(); break;
+			case OpenStoreAction: OpenStore(); break;
+			case ToggleFilterMenuAction: ToggleFilterMenu(); break;
+			case CloseFilterMenuAction: CloseFilterMenu(); break;
+			case ChooseFilterAction when Kinds.Any( x => x.Key == arg ): ChooseFilter( arg ); break;
+			case DismissNoticeAction: DismissNotice(); break;
+			case SubmitSearchAction: SubmitSearch(); break;
+			case LoadMoreAction: LoadMore(); break;
+			case ToggleDetailsAction when !string.IsNullOrEmpty( arg ): ToggleDetails( arg ); break;
+			case InstallPackageAction when !string.IsNullOrEmpty( arg ): InstallPackage( arg ); break;
+			case InstallAppAction when !string.IsNullOrEmpty( arg ): InstallApp( arg ); break;
+			case UninstallAppAction when !string.IsNullOrEmpty( arg ): UninstallApp( arg ); break;
+		}
+	}
+
 	// The work behind the events.
 
 	async Task PollAsync()
@@ -260,6 +305,14 @@ public sealed class PackagesViewModel
 
 			storePackages = append ? storePackages.Concat( packages ).ToArray() : packages;
 			total = found;
+
+			// A new list starts over: nothing expanded, details fetched fresh, and back at the top.
+			if ( !append )
+			{
+				expanded.Clear();
+				details.Clear();
+				search++;
+			}
 			status = found > 0 ? null
 				: text.Length > 0 ? "No apps found matching your filter."
 				: "No apps have been published yet.";
@@ -279,7 +332,7 @@ public sealed class PackagesViewModel
 		refreshing = false;
 		Update( uiState => uiState with
 		{
-			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = total,
+			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = total, StoreSearch = search,
 		} );
 	}
 

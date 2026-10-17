@@ -78,6 +78,35 @@ public sealed class SettingsViewModel
 
 	public void DismissNotice() => Update( uiState => uiState with { Notice = null } );
 
+	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
+
+	public const string OpenCategoryAction = "open-category";
+	public const string ChooseScaleAction = "choose-scale";
+	public const string DismissNoticeAction = "dismiss-notice";
+
+	/// <summary>
+	/// Run an action from the panel. Arguments that don't parse are ignored, like a click on nothing.
+	/// </summary>
+	public void Act( string action, string[] args )
+	{
+		var arg = args is { Length: > 0 } ? args[0] : null;
+
+		switch ( action )
+		{
+			case OpenCategoryAction when System.Enum.TryParse<SettingsCategory>( arg, out var category ) && System.Enum.IsDefined( category ):
+				OpenCategory( category );
+				break;
+
+			case ChooseScaleAction when float.TryParse( arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var scale ):
+				ChooseScale( scale );
+				break;
+
+			case DismissNoticeAction:
+				DismissNotice();
+				break;
+		}
+	}
+
 	// The work behind the events.
 
 	async Task SetScaleAsync( float scale )

@@ -95,6 +95,7 @@ The full contract — where each kind of rule goes, async and threads, the optio
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
 | `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
+| `Shared` | In multiplayer every player sees the same app: the host runs it, the others draw it. The app must be written for it. See "Multiplayer". Default `false`. |
 | `Permissions` | The permissions the app may have. It is never granted others. See below. |
 | `IsSystem` | A system app: it asks for full system access (root), which allows everything. See "System apps" below. |
 
@@ -137,6 +138,17 @@ Each `NaviComputer` saves what the player changed on it: installed apps and Stor
 - **Save slots.** A game with its own saves sets `NaviSaveData.Slot`, then calls `NaviSaveData.LoadAll( Scene )` when the player loads a save. Loading closes every window. `SaveAll`, and a computer's own `Save` and `Load`, are there for games that turn `AutoSave` off.
 - **Not a security boundary.** The files are plain JSON, and any package's code in the game can write them. Loading still applies the computer's rules: root needs a system app, and a grant only counts for a permission the app declares.
 
+## Multiplayer
+
+The host runs every computer, and other clients draw what it sends. Set the computer's GameObject to **Network Mode: Object** in the scene. Scene objects default to Snapshot, which is sent to clients only once, as they join, so they never see the screen change. The host logs a warning when a computer isn't a network object. A computer made at runtime must be network-spawned by the game (`GameObject.NetworkSpawn()`).
+
+- **One user at a time.** The first player to click a free computer takes the seat (`NaviComputer.UserId`). Only they can click, drag windows, answer permission prompts and get the controls of an app that captures input. Everyone else sees an "In use by ..." badge, and their clicks are ignored. The seat frees itself when the user leaves the game, or after `SeatTimeout` seconds without them using or pointing at the screen (never while a prompt is open or an app has their controls). When the seat changes, open prompts are dismissed.
+- **The desktop is the same everywhere.** Windows, positions, focus, installed apps, settings and prompts come from the host as a snapshot (`NetworkSnapshot`). What the user does goes to the host as an RPC (`UserLaunch`, `UserClose`, `UserMoveWindow`...), which checks the caller is the user. On other clients every method that changes the computer (`Install`, `Launch`, `Close`...) does nothing: call them on the host. Saves are written and loaded on the host only.
+- **Store apps follow the host.** A client downloads the Store apps the host has, so it can draw them.
+- **Shared apps** (`Shared` in the manifest) look the same to everyone. The host's copy runs the app and publishes its state with `Navi.Publish`. Every other client's copy is a viewer (`Navi.IsViewer`): it draws `Navi.GetState<T>`, makes no calls, and runs no logic. Controls call `Navi.Act( this, "action", args )`, which reaches the host's copy as an action (`Navi.IsAction` in `OnEvent`) from whichever client the user is on. Apps that capture input read keys with `Navi.InputDown` / `Navi.InputPressed`, which give the user's keys on the host (`NaviInputCapture.ForwardedActions` lists the ones sent). Keep the state small: it is sent to everyone, up to `NaviComputer.MaxAppState` characters. See `docs/app-architecture.md`.
+- **Other apps run locally.** Without `Shared`, each client runs its own copy, so players see different things in the window, which shows a "not shared" mark. Such a copy on a client can work its own window, and read the computer, but changes nothing else.
+- **What it trusts.** The host trusts the user's client that their clicks, and their answers to permission prompts, were real presses: the secure layer's real-mouse check runs on the user's machine. A modified client can fake both, for its own seat only. A client's copy never makes calls as an app; calls run only on the host's copy. A hostile host can make clients download any Store app, since they download what the host has installed. A client that lacks the manifests of the game's or libraries' apps (one that joins an editor session, say) takes them from the host, so a hostile host can also open any panel class in the client's code as an app; it only draws there, and can't change the client's computer.
+
 ## Permissions
 
 Every app can open apps, list them and control its own window. Anything more needs a permission (`Navi.Permission.*`, `NaviPermissions`), and the player decides which an app gets, like on Android:
@@ -170,7 +182,7 @@ An app with `IsSystem` in its manifest asks for full system access: root. Root h
 An app with `CapturesInput = true` gets the player's controls while its window is in front. The Pac-Man Store app (`fractitude.napp_pacman`) uses it.
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
-- The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
+- The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself with `Navi.InputDown( this, "Forward" )` for W (or `Input.Down`, in an app that isn't shared). In multiplayer only the computer's user is pulled in.
 - Once the screen fills the view, the mouse cursor is shown, and `WorldInput` aims with it, so the player can point and click anywhere on the computer (`FreeCursor`). Game code that hides the cursor every frame, like a crosshair, should skip that while `NaviInputCapture.Current` isn't null.
 - An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
 - Closing, minimizing or focusing another window gives control back, and the camera flies back.

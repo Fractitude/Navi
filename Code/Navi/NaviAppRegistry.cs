@@ -18,6 +18,11 @@ public sealed class NaviAppInfo
 	public bool CapturesInput { get; init; }
 
 	/// <summary>
+	/// Runs on the host, and other clients draw what it publishes. See <see cref="NaviAppResource.Shared"/>.
+	/// </summary>
+	public bool Shared { get; init; }
+
+	/// <summary>
 	/// Shipped with the game or a library: its manifest is in one of the <see cref="NaviAppRegistry.SystemAppFolders"/>, and
 	/// it wasn't downloaded from the Store. Anything else, including a manifest from an unknown source, is not.
 	/// </summary>
@@ -68,11 +73,62 @@ public sealed class NaviAppInfo
 			CanMaximize = resource.CanMaximize,
 			CanResize = resource.CanResize,
 			CapturesInput = resource.CapturesInput,
+			Shared = resource.Shared,
 			IsPrepackaged = prepackaged,
 			IsSystem = resource.IsSystem,
 			Permissions = resource.Permissions?.Where( NaviPermissions.IsKnown ).Distinct().ToArray() ?? [],
 			PanelType = panelType,
 			Resource = resource,
+		};
+	}
+
+	internal NaviAppSnapshot ToSnapshot() => new()
+	{
+		Id = Id,
+		Name = Name,
+		Description = Description,
+		Icon = Icon,
+		Color = Color,
+		CanMinimize = CanMinimize,
+		CanMaximize = CanMaximize,
+		CanResize = CanResize,
+		CapturesInput = CapturesInput,
+		Shared = Shared,
+		IsPrepackaged = IsPrepackaged,
+		IsSystem = IsSystem,
+		Permissions = Permissions.ToList(),
+		PanelType = PanelType.FullName,
+	};
+
+	/// <summary>
+	/// An app as the host describes it, for a client that doesn't have its manifest. Null if the panel class isn't in
+	/// this client's code, or the id is a Store package's (those are downloaded, not taken from the host).
+	/// </summary>
+	internal static NaviAppInfo FromSnapshot( NaviAppSnapshot app )
+	{
+		if ( string.IsNullOrEmpty( app?.Id ) || app.Id.Any( char.IsWhiteSpace ) || NaviStore.NormalizeIdent( app.Id ) is not null )
+			return null;
+
+		var panelType = TypeLibrary.GetTypes<Panel>().FirstOrDefault( x => !x.IsAbstract && x.FullName == app.PanelType );
+		if ( panelType is null )
+			return null;
+
+		return new()
+		{
+			Id = app.Id,
+			Name = app.Name ?? app.Id,
+			Description = app.Description ?? "",
+			Icon = app.Icon,
+			Color = app.Color,
+			CanMinimize = app.CanMinimize,
+			CanMaximize = app.CanMaximize,
+			CanResize = app.CanResize,
+			CapturesInput = app.CapturesInput,
+			Shared = app.Shared,
+			IsPrepackaged = app.IsPrepackaged,
+			IsSystem = app.IsSystem,
+			Permissions = app.Permissions?.Where( NaviPermissions.IsKnown ).Distinct().ToArray() ?? [],
+			PanelType = panelType,
 		};
 	}
 }
@@ -164,8 +220,24 @@ public static class NaviAppRegistry
 		.Where( x => x.Id is not null && x.Panel is not null )
 		.Select( x => NaviAppInfo.FromResource( x.Id, x.Resource, x.Panel ) )
 		.OrderBy( x => x.IsCore ? 0 : x.IsPrepackaged ? 1 : 2 )
+		.Concat( hostApps.Values )
 		.DistinctBy( x => x.Id )
 		.OrderBy( x => x.Name );
+
+	/// <summary>
+	/// On a client: apps the host described (<see cref="NaviComputerSnapshot.Apps"/>) because this client has no
+	/// manifest for them. A manifest of its own always wins.
+	/// </summary>
+	static readonly Dictionary<string, NaviAppInfo> hostApps = new();
+
+	internal static void AddHostApps( IEnumerable<NaviAppSnapshot> apps )
+	{
+		foreach ( var app in apps ?? [] )
+		{
+			if ( app?.Id is { } id && !hostApps.ContainsKey( id ) && NaviAppInfo.FromSnapshot( app ) is { } info )
+				hostApps[id] = info;
+		}
+	}
 
 	/// <summary>
 	/// The app with this id, or null.

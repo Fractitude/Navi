@@ -56,6 +56,13 @@ public sealed class NaviAppResource : GameResource
 	[Property] public bool CapturesInput { get; set; }
 
 	/// <summary>
+	/// In multiplayer, every player sees the same app: it runs on the host, and other clients only draw what it publishes.
+	/// The app must be written for it, with <c>Navi.Publish</c>, <c>Navi.GetState</c> and <c>Navi.Act</c>. Without it, each
+	/// client runs its own copy, so players see different things in the window.
+	/// </summary>
+	[Property] public bool Shared { get; set; }
+
+	/// <summary>
 	/// The permissions the app may ask for (<see cref="NaviPermissions"/>). It can't be granted any others.
 	/// </summary>
 	[Property] public List<string> Permissions { get; set; } = new();

@@ -11,6 +11,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Sandbox;
 using Sandbox.UI;
 
 namespace Sandbox;
@@ -197,4 +198,116 @@ public static class Navi
 	/// Download a Store package and install its app. Needs <see cref="Permission.InstallFromStore"/>. False if it failed.
 	/// </summary>
 	public static Task<bool> InstallPackage( Panel app, string ident ) => Call<bool>( app, "store.install", ident );
+
+	// Multiplayer. An app with Shared in its .napp runs on the host, and every other client only draws it: the host's
+	// copy publishes its state, the others draw that, and what the player at the screen does goes to the host as an
+	// action. Offline, the one copy is the host. See docs/app-architecture.md.
+
+	/// <summary>
+	/// The longest action name, and the most text an action's arguments can hold in all.
+	/// </summary>
+	public const int MaxActionName = 64, MaxActionArgs = 4096;
+
+	/// <summary>
+	/// True on a client whose copy of a shared app only draws. It makes no calls, runs no logic, and draws
+	/// <see cref="GetState{T}"/>.
+	/// </summary>
+	public static bool IsViewer( Panel app ) => app.HasClass( "navi-viewer" );
+
+	static readonly System.Collections.Generic.Dictionary<Panel, object> published = new();
+
+	/// <summary>
+	/// The host's copy of a shared app: this is what every client draws now. Send a new object when something changes,
+	/// such as a UiState record replaced whole; publishing the same object again sends nothing. Keep it small.
+	/// </summary>
+	public static void Publish( Panel app, object state )
+	{
+		if ( IsViewer( app ) || (published.TryGetValue( app, out var last ) && ReferenceEquals( last, state )) )
+			return;
+
+		Forget();
+		published[app] = state;
+		app.SetAttribute( "navi-published", Json.Serialize( state ) );
+	}
+
+	static readonly System.Collections.Generic.Dictionary<Panel, (string Json, object State)> received = new();
+
+	/// <summary>
+	/// A viewer's copy of a shared app: the state the host published last, or null before the first one arrives.
+	/// </summary>
+	public static T GetState<T>( Panel app ) where T : class
+	{
+		var json = app.GetAttribute( "navi-state", null );
+		if ( string.IsNullOrEmpty( json ) )
+			return null;
+
+		if ( received.TryGetValue( app, out var cached ) && cached.Json == json && cached.State is T same )
+			return same;
+
+		T state;
+		try
+		{
+			state = Json.Deserialize<T>( json );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't read the host's state as {typeof( T ).Name}: {e.Message}" );
+			return null;
+		}
+
+		Forget();
+		received[app] = (json, state);
+		return state;
+	}
+
+	/// <summary>
+	/// Drop what's kept for panels that are gone.
+	/// </summary>
+	static void Forget()
+	{
+		foreach ( var panel in published.Keys.Where( x => !x.IsValid ).ToArray() )
+			published.Remove( panel );
+
+		foreach ( var panel in received.Keys.Where( x => !x.IsValid ).ToArray() )
+			received.Remove( panel );
+	}
+
+	/// <summary>
+	/// The player did something in a shared app, such as press a button. The host's copy gets it as an action (see
+	/// <see cref="IsAction"/>), from whichever client the player is on, a frame or so later. Only the player using the
+	/// computer is listened to. Arguments are text: an action is what a player could have clicked, not data to trust.
+	/// </summary>
+	public static void Act( Panel app, string action, params string[] args ) =>
+		app.CreateEvent( new PanelEvent( "navi.act", app ) { Value = (action, args ?? []) } );
+
+	/// <summary>
+	/// Is this event an action (<see cref="Act"/>) for the host's copy of the app? Call it from the panel's OnEvent.
+	/// </summary>
+	public static bool IsAction( PanelEvent e, out string action, out string[] args )
+	{
+		if ( e.Name == "navi.action" && e.Value is ValueTuple<string, string[]> value )
+		{
+			(action, args) = value;
+			return true;
+		}
+
+		action = null;
+		args = null;
+		return false;
+	}
+
+	/// <summary>
+	/// Is the player holding this input action (e.g. "Forward") while the app has their controls? In a shared app it is
+	/// the input of the player using the computer, from whichever client they're on. Use it instead of Input.Down.
+	/// </summary>
+	public static bool InputDown( Panel app, string action ) =>
+		app.GetAttribute( "navi-input-down", null ) is { } down ? Has( down, action ) : HasInput( app ) && Input.Down( action );
+
+	/// <summary>
+	/// Did the player press this input action this frame? See <see cref="InputDown"/>.
+	/// </summary>
+	public static bool InputPressed( Panel app, string action ) =>
+		app.GetAttribute( "navi-input-pressed", null ) is { } pressed ? Has( pressed, action ) : HasInput( app ) && Input.Pressed( action );
+
+	static bool Has( string list, string action ) => list.Split( ',' ).Contains( action );
 }
