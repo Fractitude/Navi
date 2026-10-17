@@ -234,7 +234,7 @@ NaviDesktop
 	}
 }
 
-// Shown while an app has the player's input and Escape is pressed or held.
+// Shown while an app has the player's input, after an Escape press. The bar fills with each press.
 .quit-hint
 {
 	position: absolute;

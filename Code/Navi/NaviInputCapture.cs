@@ -3,7 +3,7 @@ namespace Sandbox;
 /// <summary>
 /// Gives the player's input to an app that captures input (<see cref="NaviAppAttribute.CapturesInput"/>) while its window is in front.
 /// The camera flies to the screen so it fills the view, and the player's movement, look and world clicks stop, so apps can read
-/// keys like WASD with <see cref="Input"/>. Holding Escape force-quits the app. When the window closes, minimizes or loses focus,
+/// keys like WASD with <see cref="Input"/>. Pressing Escape several times quickly force-quits the app. When the window closes, minimizes or loses focus,
 /// everything goes back.
 /// </summary>
 public sealed class NaviInputCapture : Component
@@ -26,20 +26,30 @@ public sealed class NaviInputCapture : Component
 	[Property, Range( 0.5f, 1f )] public float Fill { get; set; } = 1f;
 
 	/// <summary>
-	/// Seconds Escape must be held to force-quit the app. Keep it well under 1.7: s&box itself closes the whole game when
-	/// Escape is held that long, and game code can't stop it.
+	/// Escape presses in a row that force-quit the app. Not a hold: s&box tells games when Escape goes down,
+	/// but not whether it's still held.
 	/// </summary>
-	[Property, Range( 0.3f, 1.4f )] public float QuitHoldTime { get; set; } = 1f;
+	[Property, Range( 2, 10 )] public int QuitPresses { get; set; } = 5;
 
 	/// <summary>
-	/// How far through <see cref="QuitHoldTime"/> the player is, 0 to 1.
+	/// Seconds allowed between presses. A longer gap starts the count over.
 	/// </summary>
-	public float QuitProgress => QuitHoldTime > 0 ? System.MathF.Min( 1f, escapeHeld / QuitHoldTime ) : 0f;
+	[Property, Range( 0.3f, 3f )] public float QuitWindow { get; set; } = 1f;
 
 	/// <summary>
-	/// Show the "hold Escape to quit" hint: while Escape is held, and for a moment after a short press.
+	/// Presses still needed to force-quit the app.
 	/// </summary>
-	public bool ShowQuitHint => Computer.InputCapture is not null && (escapeHeld > 0 || sinceEscapePressed < 2f);
+	public int QuitPressesLeft => QuitPresses - escapePresses;
+
+	/// <summary>
+	/// How far through <see cref="QuitPresses"/> the player is, 0 to 1.
+	/// </summary>
+	public float QuitProgress => QuitPresses > 0 ? (float)escapePresses / QuitPresses : 0f;
+
+	/// <summary>
+	/// Show the "press Escape to quit" hint, from the first press until the count runs out.
+	/// </summary>
+	public bool ShowQuitHint => Computer.InputCapture is not null && escapePresses > 0;
 
 	/// <summary>
 	/// The capture that has the player's input right now, or null. Game code can check it, e.g. to hide a crosshair.
@@ -55,8 +65,8 @@ public sealed class NaviInputCapture : Component
 
 	State state;
 	float flight; // 0 at the player's view, 1 at the screen
-	float escapeHeld;
 	RealTimeSince sinceEscapePressed = 100;
+	int escapePresses;
 	Transform playerView;
 
 	record ControllerState( PlayerController Controller, bool Input, bool Look, bool Camera );
@@ -75,7 +85,7 @@ public sealed class NaviInputCapture : Component
 		if ( state == State.Idle )
 			return;
 
-		UpdateQuitHold();
+		UpdateQuit();
 
 		foreach ( var c in controllers )
 		{
@@ -98,28 +108,25 @@ public sealed class NaviInputCapture : Component
 	}
 
 	/// <summary>
-	/// A press of Escape is swallowed, so the game menu doesn't open. Holding it force-quits the app.
+	/// An Escape press is swallowed, so the game menu doesn't open. <see cref="QuitPresses"/> presses in a row, each within
+	/// <see cref="QuitWindow"/> of the last, force-quit the app. Escape never reaches <see cref="Input.Keyboard"/>: the
+	/// engine keeps it for its menu.
 	/// </summary>
-	void UpdateQuitHold()
+	void UpdateQuit()
 	{
-		if ( Input.EscapePressed )
-		{
-			Input.EscapePressed = false;
-			sinceEscapePressed = 0;
-		}
+		if ( escapePresses > 0 && sinceEscapePressed > QuitWindow )
+			escapePresses = 0;
 
-		if ( Computer.InputCapture is not { } capture || !Input.Keyboard.Down( "escape" ) )
-		{
-			escapeHeld = 0;
+		if ( !Input.EscapePressed )
 			return;
-		}
 
-		escapeHeld += RealTime.Delta;
+		Input.EscapePressed = false;
+		sinceEscapePressed = 0;
+		escapePresses++;
 
-		if ( escapeHeld >= QuitHoldTime )
+		if ( escapePresses >= QuitPresses && Computer.InputCapture is { } capture )
 		{
-			escapeHeld = 0;
-			sinceEscapePressed = 100;
+			escapePresses = 0;
 			Computer.Close( capture.App.Id );
 		}
 	}
@@ -187,6 +194,7 @@ public sealed class NaviInputCapture : Component
 		controllers.Clear();
 		worldInputs.Clear();
 		flight = 0;
+		escapePresses = 0;
 		state = State.Idle;
 
 		if ( Current == this )

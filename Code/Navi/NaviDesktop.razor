@@ -48,7 +48,7 @@
 	@if ( InputCapture?.ShowQuitHint == true )
 	{
 		<div class="quit-hint">
-			<div class="hint-text">Hold Esc to quit</div>
+			<div class="hint-text">Press Esc @InputCapture.QuitPressesLeft more @(InputCapture.QuitPressesLeft == 1 ? "time" : "times") to quit</div>
 			<div class="bar"><div class="fill" style="width: @(InputCapture.QuitProgress * 100)%;"></div></div>
 		</div>
 	}
@@ -339,5 +339,5 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count,
-		InputCapture?.ShowQuitHint, (int)((InputCapture?.QuitProgress ?? 0) * 50) );
+		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft );
 }

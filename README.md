@@ -83,7 +83,7 @@ An app with `CapturesInput = true` (on `[NaviApp]` or a `.napp`) gets the player
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
 - The local player's `PlayerController` stops moving, looking and moving the camera, and `WorldInput` clicks stop. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
-- An Escape press is swallowed so the game menu doesn't open. Holding Escape for one second force-quits the app, with a progress bar on screen (`QuitHoldTime`). It can't be longer: s&box closes the whole game when Escape is held for about 1.7 seconds, and game code can't stop that.
+- An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app, with a hint and a bar on screen (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
 - Closing, minimizing or focusing another window gives control back, and the camera flies back.
 - While an app has the controls, its panel has the `navi-input` class, so a Store app that can't use Navi types can check `HasClass( "navi-input" )`, e.g. to pause when it doesn't.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
