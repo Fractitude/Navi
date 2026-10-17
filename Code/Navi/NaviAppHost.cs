@@ -11,6 +11,11 @@ public static class NaviEvents
 	public const string Close = "navi.close";
 	public const string Minimize = "navi.minimize";
 	public const string ToggleMaximize = "navi.maximize";
+
+	/// <summary>
+	/// Class on an app's panel while it has the player's input (see <see cref="NaviInputCapture"/>), e.g. <c>HasClass( "navi-input" )</c>.
+	/// </summary>
+	public const string HasInputClass = "navi-input";
 }
 
 /// <summary>
@@ -49,6 +54,8 @@ public sealed class NaviAppHost : Panel
 
 			AddChild( app );
 		}
+
+		app.SetClass( NaviEvents.HasInputClass, Computer?.InputCapture == Process );
 
 		// A window with a set size decides the app's size. Otherwise the window fits the app.
 		var fill = Process.Size is not null || Process.IsMaximized;

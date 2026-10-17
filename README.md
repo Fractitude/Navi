@@ -25,7 +25,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Make an app in your game
 
-Apps can live in any game that has the library. Calculator, Packages and Pac-Man are in `Libraries/navi/Code/Navi/Apps/`.
+Apps can live in any game that has the library. Calculator and Packages are in `Libraries/navi/Code/Navi/Apps/`.
 
 1. Create a folder in your game's `Code/`, e.g. `Code/Apps/Notes/`.
 2. Add `Notes.razor`:
@@ -79,12 +79,13 @@ For example, Calculator turns off maximize and resize:
 
 ## Apps that take over the controls
 
-An app with `CapturesInput = true` (on `[NaviApp]` or a `.napp`) gets the player's controls while its window is in front. Pac-Man uses it.
+An app with `CapturesInput = true` (on `[NaviApp]` or a `.napp`) gets the player's controls while its window is in front. The Pac-Man Store app (`fractitude.napp_pacman`) uses it.
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
 - The local player's `PlayerController` stops moving, looking and moving the camera, and `WorldInput` clicks stop. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
 - An Escape press is swallowed so the game menu doesn't open. Holding Escape for one second force-quits the app, with a progress bar on screen (`QuitHoldTime`). It can't be longer: s&box closes the whole game when Escape is held for about 1.7 seconds, and game code can't stop that.
 - Closing, minimizing or focusing another window gives control back, and the camera flies back.
+- While an app has the controls, its panel has the `navi-input` class, so a Store app that can't use Navi types can check `HasClass( "navi-input" )`, e.g. to pause when it doesn't.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
 
 `NaviInputCapture` is added to the computer automatically by `NaviDesktop`. The camera move needs a `WorldPanel`; with a `ScreenPanel` only the controls are taken.
@@ -108,7 +109,7 @@ Players make apps in their own addon project and publish them to sbox.game. Othe
 3. Write the app as a plain Razor panel (`@inherits Panel`) in the addon's `Code/` folder. Give it its own namespace, e.g. `@namespace NaviCounter`.
 4. In the addon's `Assets/`, create a Navi App asset (`.napp`). Set App Id, Title, Icon, Color and Panel Type (the panel's full class name, e.g. `NaviCounter.Counter`). Turn off the window features the app doesn't want.
 5. Press Play to test. Code changes hot-reload. Friends who join your editor session get the changes too.
-6. Publish the `.napp` from the asset browser. The addon's code is published with it.
+6. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_counter`.
 
 An app controls its window by raising panel events, which bubble up to the window:
 
