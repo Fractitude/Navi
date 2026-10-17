@@ -98,6 +98,12 @@ public sealed class NaviComputer : Component
 	public NaviProcess Focused => running.Where( x => !x.IsMinimized ).OrderByDescending( x => x.ZIndex ).FirstOrDefault();
 
 	/// <summary>
+	/// The window that has the player's input: the window in front, if its app captures input. Otherwise null.
+	/// See <see cref="NaviInputCapture"/>.
+	/// </summary>
+	public NaviProcess InputCapture => Focused is { App.CapturesInput: true } focused ? focused : null;
+
+	/// <summary>
 	/// Installed apps, sorted by name.
 	/// </summary>
 	public IEnumerable<NaviAppInfo> Installed => NaviAppRegistry.All.Where( IsInstalled );

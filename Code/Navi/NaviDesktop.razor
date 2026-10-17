@@ -45,6 +45,14 @@
 		}
 	</div>
 
+	@if ( InputCapture?.ShowQuitHint == true )
+	{
+		<div class="quit-hint">
+			<div class="hint-text">Hold Esc to quit</div>
+			<div class="bar"><div class="fill" style="width: @(InputCapture.QuitProgress * 100)%;"></div></div>
+		</div>
+	}
+
 	<div class="taskbar">
 		<div class="start" @onclick=@(() => Computer.Launch( "packages" ))>NAVI</div>
 
@@ -67,6 +75,7 @@
 @code
 {
 	[RequireComponent] public NaviComputer Computer { get; set; }
+	[RequireComponent] public NaviInputCapture InputCapture { get; set; }
 
 	/// <summary>
 	/// Minimum gap, in panel pixels, between a tooltip and the edge of the screen.
@@ -329,5 +338,6 @@
 	}
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
-	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count );
+	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count,
+		InputCapture?.ShowQuitHint, (int)((InputCapture?.QuitProgress ?? 0) * 50) );
 }

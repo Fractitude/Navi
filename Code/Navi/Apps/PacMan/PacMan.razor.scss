@@ -1,0 +1,226 @@
+PacMan
+{
+	flex-direction: column;
+	background-color: #000;
+	padding: 4px;
+	gap: 4px;
+	font-family: Poppins;
+}
+
+.hud
+{
+	flex-direction: row;
+	align-items: center;
+	height: 14px;
+	padding: 0 2px;
+	color: #f2eee2;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 1px;
+
+	.score
+	{
+		flex-grow: 1;
+		color: #f2d64a;
+	}
+
+	.level
+	{
+		flex-grow: 1;
+		justify-content: center;
+	}
+
+	.lives
+	{
+		flex-grow: 1;
+		flex-direction: row;
+		justify-content: flex-end;
+		gap: 3px;
+	}
+
+	.life
+	{
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		background-color: #f2d64a;
+	}
+}
+
+.stage
+{
+	position: relative;
+}
+
+.message
+{
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 140px;
+	justify-content: center;
+	color: #f2d64a;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	text-shadow: 0 0 2px #000;
+}
+
+.board
+{
+	position: relative;
+	background-color: #000;
+
+	&.flash .wall
+	{
+		background-color: #f2eee2;
+	}
+
+	.wall, .door, .dot, .pellet, .pacman, .ghost
+	{
+		position: absolute;
+		width: 12px;
+		height: 12px;
+	}
+
+	.wall
+	{
+		background-color: #0b0b3a;
+		border-color: #3d5cff;
+
+		&.edge-top { border-top: 1px solid #3d5cff; }
+		&.edge-bottom { border-bottom: 1px solid #3d5cff; }
+		&.edge-left { border-left: 1px solid #3d5cff; }
+		&.edge-right { border-right: 1px solid #3d5cff; }
+	}
+
+	.door
+	{
+		border-top: 2px solid #f7a8d8;
+		margin-top: 5px;
+		height: 2px;
+	}
+
+	// Dots and pellets are small squares, offset to the middle of their tile.
+	.dot, .pellet
+	{
+		background-color: #f7c8a8;
+
+		&.eaten
+		{
+			display: none;
+		}
+	}
+
+	.dot
+	{
+		width: 2px;
+		height: 2px;
+		margin-left: 5px;
+		margin-top: 5px;
+	}
+
+	.pellet
+	{
+		width: 8px;
+		height: 8px;
+		margin-left: 2px;
+		margin-top: 2px;
+		border-radius: 50%;
+
+		&.blink
+		{
+			opacity: 0.2;
+		}
+	}
+
+	.pacman
+	{
+		border-radius: 50%;
+		background-color: #f2d64a;
+		z-index: 2;
+
+		// A black wedge on the side Pac-Man faces.
+		.mouth
+		{
+			position: absolute;
+			width: 6px;
+			height: 6px;
+			background-color: #000;
+			transform: rotate( 45deg );
+
+			&.closed
+			{
+				display: none;
+			}
+		}
+
+		&.face-right .mouth { left: 8px; top: 3px; }
+		&.face-left .mouth { left: -2px; top: 3px; }
+		&.face-up .mouth { left: 3px; top: -2px; }
+		&.face-down .mouth { left: 3px; top: 8px; }
+
+		&.dying
+		{
+			opacity: 0.4;
+		}
+	}
+
+	.ghost
+	{
+		border-radius: 6px 6px 1px 1px;
+		z-index: 3;
+
+		.eye
+		{
+			position: absolute;
+			top: 3px;
+			width: 4px;
+			height: 4px;
+			border-radius: 50%;
+			background-color: #fff;
+			border: 1px solid #fff;
+
+			&.left { left: 1px; }
+			&.right { left: 7px; }
+		}
+
+		&.blinky { background-color: #ff2a2a; }
+		&.pinky { background-color: #ffb0e0; }
+		&.inky { background-color: #2ef0f0; }
+		&.clyde { background-color: #ffb050; }
+
+		&.frightened
+		{
+			background-color: #2a2aff;
+
+			.eye
+			{
+				background-color: #f7c8a8;
+				border-color: #f7c8a8;
+				width: 2px;
+				height: 2px;
+			}
+		}
+
+		&.blink
+		{
+			background-color: #f2eee2;
+		}
+
+		&.eaten
+		{
+			background-color: transparent;
+
+			.eye
+			{
+				border-color: #2a2aff;
+			}
+		}
+
+		&.hidden
+		{
+			display: none;
+		}
+	}
+}

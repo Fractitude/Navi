@@ -17,6 +17,7 @@ public sealed class NaviAppInfo
 	public bool CanMinimize { get; init; }
 	public bool CanMaximize { get; init; }
 	public bool CanResize { get; init; }
+	public bool CapturesInput { get; init; }
 
 	/// <summary>
 	/// The app's panel class.
@@ -44,6 +45,7 @@ public sealed class NaviAppInfo
 		CanMinimize = attribute.CanMinimize,
 		CanMaximize = attribute.CanMaximize,
 		CanResize = attribute.CanResize,
+		CapturesInput = attribute.CapturesInput,
 		PanelType = type,
 	};
 
@@ -57,6 +59,7 @@ public sealed class NaviAppInfo
 		CanMinimize = resource.CanMinimize,
 		CanMaximize = resource.CanMaximize,
 		CanResize = resource.CanResize,
+		CapturesInput = resource.CapturesInput,
 		PanelType = panelType,
 		Resource = resource,
 	};

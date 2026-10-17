@@ -52,6 +52,12 @@ public sealed class NaviAppAttribute : System.Attribute
 	/// </summary>
 	public bool CanResize { get; set; } = true;
 
+	/// <summary>
+	/// While the window is in front, the camera moves to the screen and the player's keys go to the app instead of
+	/// moving the player. Read them with <see cref="Input"/>, e.g. <c>Input.Down( "Forward" )</c>. Escape closes the app.
+	/// </summary>
+	public bool CapturesInput { get; set; }
+
 	public NaviAppAttribute( string id, string name )
 	{
 		Id = id;

@@ -13,6 +13,17 @@ public static class NaviStore
 	public const string PackageType = "napp";
 
 	/// <summary>
+	/// sbox.game organisations whose apps the Store marks as official. Only an org's members can publish under its
+	/// ident, so the mark can't be faked by other publishers.
+	/// </summary>
+	public static HashSet<string> OfficialOrgs { get; } = new( System.StringComparer.OrdinalIgnoreCase ) { "fractitude" };
+
+	/// <summary>
+	/// Was this package published by one of the <see cref="OfficialOrgs"/>?
+	/// </summary>
+	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && OfficialOrgs.Contains( org );
+
+	/// <summary>
 	/// Published apps matching <paramref name="text"/>, or all of them when it is empty.
 	/// </summary>
 	public static async Task<List<Package>> SearchAsync( string text = "" )

@@ -31,7 +31,13 @@
 				<div class="row">
 					<img class="thumb" src=@package.Thumb />
 					<div class="info">
-						<div class="name">@package.Title</div>
+						<div class="title-row">
+							<div class="name">@package.Title</div>
+							@if ( NaviStore.IsOfficial( package ) )
+							{
+								<div class="official"><i>verified</i>OFFICIAL</div>
+							}
+						</div>
 						<div class="description">@package.Summary</div>
 					</div>
 

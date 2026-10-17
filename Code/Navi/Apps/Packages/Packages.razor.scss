@@ -98,6 +98,33 @@ Packages
 	overflow: hidden;
 }
 
+.title-row
+{
+	flex-direction: row;
+	align-items: center;
+	gap: 5px;
+}
+
+// Apps from NaviStore.OfficialOrgs.
+.official
+{
+	flex-direction: row;
+	align-items: center;
+	gap: 2px;
+	padding: 1px 4px;
+	font-size: 8px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	color: #2a2840;
+	background-color: #f2d64a;
+	border: 1px solid #2a2840;
+
+	i
+	{
+		font-size: 9px;
+	}
+}
+
 .name
 {
 	font-size: 13px;

@@ -48,6 +48,9 @@ public sealed class NaviAppResource : GameResource
 	/// <inheritdoc cref="NaviAppAttribute.CanResize"/>
 	[Property] public bool CanResize { get; set; } = true;
 
+	/// <inheritdoc cref="NaviAppAttribute.CapturesInput"/>
+	[Property] public bool CapturesInput { get; set; }
+
 	/// <summary>
 	/// The panel class named by <see cref="PanelType"/>, or null if it isn't loaded.
 	/// </summary>

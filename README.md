@@ -18,13 +18,14 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Windows
 
+- The window in front has focus. Clicking a window focuses it, a new window opens focused, and opening a minimized app restores and focuses it.
 - Drag the title bar to move a window. Windows can't leave the screen.
 - Drag a corner to resize. Double-click the title bar, or use its button, to maximize.
 - Minimize hides the window and keeps the app running. Click the taskbar icon to bring it back. Clicking the icon of the window in front minimizes it.
 
 ## Make an app in your game
 
-Apps can live in any game that has the library. Calculator and Packages are in `Libraries/navi/Code/Navi/Apps/`.
+Apps can live in any game that has the library. Calculator, Packages and Pac-Man are in `Libraries/navi/Code/Navi/Apps/`.
 
 1. Create a folder in your game's `Code/`, e.g. `Code/Apps/Notes/`.
 2. Add `Notes.razor`:
@@ -68,12 +69,25 @@ The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 
 | `CanMinimize` | Has a minimize button. Default `true`. |
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
+| `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
 
 For example, Calculator turns off maximize and resize:
 
 ```razor
 @attribute [NaviApp( "calculator", "Calculator", CanMaximize = false, CanResize = false )]
 ```
+
+## Apps that take over the controls
+
+An app with `CapturesInput = true` (on `[NaviApp]` or a `.napp`) gets the player's controls while its window is in front. Pac-Man uses it.
+
+- The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
+- The local player's `PlayerController` stops moving, looking and moving the camera, and `WorldInput` clicks stop. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
+- An Escape press is swallowed so the game menu doesn't open. Holding Escape for one second force-quits the app, with a progress bar on screen (`QuitHoldTime`). It can't be longer: s&box closes the whole game when Escape is held for about 1.7 seconds, and game code can't stop that.
+- Closing, minimizing or focusing another window gives control back, and the camera flies back.
+- Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
+
+`NaviInputCapture` is added to the computer automatically by `NaviDesktop`. The camera move needs a `WorldPanel`; with a `ScreenPanel` only the controls are taken.
 
 ## Inside a `NaviApp`
 
