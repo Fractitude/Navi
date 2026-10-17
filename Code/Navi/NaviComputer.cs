@@ -180,8 +180,63 @@ public sealed class NaviComputer : Component
 			_ = DownloadInstalledPackagesAsync();
 	}
 
+	/// <summary>
+	/// Players can't walk through the screen. Adds a thin collider the size of the <see cref="WorldPanel"/> on this
+	/// GameObject.
+	/// </summary>
+	[Property( Title = "Solid object" )] public bool SolidObject { get; set; }
+
+	/// <summary>
+	/// How thick the screen's collider is, in the GameObject's local units.
+	/// </summary>
+	const float SolidThickness = 1f;
+
+	BoxCollider solidCollider;
+
+	/// <summary>
+	/// Add, resize or remove the screen's collider to match <see cref="SolidObject"/> and the panel. It isn't saved with the
+	/// scene: the flag is.
+	/// </summary>
+	void UpdateSolid()
+	{
+		var panel = SolidObject ? Components.Get<WorldPanel>() : null;
+
+		if ( !panel.IsValid() )
+		{
+			if ( solidCollider.IsValid() )
+				solidCollider.Destroy();
+
+			solidCollider = null;
+			return;
+		}
+
+		if ( !solidCollider.IsValid() )
+		{
+			solidCollider = Components.Create<BoxCollider>();
+			solidCollider.Flags |= ComponentFlags.NotSaved | ComponentFlags.Hidden;
+			solidCollider.Static = true;
+		}
+
+		// Same maths as NaviInputCapture.ScreenView, in local units: panel x along Right (-Y), y along Down (-Z).
+		var size = panel.PanelSize * Sandbox.UI.WorldPanel.ScreenToWorldScale;
+
+		var offset = Vector2.Zero;
+		if ( panel.HorizontalAlign == WorldPanel.HAlignment.Left ) offset.x = size.x * 0.5f;
+		if ( panel.HorizontalAlign == WorldPanel.HAlignment.Right ) offset.x = -size.x * 0.5f;
+		if ( panel.VerticalAlign == WorldPanel.VAlignment.Top ) offset.y = size.y * 0.5f;
+		if ( panel.VerticalAlign == WorldPanel.VAlignment.Bottom ) offset.y = -size.y * 0.5f;
+
+		var center = new Vector3( 0, -offset.x, -offset.y );
+		var scale = new Vector3( SolidThickness, size.x, size.y );
+
+		if ( solidCollider.Center != center ) solidCollider.Center = center;
+		if ( solidCollider.Scale != scale ) solidCollider.Scale = scale;
+	}
+
 	protected override void OnUpdate()
 	{
+		UpdateSolid();
+
 		// The delay counts from the latest change.
 		if ( changedVersion != Version )
 		{
@@ -195,6 +250,11 @@ public sealed class NaviComputer : Component
 
 	protected override void OnDisabled()
 	{
+		if ( solidCollider.IsValid() )
+			solidCollider.Destroy();
+
+		solidCollider = null;
+
 		if ( AutoSave && savedVersion != Version )
 			Save();
 	}
