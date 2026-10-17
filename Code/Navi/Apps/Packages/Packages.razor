@@ -22,7 +22,8 @@
 		}
 		else
 		{
-			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
+			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button *@
+			@* here instead. *@
 			<div class="filter" tooltip="Show: @UiState.FilterName"
 			     @onclick=@( () => ViewModel.ToggleFilterMenu() )>
 				<i>filter_list</i>
@@ -52,7 +53,8 @@
 				<div class="status">@( UiState.Refreshing ? "Connecting to the Wired..." : UiState.StoreStatus )</div>
 			}
 
-			@* While a page loads the status takes the list's place, so a slow search reads as work rather than as the same list. *@
+			@* While a page loads the status takes the list's place, so a slow search reads as work rather than *@
+			@* as the same list. *@
 			@if ( !UiState.Refreshing )
 			{
 				@foreach ( var entry in UiState.StoreRows )
