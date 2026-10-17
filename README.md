@@ -63,8 +63,8 @@ The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 
 A panel that also holds the app's logic becomes unreadable past a few hundred lines: every field can be a reason to redraw, every `@if` a place for a rule to hide, and nothing can be exercised without clicking it. So an app of any size is three parts:
 
 - **`<App>UiState.cs`** — a `record` of everything the panel draws, already filtered, already formatted: the rows of a list, which button a row offers, the text of a tooltip. It has a `Revision` that goes up on every change, computed properties for the flags the markup asks about (`HasMore`), and no logic. Nothing in it needs a panel, so the same state could be serialized or diffed.
-- **`<App>ViewModel.cs`** — all the logic: what a click does, the calls to the computer, the polling, the async guards, the filters and the words they produce. It is a plain class, not a panel. It is made with the app's panel (every call to the computer is made with one) and it replaces `State` — a new snapshot — through one private `Update` method, which is also what bumps the revision. Nothing in it reads the panel tree.
-- **`<App>.razor`** — the view. It holds no app state: its `@code` has a lazily made `Model`, a `State => Model.State` shortcut, and `BuildHash() => Model.Revision`. Markup reads `Model.State` and every control calls a `Model` method, which updates the state and redraws.
+- **`<App>ViewModel.cs`** — all the logic: what a click does, the calls to the computer, the polling, the async guards, the filters and the words they produce. It is a plain class, not a panel. It is made with the app's panel (every call to the computer is made with one) and it replaces `UiState` — a new snapshot — through one private `Update` method, which is also what bumps the revision. Nothing in it reads the panel tree.
+- **`<App>.razor`** — the view. It holds no app state: its `@code` has a lazily made `ViewModel`, a `UiState => ViewModel.UiState` shortcut, and `BuildHash() => ViewModel.Revision`. Markup reads `ViewModel.UiState` and every control calls a `ViewModel` method, which updates the state and redraws.
 
 ```csharp
 // The state: what is drawn, and nothing else.
@@ -82,25 +82,25 @@ public sealed class NotesViewModel
 
 	public NotesViewModel( Panel app ) => this.app = app;
 
-	public NotesUiState State { get; private set; } = new();
-	public int Revision => State.Revision;
+	public NotesUiState UiState { get; private set; } = new();
+	public int Revision => UiState.Revision;
 
 	public void Delete( string id ) { /* ... await Navi... then: */ }
 
 	void Update( System.Func<NotesUiState, NotesUiState> change ) =>
-		State = change( State ) with { Revision = State.Revision + 1 };
+		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
 }
 ```
 
 ```razor
 @code
 {
-	NotesViewModel model;
+	NotesViewModel viewModel;
 
-	NotesViewModel Model => model ??= new( this );
-	NotesUiState State => Model.State;
+	NotesViewModel ViewModel => viewModel ??= new( this );
+	NotesUiState UiState => ViewModel.UiState;
 
-	protected override int BuildHash() => Model.Revision;
+	protected override int BuildHash() => ViewModel.Revision;
 }
 ```
 

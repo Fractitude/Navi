@@ -6,7 +6,7 @@ namespace NaviApps;
 /// <summary>
 /// Everything the Packages app does: what the computer knows, what each kind of app means, and which call a click
 /// becomes. The panel (<c>Packages.razor</c>) holds an instance of this and nothing else — it draws
-/// <see cref="State"/> and calls the methods below, and those replace <see cref="State"/> and touch nothing in the
+/// <see cref="UiState"/> and calls the methods below, and those replace <see cref="UiState"/> and touch nothing in the
 /// panel tree.
 /// </summary>
 /// <remarks>
@@ -85,7 +85,7 @@ public sealed class PackagesViewModel
 	{
 		this.app = app ?? throw new System.ArgumentNullException( nameof( app ) );
 
-		State = new PackagesUiState
+		UiState = new PackagesUiState
 		{
 			Filter = StartFilter,
 			Filters = BuildFilters( StartFilter ),
@@ -97,10 +97,10 @@ public sealed class PackagesViewModel
 	/// <summary>
 	/// What the panel draws. Replaced whole on every change, and only ever read by the panel.
 	/// </summary>
-	public PackagesUiState State { get; private set; }
+	public PackagesUiState UiState { get; private set; }
 
 	/// <summary>The panel's <c>BuildHash</c>: the state's revision is the panel's reason to redraw.</summary>
-	public int Revision => State.Revision;
+	public int Revision => UiState.Revision;
 
 	/// <summary>
 	/// What the Store search field holds. Typing is no reason to redraw the list, so this replaces the state without
@@ -108,8 +108,8 @@ public sealed class PackagesViewModel
 	/// </summary>
 	public string SearchText
 	{
-		get => State.SearchText;
-		set => State = State with { SearchText = value ?? "" };
+		get => UiState.SearchText;
+		set => UiState = UiState with { SearchText = value ?? "" };
 	}
 
 	/// <summary>
@@ -125,13 +125,13 @@ public sealed class PackagesViewModel
 	// Tabs.
 
 	/// <summary>Show the apps on this computer.</summary>
-	public void OpenApps() => Update( s => s with { ShowStore = false } );
+	public void OpenApps() => Update( uiState => uiState with { ShowStore = false } );
 
 	/// <summary>Show the Store, fetching its first page the first time.</summary>
 	public void OpenStore()
 	{
 		// The filter belongs to the Apps tab: the button is gone now, and a menu with no button to anchor it is a ghost.
-		Update( s => s with { ShowStore = true, FilterOpen = false } );
+		Update( uiState => uiState with { ShowStore = true, FilterOpen = false } );
 
 		if ( !storeLoaded )
 			_ = FetchStoreAsync( false );
@@ -139,14 +139,14 @@ public sealed class PackagesViewModel
 
 	// The kinds of app the Apps tab shows.
 
-	public void ToggleFilterMenu() => Update( s => s with { FilterOpen = !s.FilterOpen } );
+	public void ToggleFilterMenu() => Update( uiState => uiState with { FilterOpen = !uiState.FilterOpen } );
 
-	public void CloseFilterMenu() => Update( s => s with { FilterOpen = false } );
+	public void CloseFilterMenu() => Update( uiState => uiState with { FilterOpen = false } );
 
 	/// <summary>Show the apps of one <see cref="Kinds"/> kind.</summary>
 	public void ChooseFilter( string filter )
 	{
-		Update( s => s with
+		Update( uiState => uiState with
 		{
 			Filter = filter,
 			FilterOpen = false,
@@ -160,8 +160,8 @@ public sealed class PackagesViewModel
 	/// <summary>Dismiss the notice above the list.</summary>
 	public void DismissNotice()
 	{
-		if ( State.Notice is not null )
-			Update( s => s with { Notice = null } );
+		if ( UiState.Notice is not null )
+			Update( uiState => uiState with { Notice = null } );
 	}
 
 	// The Store.
@@ -178,11 +178,11 @@ public sealed class PackagesViewModel
 		if ( !expanded.Add( ident ) )
 		{
 			expanded.Remove( ident );
-			Update( s => s with { StoreRows = BuildStoreRows() } );
+			Update( uiState => uiState with { StoreRows = BuildStoreRows() } );
 			return;
 		}
 
-		Update( s => s with { StoreRows = BuildStoreRows() } );
+		Update( uiState => uiState with { StoreRows = BuildStoreRows() } );
 
 		if ( !details.ContainsKey( ident ) )
 			_ = FetchDetailsAsync( ident );
@@ -219,7 +219,7 @@ public sealed class PackagesViewModel
 			installedPackages = installed.ToHashSet();
 			installingPackages = installing.ToHashSet();
 
-			Update( s => s with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
+			Update( uiState => uiState with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
 		}
 		finally
 		{
@@ -239,11 +239,11 @@ public sealed class PackagesViewModel
 
 		refreshing = true;
 		storeLoaded = true;
-		Update( s => s with { Refreshing = true } );
+		Update( uiState => uiState with { Refreshing = true } );
 
 		RealTimeSince elapsed = 0;
 
-		var text = State.SearchText.Trim();
+		var text = UiState.SearchText.Trim();
 		var skip = append ? storePackages.Length : 0;
 		string status;
 
@@ -271,7 +271,7 @@ public sealed class PackagesViewModel
 			await Task.Delay( (int)( remaining * 1000 ) );
 
 		refreshing = false;
-		Update( s => s with
+		Update( uiState => uiState with
 		{
 			Refreshing = false,
 			StoreStatus = status,
@@ -297,7 +297,7 @@ public sealed class PackagesViewModel
 			Log.Warning( e, $"Packages: couldn't fetch {ident}: {e.Message}" );
 		}
 
-		Update( s => s with { StoreRows = BuildStoreRows() } );
+		Update( uiState => uiState with { StoreRows = BuildStoreRows() } );
 	}
 
 	/// <summary>
@@ -315,12 +315,12 @@ public sealed class PackagesViewModel
 		}
 		catch ( System.UnauthorizedAccessException )
 		{
-			Update( s => s with { Notice = $"Packages isn't allowed to {what}." } );
+			Update( uiState => uiState with { Notice = $"Packages isn't allowed to {what}." } );
 		}
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"Packages: couldn't {what}: {e.Message}" );
-			Update( s => s with { Notice = $"Couldn't {what}." } );
+			Update( uiState => uiState with { Notice = $"Couldn't {what}." } );
 		}
 	}
 
@@ -329,7 +329,7 @@ public sealed class PackagesViewModel
 	/// why <see cref="Revision"/> is the only thing the panel's hash needs.
 	/// </summary>
 	void Update( System.Func<PackagesUiState, PackagesUiState> change ) =>
-		State = change( State ) with { Revision = State.Revision + 1 };
+		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
 
 	// What the state is built from.
 
@@ -363,7 +363,7 @@ public sealed class PackagesViewModel
 
 	IReadOnlyList<AppRow> BuildAppRows( string filter = null )
 	{
-		var kind = filter ?? State.Filter;
+		var kind = filter ?? UiState.Filter;
 
 		return apps
 			.Select( x => (App: x, FromStore: storeAppIds.Contains( x.Id )) )

@@ -11,46 +11,46 @@
 
 <root>
 	<div class="tabs">
-		<div class="tab @(State.ShowStore ? "" : "active")" @onclick=@(() => Model.OpenApps())>Apps</div>
-		<div class="tab @(State.ShowStore ? "active" : "")" @onclick=@(() => Model.OpenStore())>Store</div>
+		<div class="tab @(UiState.ShowStore ? "" : "active")" @onclick=@(() => ViewModel.OpenApps())>Apps</div>
+		<div class="tab @(UiState.ShowStore ? "active" : "")" @onclick=@(() => ViewModel.OpenStore())>Store</div>
 		<div class="spacer"></div>
 
-		@if ( State.ShowStore )
+		@if ( UiState.ShowStore )
 		{
-			<div class="button @(State.Refreshing ? "disabled" : "")" @onclick=@(() => Model.SubmitSearch())><i>refresh</i></div>
+			<div class="button @(UiState.Refreshing ? "disabled" : "")" @onclick=@(() => ViewModel.SubmitSearch())><i>refresh</i></div>
 		}
 		else
 		{
 			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
-			<div class="filter" tooltip="Show: @State.FilterName" @onclick=@(() => Model.ToggleFilterMenu())><i>filter_list</i></div>
+			<div class="filter" tooltip="Show: @UiState.FilterName" @onclick=@(() => ViewModel.ToggleFilterMenu())><i>filter_list</i></div>
 		}
 	</div>
 
 	@* Store search. Enter runs it; the refresh button re-runs the text that is in the field. *@
-	@if ( State.ShowStore )
+	@if ( UiState.ShowStore )
 	{
 		<div class="search">
-			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => Model.SubmitSearch()) />
+			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => ViewModel.SubmitSearch()) />
 		</div>
 	}
 
 	<div class="list">
-		@if ( State.Notice is not null )
+		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@(() => Model.DismissNotice())>@State.Notice</div>
+			<div class="notice" @onclick=@(() => ViewModel.DismissNotice())>@UiState.Notice</div>
 		}
 
-		@if ( State.ShowStore )
+		@if ( UiState.ShowStore )
 		{
-			@if ( State.Refreshing || State.StoreStatus is not null )
+			@if ( UiState.Refreshing || UiState.StoreStatus is not null )
 			{
-				<div class="status">@( State.Refreshing ? "Connecting to the Wired..." : State.StoreStatus )</div>
+				<div class="status">@( UiState.Refreshing ? "Connecting to the Wired..." : UiState.StoreStatus )</div>
 			}
 
 			@* While a page loads the status takes the list's place, so a slow search reads as work rather than as the same list. *@
-			@if ( !State.Refreshing )
+			@if ( !UiState.Refreshing )
 			{
-				@foreach ( var entry in State.StoreRows )
+				@foreach ( var entry in UiState.StoreRows )
 				{
 					<div class="entry">
 						<div class="row">
@@ -76,10 +76,10 @@
 							}
 							else
 							{
-								<div class="button install" @onclick=@(() => Model.InstallPackage( entry.Ident ))>Install</div>
+								<div class="button install" @onclick=@(() => ViewModel.InstallPackage( entry.Ident ))>Install</div>
 							}
 
-							<div class="expand" tooltip=@(entry.Expanded ? "Less" : "More") @onclick=@(() => Model.ToggleDetails( entry.Ident ))>
+							<div class="expand" tooltip=@(entry.Expanded ? "Less" : "More") @onclick=@(() => ViewModel.ToggleDetails( entry.Ident ))>
 								<i>@(entry.Expanded ? "expand_less" : "expand_more")</i>
 							</div>
 						</div>
@@ -103,12 +103,12 @@
 		}
 		else
 		{
-			@if ( State.AppListEmpty )
+			@if ( UiState.AppListEmpty )
 			{
-				<div class="status">@State.EmptyText</div>
+				<div class="status">@UiState.EmptyText</div>
 			}
 
-			@foreach ( var app in State.AppRows )
+			@foreach ( var app in UiState.AppRows )
 			{
 				<div class="row">
 					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
@@ -125,11 +125,11 @@
 
 					@if ( app.Action == AppAction.Uninstall )
 					{
-						<div class="button" @onclick=@(() => Model.UninstallApp( app.Id ))>Uninstall</div>
+						<div class="button" @onclick=@(() => ViewModel.UninstallApp( app.Id ))>Uninstall</div>
 					}
 					else if ( app.Action == AppAction.Install )
 					{
-						<div class="button install" @onclick=@(() => Model.InstallApp( app.Id ))>Install</div>
+						<div class="button install" @onclick=@(() => ViewModel.InstallApp( app.Id ))>Install</div>
 					}
 				</div>
 			}
@@ -138,14 +138,14 @@
 
 	@* Which apps the list shows. Drawn after the list, so it paints over it, with a backdrop that closes it. The *@
 	@* backdrop starts under the tabs row, so the tabs and this button stay clickable while the menu is up. *@
-	@if ( State.FilterOpen && !State.ShowStore )
+	@if ( UiState.FilterOpen && !UiState.ShowStore )
 	{
-		<div class="filter-backdrop" @onmousedown=@(() => Model.CloseFilterMenu())></div>
+		<div class="filter-backdrop" @onmousedown=@(() => ViewModel.CloseFilterMenu())></div>
 
 		<div class="filter-menu">
-			@foreach ( var kind in State.Filters )
+			@foreach ( var kind in UiState.Filters )
 			{
-				<div class="item @(kind.Selected ? "active" : "")" @onclick=@(() => Model.ChooseFilter( kind.Key ))>
+				<div class="item @(kind.Selected ? "active" : "")" @onclick=@(() => ViewModel.ChooseFilter( kind.Key ))>
 					<i>@(kind.Selected ? "check" : "")</i>
 					<div class="label">@kind.Label</div>
 				</div>
@@ -154,14 +154,14 @@
 	}
 
 	@* How much of the Store the list holds, and the way to the next page of it. *@
-	@if ( State.ShowStore && !State.Refreshing && State.StoreTotal > 0 )
+	@if ( UiState.ShowStore && !UiState.Refreshing && UiState.StoreTotal > 0 )
 	{
 		<div class="footer">
-			<div class="count">Showing @State.StoreShown of @State.StoreTotal apps</div>
+			<div class="count">Showing @UiState.StoreShown of @UiState.StoreTotal apps</div>
 
-			@if ( State.HasMore )
+			@if ( UiState.HasMore )
 			{
-				<div class="button" @onclick=@(() => Model.LoadMore())>More</div>
+				<div class="button" @onclick=@(() => ViewModel.LoadMore())>More</div>
 			}
 		</div>
 	}
@@ -169,18 +169,18 @@
 
 @code
 {
-	PackagesViewModel model;
+	PackagesViewModel viewModel;
 
 	/// <summary>
 	/// The app's logic and its state. Made on first use, because every call it makes to the computer is made with the
 	/// app's own panel, which is this.
 	/// </summary>
-	PackagesViewModel Model => model ??= new( this );
+	PackagesViewModel ViewModel => viewModel ??= new( this );
 
 	/// <summary>
 	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw.
 	/// </summary>
-	PackagesUiState State => Model.State;
+	PackagesUiState UiState => ViewModel.UiState;
 
 	/// <summary>
 	/// The Store search field binds to this. Typing isn't a reason to redraw the list: Enter, or the refresh button,
@@ -188,8 +188,8 @@
 	/// </summary>
 	string SearchText
 	{
-		get => Model.SearchText;
-		set => Model.SearchText = value;
+		get => ViewModel.SearchText;
+		set => ViewModel.SearchText = value;
 	}
 
 	public override void Tick()
@@ -198,7 +198,7 @@
 
 		FitScrollbarGutter();
 
-		Model.Tick();
+		ViewModel.Tick();
 	}
 
 	/// <summary>
@@ -224,5 +224,5 @@
 		}
 	}
 
-	protected override int BuildHash() => Model.Revision;
+	protected override int BuildHash() => ViewModel.Revision;
 }
