@@ -1,7 +1,7 @@
 namespace Sandbox;
 
 /// <summary>
-/// Gives the player's input to an app that captures input (<see cref="NaviAppAttribute.CapturesInput"/>) while its window is in front.
+/// Gives the player's input to an app that captures input (<see cref="NaviAppResource.CapturesInput"/>) while its window is in front.
 /// The camera flies to the screen so it fills the view, and the player's movement and look stop, so apps can read keys like WASD
 /// with <see cref="Input"/>. Once there, the mouse cursor is free to point and click anywhere on the screen. Pressing Escape several
 /// times quickly force-quits the app. When the window closes, minimizes or loses focus, everything goes back.

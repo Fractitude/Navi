@@ -1,8 +1,10 @@
 @using Sandbox.UI
 @using System.Threading.Tasks
-@inherits NaviApp
-@namespace Sandbox
-@attribute [NaviApp( "packages", "Packages", Description = "Install and uninstall apps.", Icon = "inventory_2", Color = "#9ab0c4", IsSystem = true )]
+@inherits Panel
+@namespace NaviApps
+
+@* A Navi app like any other: a plain panel, described by Assets/navi/apps/packages.napp, that talks to the computer *@
+@* through the Navi client. It is a system app there, so it starts with the permissions it lists. *@
 
 <root>
 	<div class="tabs">
@@ -17,6 +19,11 @@
 	</div>
 
 	<div class="list">
+		@if ( Notice is not null )
+		{
+			<div class="notice" @onclick=@(() => Notice = null)>@Notice</div>
+		}
+
 		@if ( ShowStore )
 		{
 			@if ( StoreStatus is not null )
@@ -24,7 +31,7 @@
 				<div class="status">@StoreStatus</div>
 			}
 
-			@foreach ( var package in StorePackages )
+			@foreach ( var (package, official) in StorePackages )
 			{
 				var ident = package.FullIdent;
 				var isExpanded = Expanded.Contains( ident );
@@ -35,7 +42,7 @@
 					<div class="info">
 						<div class="title-row">
 							<div class="name">@package.Title</div>
-							@if ( NaviStore.IsOfficial( package ) )
+							@if ( official )
 							{
 								<div class="official" tooltip="Official"><i>verified</i></div>
 							}
@@ -43,17 +50,17 @@
 						<div class="description">@package.Summary</div>
 					</div>
 
-					@if ( Computer.IsDownloading( ident ) )
+					@if ( InstallingPackages.Contains( ident ) )
 					{
 						<div class="button disabled">Installing...</div>
 					}
-					else if ( Computer.IsPackageInstalled( ident ) )
+					else if ( InstalledPackages.Contains( ident ) )
 					{
 						<div class="button disabled">Installed</div>
 					}
 					else
 					{
-						<div class="button install" @onclick=@(() => _ = Computer.InstallPackageAsync( ident ))>Install</div>
+						<div class="button install" @onclick=@(() => Run( "install this app", () => Navi.InstallPackage( this, ident ) ))>Install</div>
 					}
 
 					<div class="expand" tooltip=@(isExpanded ? "Less" : "More") @onclick=@(() => ToggleDetails( package ))>
@@ -83,8 +90,10 @@
 		}
 		else
 		{
-			@foreach ( var app in NaviAppRegistry.All.Where( x => !x.IsSystem ) )
+			@foreach ( var app in Apps.Where( x => !x.System ) )
 			{
+				var id = app.Id;
+
 				<div class="row">
 					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 					<div class="info">
@@ -92,13 +101,13 @@
 						<div class="description">@app.Description</div>
 					</div>
 
-					@if ( Computer.IsInstalled( app ) )
+					@if ( app.Installed )
 					{
-						<div class="button" @onclick=@(() => Computer.Uninstall( app.Id ))>Uninstall</div>
+						<div class="button" @onclick=@(() => Run( "uninstall apps", () => Navi.Uninstall( this, id ) ))>Uninstall</div>
 					}
 					else
 					{
-						<div class="button install" @onclick=@(() => Computer.Install( app.Id ))>Install</div>
+						<div class="button install" @onclick=@(() => Run( "install apps", () => Navi.Install( this, id ) ))>Install</div>
 					}
 				</div>
 			}
@@ -110,7 +119,80 @@
 {
 	bool ShowStore;
 
-	List<Package> StorePackages = new();
+	(string Id, string Name, string Description, string Icon, string Color, bool Installed, bool System)[] Apps = [];
+
+	(Package Package, bool Official)[] StorePackages = [];
+	HashSet<string> InstalledPackages = new();
+	HashSet<string> InstallingPackages = new();
+
+	/// <summary>
+	/// Message shown above the list, e.g. when the player denied a permission. Click to dismiss.
+	/// </summary>
+	string Notice;
+
+	/// <summary>
+	/// The computer's version when the lists were last fetched. They are fetched again when it changes.
+	/// </summary>
+	int? knownVersion;
+	bool polling;
+	RealTimeSince sincePoll;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !polling && sincePoll > 0.25f )
+			_ = PollAsync();
+	}
+
+	async Task PollAsync()
+	{
+		polling = true;
+		sincePoll = 0;
+
+		try
+		{
+			var version = await Navi.GetVersion( this );
+			if ( version == knownVersion )
+				return;
+
+			knownVersion = version;
+			Apps = await Navi.GetApps( this );
+
+			var (installed, installing) = await Navi.GetStoreStatus( this );
+			InstalledPackages = installed.ToHashSet();
+			InstallingPackages = installing.ToHashSet();
+			storeVersion++;
+		}
+		finally
+		{
+			polling = false;
+		}
+	}
+
+	/// <summary>
+	/// Make a call that needs a permission, asking the player for it if this app doesn't have it.
+	/// </summary>
+	async void Run( string what, System.Func<Task<bool>> call )
+	{
+		Notice = null;
+
+		try
+		{
+			await Navi.WithPermission( this, call );
+		}
+		catch ( System.UnauthorizedAccessException )
+		{
+			Notice = $"Packages isn't allowed to {what}.";
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: couldn't {what}: {e.Message}" );
+			Notice = $"Couldn't {what}.";
+		}
+
+		storeVersion++;
+	}
 
 	/// <summary>
 	/// Message shown above the Store list, or null.
@@ -198,13 +280,13 @@
 	{
 		StoreLoaded = true;
 		StoreStatus = "Connecting to the Wired...";
-		StorePackages = new();
+		StorePackages = [];
 		storeVersion++;
 
 		try
 		{
-			StorePackages = await NaviStore.SearchAsync();
-			StoreStatus = StorePackages.Count == 0 ? "No apps have been published yet." : null;
+			StorePackages = await Navi.SearchStore( this );
+			StoreStatus = StorePackages.Length == 0 ? "No apps have been published yet." : null;
 		}
 		catch ( System.Exception e )
 		{
@@ -215,5 +297,5 @@
 		storeVersion++;
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, ShowStore, storeVersion );
+	protected override int BuildHash() => System.HashCode.Combine( knownVersion, ShowStore, storeVersion, Notice );
 }

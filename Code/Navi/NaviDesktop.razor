@@ -20,6 +20,11 @@
 					<i class="glyph">@app.Icon</i>
 					<div class="name">@app.Name</div>
 
+					@if ( process.Permissions.Count > 0 )
+					{
+						<i class="glyph shield" tooltip=@PermissionSummary( process )>shield</i>
+					}
+
 					@if ( app.CanMinimize )
 					{
 						<div class="button" @onclick=@(() => Computer.Minimize( app.Id ))><i>remove</i></div>
@@ -53,6 +58,12 @@
 		</div>
 	}
 
+	@if ( MenuApp is not null )
+	{
+		@* Catches clicks outside the menu, to close it. *@
+		<div class="menu-backdrop" @onmousedown=@(() => MenuApp = null)></div>
+	}
+
 	<div class="taskbar">
 		<div class="start" @onclick=@(() => Computer.Launch( "packages" ))>NAVI</div>
 
@@ -60,16 +71,75 @@
 		{
 			var process = Computer.GetProcess( app.Id );
 
-			<div class="app" @onclick=@(() => OnTaskbarClick( app ))>
+			<div class="app @(MenuApp == app.Id ? "menu-open" : "")" @onclick=@(() => OnTaskbarClick( app )) @onrightclick=@(() => MenuApp = app.Id)>
 				<div class="tooltip">@app.Name</div>
 				<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 				@if ( process is not null )
 				{
 					<div class="marker @(process.IsMinimized ? "minimized" : "")"></div>
 				}
+
+				@if ( MenuApp == app.Id )
+				{
+					<div class="menu">
+						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.Launch( app.Id ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
+
+						@if ( app.Permissions.Count > 0 && !app.IsSystem )
+						{
+							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.ReviewPermissions( app.Id ) ))>
+								<i>shield</i>@(process is null ? "Open with permissions..." : "Permissions...")
+							</div>
+						}
+
+						@if ( process is not null )
+						{
+							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.Close( app.Id ) ))><i>close</i>Close</div>
+						}
+					</div>
+				}
 			</div>
 		}
 	</div>
+
+	@if ( Computer.PermissionRequests.FirstOrDefault() is { } request )
+	{
+		var heading = request.IsReview
+			? (request.Launch ? $"Open {request.App.Name} with permissions" : $"{request.App.Name}'s permissions")
+			: $"{request.App.Name} asks for permissions";
+
+		<div class="dialog-backdrop">
+			<div class="dialog">
+				<div class="dialog-title">
+					<div class="icon" style="background-color: @request.App.Color;"><i>@request.App.Icon</i></div>
+					<div class="heading">@heading</div>
+				</div>
+
+				<div class="dialog-text">Tick what @request.App.Name may do. It keeps them, and you can change them from its taskbar menu.</div>
+
+				@foreach ( var permission in request.Permissions )
+				{
+					var info = NaviPermissions.Describe( permission );
+					var ticked = !Unticked.Contains( permission );
+
+					<div class="permission @(ticked ? "ticked" : "")" @onclick=@(() => TogglePermission( permission ))>
+						<i class="check">@(ticked ? "check_box" : "check_box_outline_blank")</i>
+						<i class="glyph">@info.Icon</i>
+						<div class="perm-text">
+							<div class="perm-title">@info.Title</div>
+							<div class="perm-description">@info.Description</div>
+						</div>
+					</div>
+				}
+
+				<div class="dialog-buttons">
+					<div class="button" @onclick=@(() => Computer.DismissPermissionRequest( request ))>@(request.IsReview ? "Cancel" : "Deny all")</div>
+					<div class="button primary" @onclick=@(() => Computer.AnswerPermissionRequest( request, request.Permissions.Except( Unticked ) ))>
+						@(request.IsReview ? (request.Launch ? "Open" : "Save") : "Allow ticked")
+					</div>
+				</div>
+			</div>
+		</div>
+	}
 </root>
 
 @code
@@ -108,8 +178,30 @@
 	// Windows that were maximized last frame. Their measured size is still the maximized one, so they skip clamping for a frame.
 	readonly HashSet<NaviProcess> wasMaximized = new();
 
+	/// <summary>
+	/// Id of the app whose taskbar menu is open, or null.
+	/// </summary>
+	string MenuApp;
+
+	// Permissions unticked in the dialog. Reset for each new request, from what it starts with ticked.
+	readonly HashSet<string> Unticked = new();
+	NaviPermissionRequest tickedRequest;
+
 	protected override void OnUpdate()
 	{
+		var request = Computer.PermissionRequests.FirstOrDefault();
+		if ( request != tickedRequest )
+		{
+			tickedRequest = request;
+			Unticked.Clear();
+
+			if ( request is not null )
+				Unticked.UnionWith( request.Permissions.Except( request.Ticked ) );
+		}
+
+		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
+			MenuApp = null;
+
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
 		if ( screen is not null )
 			UpdateWindows( screen );
@@ -127,12 +219,33 @@
 	/// </summary>
 	void OnTaskbarClick( NaviAppInfo app )
 	{
+		MenuApp = null;
+
 		var process = Computer.GetProcess( app.Id );
 		if ( process is not null && process == Computer.Focused && Computer.Minimize( app.Id ) )
 			return;
 
 		Computer.Launch( app.Id );
 	}
+
+	/// <summary>
+	/// Run a taskbar menu item and close the menu. The click doesn't reach the icon, so it doesn't also open the app.
+	/// </summary>
+	void MenuAction( PanelEvent e, System.Action action )
+	{
+		e.StopPropagation();
+		MenuApp = null;
+		action();
+	}
+
+	void TogglePermission( string permission )
+	{
+		if ( !Unticked.Remove( permission ) )
+			Unticked.Add( permission );
+	}
+
+	static string PermissionSummary( NaviProcess process ) =>
+		"Allowed: " + string.Join( ", ", process.Permissions.Select( x => NaviPermissions.Describe( x ).Title ) );
 
 	void OnTitleDoubleClick( NaviProcess process, PanelEvent e )
 	{
@@ -363,5 +476,5 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count,
-		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft );
+		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft, MenuApp, Unticked.Count, tickedRequest );
 }

@@ -1,13 +1,19 @@
 using Sandbox.UI;
+using System.Threading.Tasks;
 
 namespace Sandbox;
 
 /// <summary>
-/// Panel events an app can raise to control its window, e.g. <c>CreateEvent( "navi.close" )</c>.
-/// They are plain strings, so apps that don't reference Navi can use them too.
+/// Panel event names and classes shared with apps. They are plain strings, so apps that don't reference Navi can use them.
 /// </summary>
 public static class NaviEvents
 {
+	/// <summary>
+	/// A call to the computer. See <see cref="NaviSystemCalls"/>.
+	/// </summary>
+	public const string Call = NaviSystemCalls.EventName;
+
+	// Older ways to control the window, from before NaviSystemCalls. Kept for published apps.
 	public const string Close = "navi.close";
 	public const string Minimize = "navi.minimize";
 	public const string ToggleMaximize = "navi.maximize";
@@ -19,8 +25,8 @@ public static class NaviEvents
 }
 
 /// <summary>
-/// Window body. Creates the panel of the app in <see cref="Process"/> and keeps it as its only child.
-/// Razor can't create a panel whose type is only known at runtime, so this does it in code.
+/// Window body. Creates the panel of the app in <see cref="Process"/> and keeps it as its only child, and answers the
+/// calls the app makes to the computer. Razor can't create a panel whose type is only known at runtime, so this does it in code.
 /// </summary>
 public sealed class NaviAppHost : Panel
 {
@@ -45,13 +51,6 @@ public sealed class NaviAppHost : Panel
 
 			app = Process.App.Create();
 			appId = Process.App.Id;
-
-			if ( app is NaviApp naviApp )
-			{
-				naviApp.Computer = Computer;
-				naviApp.Info = Process.App;
-			}
-
 			AddChild( app );
 		}
 
@@ -74,6 +73,11 @@ public sealed class NaviAppHost : Panel
 		{
 			switch ( e.Name )
 			{
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call:
+					_ = NaviSystemCalls.RunAsync( Computer, Process, call.Item1, call.Item2, call.Item3 );
+					e.StopPropagation();
+					return;
+
 				case NaviEvents.Close:
 					Computer.Close( id );
 					e.StopPropagation();

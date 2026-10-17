@@ -24,6 +24,16 @@ public static class NaviStore
 	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && OfficialOrgs.Contains( org );
 
 	/// <summary>
+	/// Resource paths of the apps downloaded from the Store. Every other app shipped with the game or a library.
+	/// </summary>
+	static readonly HashSet<string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
+
+	/// <summary>
+	/// Was this app downloaded from the Store, rather than shipped with the game or a library?
+	/// </summary>
+	public static bool IsDownloaded( NaviAppResource resource ) => resource?.ResourcePath is { } path && downloaded.Contains( path );
+
+	/// <summary>
 	/// Published apps matching <paramref name="text"/>, or all of them when it is empty.
 	/// </summary>
 	public static async Task<List<Package>> SearchAsync( string text = "" )
@@ -45,6 +55,8 @@ public static class NaviStore
 			Log.Warning( $"NaviStore: '{packageIdent}' is not a Navi app" );
 			return null;
 		}
+
+		downloaded.Add( resource.ResourcePath );
 
 		var app = NaviAppRegistry.Find( resource.AppId );
 		if ( app is null )

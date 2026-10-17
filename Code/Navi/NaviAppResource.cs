@@ -1,10 +1,10 @@
 namespace Sandbox;
 
 /// <summary>
-/// Defines a Navi app whose panel is any <see cref="Sandbox.UI.Panel"/>, and publishes it to the Store (sbox.game).
-/// The panel doesn't need to use any Navi types, so an app published from an addon works in every game with the Navi library.
-/// Create one in an addon project that targets a game with Navi, set <see cref="PanelType"/>, and publish it from the asset browser.
-/// The addon's code is published with it.
+/// Defines a Navi app: a <see cref="Sandbox.UI.Panel"/> class plus how it appears and what it may ask for. Every app is
+/// one of these. Built-in apps are in the library's assets; players publish theirs to the Store (sbox.game) from an addon.
+/// The panel doesn't use Navi types. It talks to the computer through the <c>Navi</c> client (<c>Code/Navi/Client/Navi.cs</c>),
+/// so an app published from an addon works in every game with the Navi library.
 /// </summary>
 [AssetType( Name = "Navi App", Extension = NaviStore.PackageType, Category = "Navi", Flags = AssetTypeFlags.NoEmbedding )]
 public sealed class NaviAppResource : GameResource
@@ -39,17 +39,36 @@ public sealed class NaviAppResource : GameResource
 	/// </summary>
 	[Property] public string PanelType { get; set; }
 
-	/// <inheritdoc cref="NaviAppAttribute.CanMinimize"/>
+	/// <summary>
+	/// Has a minimize button.
+	/// </summary>
 	[Property] public bool CanMinimize { get; set; } = true;
 
-	/// <inheritdoc cref="NaviAppAttribute.CanMaximize"/>
+	/// <summary>
+	/// Has a maximize button and maximizes on title bar double-click.
+	/// </summary>
 	[Property] public bool CanMaximize { get; set; } = true;
 
-	/// <inheritdoc cref="NaviAppAttribute.CanResize"/>
+	/// <summary>
+	/// Can be resized by its corners.
+	/// </summary>
 	[Property] public bool CanResize { get; set; } = true;
 
-	/// <inheritdoc cref="NaviAppAttribute.CapturesInput"/>
+	/// <summary>
+	/// Takes over the player's controls while its window is in front. See <see cref="NaviInputCapture"/>.
+	/// </summary>
 	[Property] public bool CapturesInput { get; set; }
+
+	/// <summary>
+	/// The permissions the app may ask for (<see cref="NaviPermissions"/>). It can't be granted any others.
+	/// </summary>
+	[Property] public List<string> Permissions { get; set; } = new();
+
+	/// <summary>
+	/// A system app: always installed, can't be uninstalled, and gets all its <see cref="Permissions"/> without asking.
+	/// Only counts for apps that ship with the game or a library. A Store app with this set is a normal app.
+	/// </summary>
+	[Property] public bool IsSystem { get; set; }
 
 	/// <summary>
 	/// The panel class named by <see cref="PanelType"/>, or null if it isn't loaded.
@@ -74,6 +93,12 @@ public sealed class NaviAppResource : GameResource
 		if ( FindPanelType() is null )
 		{
 			context.SetPublishingDisabled( $"Panel Type '{PanelType}' isn't a panel class in this project's code." );
+			return;
+		}
+
+		if ( Permissions?.FirstOrDefault( x => !NaviPermissions.IsKnown( x ) ) is { } unknown )
+		{
+			context.SetPublishingDisabled( $"'{unknown}' isn't a Navi permission." );
 			return;
 		}
 

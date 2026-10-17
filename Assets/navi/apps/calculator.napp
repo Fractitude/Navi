@@ -1,0 +1,16 @@
+{
+  "AppId": "calculator",
+  "Title": "Calculator",
+  "Description": "Add, subtract, multiply and divide.",
+  "Icon": "calculate",
+  "Color": "#e0b060",
+  "PanelType": "NaviApps.Calculator",
+  "CanMinimize": true,
+  "CanMaximize": false,
+  "CanResize": false,
+  "CapturesInput": false,
+  "Permissions": [],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

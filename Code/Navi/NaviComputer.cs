@@ -33,6 +33,46 @@ public sealed class NaviProcess
 	/// Stacking order. The highest is in front.
 	/// </summary>
 	public int ZIndex { get; set; }
+
+	/// <summary>
+	/// The permissions the app has (<see cref="NaviPermissions"/>): what the player granted it, which the computer
+	/// remembers per app (<see cref="NaviComputer.GrantedPermissions"/>), or all it declares for a system app.
+	/// </summary>
+	public HashSet<string> Permissions { get; } = new();
+
+	public bool HasPermission( string permission ) => Permissions.Contains( permission );
+}
+
+/// <summary>
+/// A permission dialog on the desktop. Either a review of all the permissions an app declares, which sets exactly what it
+/// has (before its first launch, or from its taskbar menu), or a running app asking for more (<c>Navi.RequestPermissions</c>).
+/// </summary>
+public sealed class NaviPermissionRequest
+{
+	public NaviAppInfo App { get; init; }
+
+	/// <summary>
+	/// The permissions in the dialog.
+	/// </summary>
+	public IReadOnlyList<string> Permissions { get; init; }
+
+	/// <summary>
+	/// The permissions ticked when the dialog opens.
+	/// </summary>
+	public IReadOnlyList<string> Ticked { get; init; }
+
+	/// <summary>
+	/// A review of everything the app declares: the ticked ones are what it has afterwards. Otherwise the app asked
+	/// for more, and the ticked ones are added.
+	/// </summary>
+	public bool IsReview { get; init; }
+
+	/// <summary>
+	/// Open the app once the player answers. Cancelling doesn't open it.
+	/// </summary>
+	public bool Launch { get; init; }
+
+	internal System.Threading.Tasks.TaskCompletionSource<string[]> Answer { get; } = new();
 }
 
 /// <summary>
@@ -52,12 +92,25 @@ public sealed class NaviComputer : Component
 	[Property] public List<string> InstalledPackages { get; set; } = new();
 
 	/// <summary>
+	/// Permissions the player granted, as "app-id permission" pairs. System apps have theirs without being listed.
+	/// </summary>
+	[Property] public List<string> GrantedPermissions { get; set; } = new();
+
+	/// <summary>
+	/// Apps whose declared permissions the player has reviewed. An app that declares permissions shows the review on its
+	/// first launch, before it runs.
+	/// </summary>
+	[Property] public List<string> ReviewedApps { get; set; } = new();
+
+	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
 	public int Version { get; private set; }
 
 	readonly List<NaviProcess> running = new();
 	int topZIndex;
+
+	readonly List<NaviPermissionRequest> permissionRequests = new();
 
 	readonly HashSet<string> downloading = new();
 
@@ -93,6 +146,11 @@ public sealed class NaviComputer : Component
 	public IReadOnlyList<NaviProcess> Running => running;
 
 	/// <summary>
+	/// Permission requests waiting for the player, oldest first. The desktop shows the first one.
+	/// </summary>
+	public IReadOnlyList<NaviPermissionRequest> PermissionRequests => permissionRequests;
+
+	/// <summary>
 	/// The visible app in front, or null.
 	/// </summary>
 	public NaviProcess Focused => running.Where( x => !x.IsMinimized ).OrderByDescending( x => x.ZIndex ).FirstOrDefault();
@@ -122,6 +180,11 @@ public sealed class NaviComputer : Component
 	public bool IsPackageInstalled( string packageIdent ) => InstalledPackages?.Contains( packageIdent ) ?? false;
 
 	public bool IsDownloading( string packageIdent ) => downloading.Contains( packageIdent );
+
+	/// <summary>
+	/// Store packages being downloaded right now.
+	/// </summary>
+	public IEnumerable<string> DownloadingPackages => downloading;
 
 	/// <summary>
 	/// Download an app from the Store and install it. Returns false if the download failed.
@@ -200,16 +263,21 @@ public sealed class NaviComputer : Component
 			InstalledPackages?.Remove( packageIdent );
 
 		Close( id );
+
+		// A reinstall starts over, and asks again.
+		GrantedPermissions?.RemoveAll( x => x.StartsWith( id + " " ) );
+		ReviewedApps?.Remove( id );
 		Version++;
 		return true;
 	}
 
 	/// <summary>
-	/// Open an installed app, or restore it and bring it to the front if it is already open.
+	/// Open an installed app, or restore it and bring it to the front if it is already open. An app that declares
+	/// permissions the player hasn't reviewed yet shows the review first, and opens once they answer it.
 	/// </summary>
 	public bool Launch( string id )
 	{
-		if ( IsRunning( id ) )
+		if ( GetProcess( id ) is not null )
 		{
 			Focus( id );
 			return true;
@@ -219,23 +287,169 @@ public sealed class NaviComputer : Component
 		if ( app is null || !IsInstalled( app ) )
 			return false;
 
+		if ( NeedsReview( app ) )
+		{
+			ReviewPermissions( id );
+			return true;
+		}
+
+		Open( app );
+		return true;
+	}
+
+	void Open( NaviAppInfo app )
+	{
 		// Cascade new windows so they don't cover each other exactly.
 		var offset = (running.Count % 6) * 16f;
-		running.Add( new NaviProcess
+		var process = new NaviProcess
 		{
 			App = app,
 			Position = new Vector2( 16f + offset, 8f + offset ),
 			ZIndex = ++topZIndex,
-		} );
+		};
 
+		process.Permissions.UnionWith( GetPermissions( app ) );
+		running.Add( process );
 		Version++;
-		return true;
 	}
 
 	public void Close( string id )
 	{
-		if ( running.RemoveAll( x => x.App.Id == id ) > 0 )
+		if ( running.RemoveAll( x => x.App.Id == id ) == 0 )
+			return;
+
+		// Nobody is left to answer these.
+		foreach ( var request in permissionRequests.Where( x => x.App.Id == id && !x.IsReview ).ToList() )
+			DismissPermissionRequest( request );
+
+		Version++;
+	}
+
+	/// <summary>
+	/// Declares permissions, isn't a system app, and the player hasn't reviewed them yet.
+	/// </summary>
+	public bool NeedsReview( NaviAppInfo app ) => !app.IsSystem && app.Permissions.Count > 0 && !(ReviewedApps?.Contains( app.Id ) ?? false);
+
+	/// <summary>
+	/// The permissions an app has: all it declares for a system app, otherwise those the player granted.
+	/// </summary>
+	public IEnumerable<string> GetPermissions( NaviAppInfo app )
+	{
+		if ( app.IsSystem )
+			return app.Permissions;
+
+		var prefix = app.Id + " ";
+		return GrantedPermissions?.Where( x => x.StartsWith( prefix ) ).Select( x => x[prefix.Length..] ).Where( app.Permissions.Contains ) ?? [];
+	}
+
+	/// <summary>
+	/// Set exactly which permissions an app has, remembered for later launches. Only the ones it declares count.
+	/// </summary>
+	public void SetPermissions( NaviAppInfo app, IEnumerable<string> permissions )
+	{
+		var granted = permissions?.Where( app.Permissions.Contains ).Distinct().ToArray() ?? [];
+
+		GrantedPermissions ??= new();
+		GrantedPermissions.RemoveAll( x => x.StartsWith( app.Id + " " ) );
+		GrantedPermissions.AddRange( granted.Select( x => $"{app.Id} {x}" ) );
+
+		if ( GetProcess( app.Id ) is { } process && !app.IsSystem )
+		{
+			process.Permissions.Clear();
+			process.Permissions.UnionWith( granted );
+		}
+
+		Version++;
+	}
+
+	/// <summary>
+	/// Ask the player to grant a running app more permissions, with a dialog. Returns the ones it has afterwards, out of
+	/// those asked for. Permissions it already has, or that it doesn't declare, aren't shown; the latter are never granted.
+	/// </summary>
+	public async Task<string[]> RequestPermissionsAsync( NaviProcess process, IEnumerable<string> permissions )
+	{
+		var asked = permissions?.Distinct().ToArray() ?? [];
+		var missing = asked.Where( x => process.App.Permissions.Contains( x ) && !process.HasPermission( x ) ).ToArray();
+
+		if ( missing.Length > 0 && running.Contains( process ) )
+		{
+			var request = new NaviPermissionRequest { App = process.App, Permissions = missing, Ticked = missing };
+			permissionRequests.Add( request );
 			Version++;
+
+			await request.Answer.Task;
+		}
+
+		return asked.Where( process.HasPermission ).ToArray();
+	}
+
+	/// <summary>
+	/// Show the player every permission an app declares, ticked as it has them (all ticked the first time), so they can
+	/// change them. Opens the app afterwards if it isn't running. The taskbar menu's "Permissions..." does this.
+	/// </summary>
+	public void ReviewPermissions( string id )
+	{
+		var app = NaviAppRegistry.Find( id );
+		if ( app is null || !IsInstalled( app ) || app.IsSystem || app.Permissions.Count == 0 )
+			return;
+
+		if ( permissionRequests.Any( x => x.App.Id == id && x.IsReview ) )
+			return;
+
+		permissionRequests.Add( new NaviPermissionRequest
+		{
+			App = app,
+			Permissions = app.Permissions,
+			Ticked = NeedsReview( app ) ? app.Permissions : GetPermissions( app ).ToArray(),
+			IsReview = true,
+			Launch = !IsRunning( id ),
+		} );
+
+		Version++;
+	}
+
+	/// <summary>
+	/// The player closed a permission dialog without answering: nothing changes, an app that asked gets nothing more,
+	/// and an app waiting to open doesn't open.
+	/// </summary>
+	public void DismissPermissionRequest( NaviPermissionRequest request )
+	{
+		if ( !permissionRequests.Remove( request ) )
+			return;
+
+		request.Answer.TrySetResult( [] );
+		Version++;
+	}
+
+	/// <summary>
+	/// The player answered a permission dialog. <paramref name="ticked"/> are the permissions they ticked.
+	/// </summary>
+	public void AnswerPermissionRequest( NaviPermissionRequest request, IEnumerable<string> ticked )
+	{
+		if ( !permissionRequests.Remove( request ) )
+			return;
+
+		var answer = ticked?.Where( request.Permissions.Contains ).ToArray() ?? [];
+		var app = request.App;
+
+		if ( request.IsReview )
+		{
+			ReviewedApps ??= new();
+			if ( !ReviewedApps.Contains( app.Id ) )
+				ReviewedApps.Add( app.Id );
+
+			SetPermissions( app, answer );
+
+			if ( request.Launch && !IsRunning( app.Id ) && IsInstalled( app ) )
+				Open( app );
+		}
+		else
+		{
+			SetPermissions( app, GetPermissions( app ).Concat( answer ) );
+		}
+
+		request.Answer.TrySetResult( answer );
+		Version++;
 	}
 
 	/// <summary>

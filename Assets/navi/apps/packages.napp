@@ -1,0 +1,19 @@
+{
+  "AppId": "packages",
+  "Title": "Packages",
+  "Description": "Install and uninstall apps.",
+  "Icon": "inventory_2",
+  "Color": "#9ab0c4",
+  "PanelType": "NaviApps.Packages",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "CapturesInput": false,
+  "Permissions": [
+    "navi.apps.install",
+    "navi.store.install"
+  ],
+  "IsSystem": true,
+  "__references": [],
+  "__version": 0
+}

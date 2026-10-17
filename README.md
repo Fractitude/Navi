@@ -10,38 +10,39 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Parts
 
-- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector) and the open windows. Call `Install`, `Uninstall`, `Launch` and `Close` with an app id.
-- `NaviDesktop` (panel component) draws the desktop, windows and taskbar. It adds a `NaviComputer` to its GameObject if there is none.
-- `NaviAppRegistry` finds every app, so a new app needs no registration code. An app is either a `NaviApp` class with a `[NaviApp]` attribute (built-in and game apps), or any panel described by a `NaviAppResource` (Store apps).
-- `Packages` is the system app for installing and uninstalling. Open it with the NAVI button. Its Store tab lists apps players published to sbox.game.
-- `NaviAppResource` (`.napp`) describes an app and publishes it from an addon project. `NaviStore` finds and downloads published apps.
+- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector), the open windows and the permissions granted to apps. Gameplay code can call `Install`, `Uninstall`, `Launch` and `Close` with an app id.
+- `NaviDesktop` (panel component) draws the desktop, windows, taskbar and permission dialogs. It adds a `NaviComputer` to its GameObject if there is none.
+- `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
+- `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
+- `NaviPermissions` lists what apps can be allowed to do.
+- `Packages` and `Calculator` are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game.
 
 ## Windows
 
-- The window in front has focus. Clicking a window focuses it, a new window opens focused, and opening a minimized app restores and focuses it.
+- The window in front has focus. Clicking a window focuses it and draws it above the others. A new window opens focused, and opening a minimized app restores and focuses it.
 - Drag the title bar to move a window. Windows can't leave the screen.
 - Drag a corner to resize. Double-click the title bar, or use its button, to maximize.
 - Minimize hides the window and keeps the app running. Click the taskbar icon to bring it back. Clicking the icon of the window in front minimizes it.
+- Right-click a taskbar icon for its menu: Open, Permissions..., Close.
+- A shield in a window's title bar means the app holds permissions.
 
-## Make an app in your game
+## Make an app
 
-Apps can live in any game that has the library. Calculator and Packages are in `Libraries/navi/Code/Navi/Apps/`.
+Every app is made the same way, whether it is built in, part of a game, or published to the Store: a plain Razor panel, plus a `.napp` manifest that describes it. The panel uses no Navi types; it talks to the computer through the `Navi` client.
 
-1. Create a folder in your game's `Code/`, e.g. `Code/Apps/Notes/`.
-2. Add `Notes.razor`:
+1. Write the panel. Give it its own namespace so class names don't clash:
 
    ```razor
    @using Sandbox.UI
-   @inherits NaviApp
-   @namespace Sandbox
-   @attribute [NaviApp( "notes", "Notes", Description = "Write things down.", Icon = "edit_note", Color = "#c0d890" )]
+   @inherits Panel
+   @namespace NotesApp
 
    <root>
-   	<div>Hello from @Info.Name</div>
+   	<div class="button" @onclick=@(() => Navi.Close( this ))>Done</div>
    </root>
    ```
 
-3. Add `Notes.razor.scss`. Give the root a size, because a new window fits its content. When the window is resized or maximized the app is stretched to fill it, so lay it out with flex rather than fixed sizes if it can resize:
+2. Add `Notes.razor.scss`. Give the root a size, because a new window fits its content. When the window is resized or maximized the app is stretched to fill it, so lay it out with flex rather than fixed sizes if it can resize:
 
    ```scss
    Notes
@@ -52,79 +53,91 @@ Apps can live in any game that has the library. Calculator and Packages are in `
    }
    ```
 
+3. In `Assets/`, create a Navi App asset (`.napp`). Set App Id, Title and Panel Type (the panel's full class name, e.g. `NotesApp.Notes`), and fill in the rest of the manifest below.
 4. Save. The app is now in Packages. Click Install, then click its taskbar icon.
 
 The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 312 high, so keep apps small.
 
-## Attribute fields
+### The manifest (`.napp`)
 
 | Field | Meaning |
 |---|---|
-| `id` | Stable unique id. It is saved in `InstalledApps`, so do not change it after you use it. |
-| `name` | Name on the taskbar tooltip, window title and package list. |
+| `AppId` | Stable unique id. It is saved in `InstalledApps`, so do not change it after you use it. |
+| `Title` | Name on the taskbar tooltip, window title and package list. |
 | `Description` | One line in the package list. |
 | `Icon` | Material icon name, e.g. `calculate`. |
 | `Color` | Icon background, as a CSS color. |
-| `IsSystem` | Always installed. Can't be uninstalled. |
+| `PanelType` | Full name of the app's panel class. |
 | `CanMinimize` | Has a minimize button. Default `true`. |
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
 | `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
+| `Permissions` | The permissions the app may have. It is never granted others. See below. |
+| `IsSystem` | A system app: always installed, can't be uninstalled, and has all its `Permissions` without asking. Only counts for apps that ship with a game or a library, never for Store apps. |
 
-For example, Calculator turns off maximize and resize:
+## Talking to the computer
 
-```razor
-@attribute [NaviApp( "calculator", "Calculator", CanMaximize = false, CanResize = false )]
-```
+Apps call the static `Navi` class with their own panel. Calls are async: they travel up the panel tree as a `navi.call` event and are answered a frame or so later.
+
+| Call | Does | Needs |
+|---|---|---|
+| `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The app's own window | |
+| `Navi.HasInput( this )` | True while the app has the player's controls (not async) | |
+| `Navi.GetApps( this )` | Every app, with installed and system flags | |
+| `Navi.Launch( this, id )` | Open an app | |
+| `Navi.Install( this, id )`, `Uninstall` | Install or uninstall an app | `navi.apps.install` |
+| `Navi.CloseApp( this, id )` | Close another app | `navi.apps.manage` |
+| `Navi.SearchStore( this )` | Store packages, with an official flag | |
+| `Navi.GetStoreStatus( this )` | Installed and downloading package idents | |
+| `Navi.InstallPackage( this, ident )` | Download and install a Store app | `navi.store.install` |
+| `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
+| `Navi.GetPermissions( this )`, `RequestPermissions` | See below | |
+
+## Permissions
+
+Every app can open apps, list them and control its own window. Anything more needs a permission (`Navi.Permission.*`, `NaviPermissions`), and the player decides which an app gets, like on Android:
+
+- **The manifest declares them.** An app can only ever have the permissions its `.napp` lists.
+- **First launch asks first.** The first time the player opens an app that declares permissions, a dialog lists them, all ticked. The player unticks what they don't want and clicks Open; the app then runs with the rest. Cancel doesn't open it.
+- **Apps can ask while running.** `await Navi.RequestPermissions( this, Navi.Permission.InstallApps )` shows the same dialog for the ones it lacks and returns `(Granted, Denied)`.
+- **Missing permissions fail.** A call without its permission throws `UnauthorizedAccessException`. `Navi.MissingPermission( e )` says which one. `Navi.WithPermission( this, () => Navi.Install( this, id ) )` makes a call, asks for a missing permission, and tries once more.
+- **Grants are remembered** per app (`NaviComputer.GrantedPermissions`), across launches. Uninstalling forgets them.
+- **The player can change them** from the taskbar menu: Permissions... (or Open with permissions... when the app is closed) shows every declared permission, ticked as granted. Unticking revokes.
+- **System apps** (`IsSystem`, pre-packaged only) have all their declared permissions without asking. Packages is one.
+
+The app's job is to cope with what it was denied: hide or disable those features, or explain why they don't work.
 
 ## Apps that take over the controls
 
-An app with `CapturesInput = true` (on `[NaviApp]` or a `.napp`) gets the player's controls while its window is in front. The Pac-Man Store app (`fractitude.napp_pacman`) uses it.
+An app with `CapturesInput = true` gets the player's controls while its window is in front. The Pac-Man Store app (`fractitude.napp_pacman`) uses it.
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
 - The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
 - Once the screen fills the view, the mouse cursor is shown, and `WorldInput` aims with it, so the player can point and click anywhere on the computer (`FreeCursor`). Game code that hides the cursor every frame, like a crosshair, should skip that while `NaviInputCapture.Current` isn't null.
 - An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app, with a bar on screen filling up with each press (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
 - Closing, minimizing or focusing another window gives control back, and the camera flies back.
-- While an app has the controls, its panel has the `navi-input` class, so a Store app that can't use Navi types can check `HasClass( "navi-input" )`, e.g. to pause when it doesn't.
+- `Navi.HasInput( this )` is true while the app has the controls (its panel has the `navi-input` class). Pause when it isn't.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
 
 `NaviInputCapture` is added to the computer automatically by `NaviDesktop`. The camera move needs a `WorldPanel`; with a `ScreenPanel` only the controls are taken.
 
-## Inside a `NaviApp`
-
-- `Computer` is the `NaviComputer` the app runs on. Use it to install, launch or close other apps.
-- `Info` is the app's registration (id, name, icon...).
-- `Close()` closes the app's window.
-- App state lives in the panel. Minimizing keeps it. Closing the window deletes the panel, so the state resets on the next launch.
-- Install state is local. It is not synced over the network yet.
-
-## Make an app as an addon (players)
+## Publish an app to the Store (players)
 
 Players make apps in their own addon project and publish them to sbox.game. Other players install them from the Store tab in Packages, in any game that has the Navi library. In the Omnipresence repo, `Addons/navi_counter/` is an example: a counter with - and + buttons.
 
-**Don't install the Navi library in an app addon, and don't use Navi types in its code.** When an addon asset is published with code, s&box bundles every library in the addon project. A bundled Navi would replace the host game's Navi when the app is installed. Instead, the app is a plain `Panel` and a `.napp` asset describes it. The `.napp` asset type comes from the target game, which already has Navi.
+**Don't install the Navi library in an app addon.** When an addon asset is published with code, s&box bundles every library in the addon project, and a bundled Navi would replace the host game's Navi when the app is installed. That's why apps use no Navi types: copy `Code/Navi/Client/Navi.cs` into the addon's `Code/` and change only its namespace line. The `.napp` asset type comes from the target game, which already has Navi.
 
 1. Create an addon project: in the s&box launcher, New Project > Addon.
 2. In Project Settings, set Target Game to a game that has the Navi library, e.g. `fractitude.omnipresence`. Restart the editor.
-3. Write the app as a plain Razor panel (`@inherits Panel`) in the addon's `Code/` folder. Give it its own namespace, e.g. `@namespace NaviCounter`.
-4. In the addon's `Assets/`, create a Navi App asset (`.napp`). Set App Id, Title, Icon, Color and Panel Type (the panel's full class name, e.g. `NaviCounter.Counter`). Turn off the window features the app doesn't want.
-5. Press Play to test. Code changes hot-reload. Friends who join your editor session get the changes too.
-6. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_counter`.
-
-An app controls its window by raising panel events, which bubble up to the window:
-
-| Event | Effect |
-|---|---|
-| `CreateEvent( "navi.close" )` | Close the window |
-| `CreateEvent( "navi.minimize" )` | Minimize the window |
-| `CreateEvent( "navi.maximize" )` | Maximize or restore the window |
+3. Copy the `Navi` client in, if the app calls the computer. Write the app as in "Make an app".
+4. Press Play to test. Code changes hot-reload. Friends who join your editor session get the changes too.
+5. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_counter`.
 
 How the Store works:
 
 - The Store lists packages of type `napp`. These are shared by every game with the library.
-- Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The resource names the panel class, and the app is then found like any other app.
+- Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The manifest names the panel class, and the app is then found like any other app. Its declared permissions are reviewed on its first launch.
 - Installed Store packages are kept in `NaviComputer.InstalledPackages` and downloaded again when the game starts.
 - Addon code must pass the s&box API whitelist, like all game code.
 - Uninstalling a Store app keeps its code loaded until the game restarts.
-- Each game has its own copy of the library's source. Keep `NaviAppResource` and the `navi.*` events stable, or published apps can break.
+- Each game has its own copy of the library's source. Keep `NaviAppResource`, the `navi.call` methods (`NaviSystemCalls`) and the permission ids stable, or published apps can break. The older `navi.close`, `navi.minimize` and `navi.maximize` events still work.

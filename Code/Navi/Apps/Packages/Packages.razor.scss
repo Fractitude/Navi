@@ -51,6 +51,17 @@ Packages
 	overflow-y: scroll;
 }
 
+// A message about the last action, e.g. a denied permission. Click to dismiss.
+.notice
+{
+	flex-shrink: 0;
+	padding: 4px 6px;
+	font-size: 10px;
+	color: #f2eee2;
+	background-color: #8a3a3a;
+	cursor: pointer;
+}
+
 .status
 {
 	padding: 12px 4px;
