@@ -1,5 +1,4 @@
 @using Sandbox.UI
-@using System.Threading.Tasks
 @inherits Panel
 @namespace NaviApps
 
@@ -18,12 +17,15 @@
 		@if ( UiState.ShowStore )
 		{
 			<div class="button @( UiState.Refreshing ? "disabled" : "" )" @onclick=@( () => ViewModel.SubmitSearch() )>
-				<i>refresh</i></div>
+				<i>refresh</i>
+			</div>
 		}
 		else
 		{
 			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
-			<div class="filter" tooltip="Show: @UiState.FilterName" @onclick=@( () => ViewModel.ToggleFilterMenu() )><i>filter_list</i>
+			<div class="filter" tooltip="Show: @UiState.FilterName"
+			     @onclick=@( () => ViewModel.ToggleFilterMenu() )>
+				<i>filter_list</i>
 			</div>
 		}
 	</div>
@@ -98,7 +100,8 @@
 								<div class="facts">
 									@foreach ( var fact in entry.Facts )
 									{
-										<div class="fact"><i>@fact.Icon</i>
+										<div class="fact">
+											<i>@fact.Icon</i>
 											<div class="key">@fact.Key</div>
 											<div class="value">@fact.Value</div>
 										</div>
