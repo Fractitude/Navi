@@ -43,21 +43,6 @@ public sealed class NaviInputCapture : Component
 	[Property, Range( 0.3f, 3f )] public float QuitWindow { get; set; } = 1f;
 
 	/// <summary>
-	/// Presses still needed to force-quit the app.
-	/// </summary>
-	public int QuitPressesLeft => QuitPresses - escapePresses;
-
-	/// <summary>
-	/// How far through <see cref="QuitPresses"/> the player is, 0 to 1.
-	/// </summary>
-	public float QuitProgress => QuitPresses > 0 ? (float)escapePresses / QuitPresses : 0f;
-
-	/// <summary>
-	/// Show the "press Escape to quit" hint, from the first press until the count runs out.
-	/// </summary>
-	public bool ShowQuitHint => Computer.InputCapture is not null && escapePresses > 0;
-
-	/// <summary>
 	/// The capture that has the player's input right now, or null. Game code can check it, e.g. to hide a crosshair.
 	/// </summary>
 	public static NaviInputCapture Current { get; private set; }

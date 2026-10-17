@@ -128,7 +128,7 @@ An app with `CapturesInput = true` gets the player's controls while its window i
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
 - The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself, e.g. `Input.Down( "Forward" )` for W.
 - Once the screen fills the view, the mouse cursor is shown, and `WorldInput` aims with it, so the player can point and click anywhere on the computer (`FreeCursor`). Game code that hides the cursor every frame, like a crosshair, should skip that while `NaviInputCapture.Current` isn't null.
-- An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app, with a bar on screen filling up with each press (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
+- An Escape press is swallowed so the game menu doesn't open. Pressing Escape 5 times, each within a second of the last, force-quits the app (`QuitPresses`, `QuitWindow`). It can't be a hold: s&box tells games when Escape goes down, but never whether it's still held.
 - Closing, minimizing or focusing another window gives control back, and the camera flies back.
 - `Navi.HasInput( this )` is true while the app has the controls (its panel has the `navi-input` class). Pause when it isn't.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.

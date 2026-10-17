@@ -51,13 +51,6 @@
 		}
 	</div>
 
-	@if ( InputCapture?.ShowQuitHint == true )
-	{
-		<div class="quit-hint">
-			<div class="bar"><div class="fill" style="width: @(InputCapture.QuitProgress * 100)%;"></div></div>
-		</div>
-	}
-
 	@if ( MenuApp is not null )
 	{
 		@* Catches clicks outside the menu, to close it. *@
@@ -467,6 +460,5 @@
 	}
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
-	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count,
-		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft, MenuApp );
+	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp );
 }
