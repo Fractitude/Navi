@@ -196,9 +196,10 @@
 	string AppFilter = "installed";
 
 	/// <summary>
-	/// The kinds of app the Apps tab can show, in menu order.
+	/// The kinds of app the Apps tab can show, in menu order. A property, not a field: a hot reload patches methods, so
+	/// a change to this list shows up in a running game, while a field's initializer only runs once per load.
 	/// </summary>
-	static readonly (string Key, string Name)[] Filters = [ ("installed", "Installed"), ("store", "Store"), ("core", "Core"), ("system", "System"), ("prepackaged", "Pre-packaged")];
+	static (string Key, string Name)[] Filters => [ ("installed", "Installed"), ("store", "Store"), ("core", "Core"), ("system", "System"), ("prepackaged", "Pre-packaged")];
 
 	/// <summary>
 	/// The current filter's name, for the button's tooltip. Falls back to the first kind if the filter is one this
@@ -462,11 +463,12 @@
 	}
 
 	/// <summary>
-	/// Is the app in the list under <paramref name="filter"/>? Installed apps are in every filter. Pre-packaged is the
-	/// apps that ship with the game or a library but aren't part of the OS: they are in it whether or not they are
-	/// installed, because the Store can't bring them back, and the rest are Store apps, which are left to the Store tab
-	/// when they aren't installed. Core apps are part of the OS, and system apps ask for full system access, whether
-	/// they ship with the game or with a Store package, so an app can match more than one of these.
+	/// Is the app in the list under <paramref name="filter"/>? Installed is the plain apps that are installed: core and
+	/// system apps are left to their own kinds. Pre-packaged is the apps that ship with the game or a library but
+	/// aren't part of the OS, whether or not they are installed, because the Store can't bring them back; the rest are
+	/// Store apps, which are left to the Store tab when they aren't installed. Core apps are part of the OS, and
+	/// system apps ask for full system access, whether they ship with the game or with a Store package, so an app can
+	/// match more than one of these.
 	/// </summary>
 	static bool Matches( string filter, bool installed, string type, bool fromStore ) => filter switch
 	{
@@ -474,7 +476,7 @@
 		"core" => type is "core",
 		"system" => installed && ( type is "core" or "system" ),
 		"prepackaged" => !fromStore && type is not "core",
-		_ => installed,
+		_ => installed && type is "app",
 	};
 
 	/// <summary>
