@@ -174,7 +174,125 @@ public sealed class NaviComputer : Component
 
 	protected override void OnStart()
 	{
+		// A save replaces what the scene set up, and downloads its own packages.
+		if ( !AutoSave || !Load() )
+			_ = DownloadInstalledPackagesAsync();
+	}
+
+	protected override void OnUpdate()
+	{
+		// The delay counts from the latest change.
+		if ( changedVersion != Version )
+		{
+			changedVersion = Version;
+			sinceChange = 0;
+		}
+
+		if ( AutoSave && savedVersion != Version && sinceChange > AutoSaveDelay )
+			Save();
+	}
+
+	protected override void OnDisabled()
+	{
+		if ( AutoSave && savedVersion != Version )
+			Save();
+	}
+
+	/// <summary>
+	/// Names this computer's save file (<see cref="NaviSaveData"/>). Letters, digits, '-' and '_'. Empty uses the
+	/// GameObject's id, which stays the same across launches for an object saved in a scene. Set it on computers that are
+	/// spawned at runtime, or the save won't find them again.
+	/// </summary>
+	[Property] public string SaveId { get; set; } = "";
+
+	/// <summary>
+	/// Load this computer's save when it starts, and save it a moment after every change. Turn it off to save and load
+	/// only from game code (<see cref="Save"/>, <see cref="Load"/>, <see cref="NaviSaveData"/>).
+	/// </summary>
+	[Property] public bool AutoSave { get; set; } = true;
+
+	/// <summary>
+	/// How long the computer waits after a change before it saves, in seconds, so a burst of changes is one write.
+	/// </summary>
+	const float AutoSaveDelay = 1f;
+
+	/// <summary>The file name this computer saves to.</summary>
+	public string SaveKey => string.IsNullOrWhiteSpace( SaveId ) ? GameObject.Id.ToString( "N" ) : SaveId;
+
+	int savedVersion;
+	int changedVersion;
+	RealTimeSince sinceChange;
+	string savedJson;
+
+	/// <summary>
+	/// Write what the player changed on this computer to the current save slot. Skipped if nothing changed since the last
+	/// save.
+	/// </summary>
+	public void Save()
+	{
+		savedVersion = Version;
+
+		var save = CaptureSave();
+		var json = Json.Serialize( save );
+		if ( json == savedJson )
+			return;
+
+		NaviSaveData.Write( SaveKey, save );
+		savedJson = json;
+	}
+
+	/// <summary>
+	/// Replace this computer's state with its save in the current slot. Every window closes and open prompts are
+	/// dismissed, since what they were opened with may no longer hold. Returns false, changing nothing, if there is no save.
+	/// </summary>
+	public bool Load()
+	{
+		if ( NaviSaveData.Read( SaveKey ) is not { } save )
+			return false;
+
+		foreach ( var process in running.ToList() )
+			Close( process.App.Id );
+
+		foreach ( var request in permissionRequests.ToList() )
+			DismissPermissionRequest( request );
+
+		RestoreSave( save );
+		savedJson = Json.Serialize( CaptureSave() );
+		savedVersion = Version;
+
 		_ = DownloadInstalledPackagesAsync();
+		return true;
+	}
+
+	/// <summary>
+	/// What the player changed on this computer, as it would be saved.
+	/// </summary>
+	public NaviComputerSave CaptureSave() => new()
+	{
+		InstalledApps = InstalledApps?.ToList() ?? new(),
+		InstalledPackages = InstalledPackages?.ToList() ?? new(),
+		GrantedPermissions = GrantedPermissions?.ToList() ?? new(),
+		ReviewedApps = ReviewedApps?.ToList() ?? new(),
+		RootApps = RootApps?.ToList() ?? new(),
+		DisplayScale = DisplayScale,
+	};
+
+	/// <summary>
+	/// Take on a save's state. Unknown permissions and display scales are dropped; the rest is checked where it is used,
+	/// as always (root needs a system app, a grant only counts for a permission the app declares).
+	/// </summary>
+	public void RestoreSave( NaviComputerSave save )
+	{
+		InstalledApps = save.InstalledApps?.Distinct().ToList() ?? new();
+		InstalledPackages = save.InstalledPackages?.Distinct().ToList() ?? new();
+		GrantedPermissions = save.GrantedPermissions?.Where( x => NaviPermissions.IsKnown( x.Split( ' ' ).Last() ) ).Distinct().ToList() ?? new();
+		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();
+		RootApps = save.RootApps?.Distinct().ToList() ?? new();
+
+		if ( !SetDisplayScale( save.DisplayScale ) )
+			DisplayScale = 1f;
+
+		Version++;
 	}
 
 	/// <summary>

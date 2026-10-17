@@ -120,6 +120,15 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
 | `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
 
+## Saving
+
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, and settings such as the display scale. Open windows aren't saved. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+
+- **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.
+- **One file per computer.** `SaveId` names the file. Left empty, it is the GameObject's id, which stays the same for an object saved in a scene. Set it on computers that are spawned at runtime.
+- **Save slots.** A game with its own saves sets `NaviSaveData.Slot`, then calls `NaviSaveData.LoadAll( Scene )` when the player loads a save. Loading closes every window. `SaveAll`, and a computer's own `Save` and `Load`, are there for games that turn `AutoSave` off.
+- **Not a security boundary.** The files are plain JSON, and any package's code in the game can write them. Loading still applies the computer's rules: root needs a system app, and a grant only counts for a permission the app declares.
+
 ## Permissions
 
 Every app can open apps, list them and control its own window. Anything more needs a permission (`Navi.Permission.*`, `NaviPermissions`), and the player decides which an app gets, like on Android:
