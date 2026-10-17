@@ -2,9 +2,9 @@ namespace Sandbox;
 
 /// <summary>
 /// Gives the player's input to an app that captures input (<see cref="NaviAppAttribute.CapturesInput"/>) while its window is in front.
-/// The camera flies to the screen so it fills the view, and the player's movement, look and world clicks stop, so apps can read
-/// keys like WASD with <see cref="Input"/>. Pressing Escape several times quickly force-quits the app. When the window closes, minimizes or loses focus,
-/// everything goes back.
+/// The camera flies to the screen so it fills the view, and the player's movement and look stop, so apps can read keys like WASD
+/// with <see cref="Input"/>. Once there, the mouse cursor is free to point and click anywhere on the screen. Pressing Escape several
+/// times quickly force-quits the app. When the window closes, minimizes or loses focus, everything goes back.
 /// </summary>
 public sealed class NaviInputCapture : Component
 {
@@ -24,6 +24,12 @@ public sealed class NaviInputCapture : Component
 	/// How much of the view the screen fills. 1 fits it exactly; less leaves a border.
 	/// </summary>
 	[Property, Range( 0.5f, 1f )] public float Fill { get; set; } = 1f;
+
+	/// <summary>
+	/// Show the mouse cursor once the screen fills the view, so the player can point and click on it. <see cref="WorldInput"/>
+	/// aims with the cursor while it's visible. Off, clicks stop entirely while an app has the controls.
+	/// </summary>
+	[Property] public bool FreeCursor { get; set; } = true;
 
 	/// <summary>
 	/// Escape presses in a row that force-quit the app. Not a hold: s&box tells games when Escape goes down,
@@ -68,6 +74,7 @@ public sealed class NaviInputCapture : Component
 	RealTimeSince sinceEscapePressed = 100;
 	int escapePresses;
 	Transform playerView;
+	MouseVisibility playerMouse;
 
 	record ControllerState( PlayerController Controller, bool Input, bool Look, bool Camera );
 	readonly List<ControllerState> controllers = new();
@@ -98,12 +105,41 @@ public sealed class NaviInputCapture : Component
 		if ( state == State.FlyingIn )
 		{
 			flight = System.MathF.Min( 1f, flight + step );
-			if ( flight >= 1f ) state = State.Captured;
+			if ( flight >= 1f ) Arrive();
 		}
 		else if ( state == State.FlyingOut )
 		{
 			flight = System.MathF.Max( 0f, flight - step );
 			if ( flight <= 0f ) End();
+		}
+
+		UpdateCursor();
+	}
+
+	/// <summary>
+	/// The camera reached the screen: centre the cursor on it.
+	/// </summary>
+	void Arrive()
+	{
+		state = State.Captured;
+
+		if ( FreeCursor )
+			Mouse.Position = Screen.Size * 0.5f;
+	}
+
+	/// <summary>
+	/// The cursor and world clicks only work once the screen fills the view, so nothing is clicked by accident mid-flight.
+	/// Set every frame, because game code (like a crosshair) may hide the cursor every frame too.
+	/// </summary>
+	void UpdateCursor()
+	{
+		var free = FreeCursor && state == State.Captured;
+
+		Mouse.Visibility = free ? MouseVisibility.Visible : playerMouse;
+
+		foreach ( var wi in worldInputs )
+		{
+			if ( wi.IsValid() ) wi.Enabled = free;
 		}
 	}
 
@@ -156,6 +192,8 @@ public sealed class NaviInputCapture : Component
 			if ( Scene.Camera is { } camera )
 				playerView = camera.WorldTransform;
 
+			playerMouse = Mouse.Visibility;
+
 			foreach ( var pc in Scene.GetAllComponents<PlayerController>().Where( x => !x.IsProxy ) )
 			{
 				controllers.Add( new ControllerState( pc, pc.UseInputControls, pc.UseLookControls, pc.UseCameraControls ) );
@@ -164,7 +202,7 @@ public sealed class NaviInputCapture : Component
 				pc.UseCameraControls = false;
 			}
 
-			// Clicks would otherwise go to whatever the screen centre points at.
+			// Off while the camera flies, or clicks go to whatever the view's centre passes over. UpdateCursor turns them back on.
 			foreach ( var wi in Scene.GetAllComponents<WorldInput>().Where( x => x.Enabled ) )
 			{
 				worldInputs.Add( wi );
@@ -191,6 +229,7 @@ public sealed class NaviInputCapture : Component
 			if ( wi.IsValid() ) wi.Enabled = true;
 		}
 
+		Mouse.Visibility = playerMouse;
 		controllers.Clear();
 		worldInputs.Clear();
 		flight = 0;
