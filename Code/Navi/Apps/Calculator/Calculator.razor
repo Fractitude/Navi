@@ -16,7 +16,7 @@
 			<div class="row">
 				@foreach ( var label in row )
 				{
-					<div class="key @KeyClass( label )" @onclick=@(() => Press( label ))>@label</div>
+					<div class="key @KeyClass( label )" @onclick=@( () => Press( label ) )>@label</div>
 				}
 			</div>
 		}
@@ -189,5 +189,6 @@
 
 	static double Parse( string text ) => double.Parse( text, System.Globalization.CultureInfo.InvariantCulture );
 
-	static string Format( double value ) => value.ToString( $"G{MaxDigits}", System.Globalization.CultureInfo.InvariantCulture );
+	static string Format( double value ) =>
+		value.ToString( $"G{MaxDigits}", System.Globalization.CultureInfo.InvariantCulture );
 }
