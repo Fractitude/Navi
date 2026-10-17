@@ -450,11 +450,12 @@ public sealed partial class NaviComputer : Component
 	public IEnumerable<string> DownloadingPackages => downloading;
 
 	/// <summary>
-	/// Download an app from the Store and install it. Returns false if the download failed.
+	/// Download an app from the Store and install it. Returns false if the download failed, or the game doesn't allow
+	/// the package (<see cref="NaviStore.OfficialOnly"/>).
 	/// </summary>
 	public async Task<bool> InstallPackageAsync( string packageIdent )
 	{
-		if ( !IsAuthority || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
+		if ( !IsAuthority || !NaviStore.IsAllowed( packageIdent ) || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
 			return false;
 
 		var app = await DownloadPackageAsync( packageIdent );
@@ -501,12 +502,20 @@ public sealed partial class NaviComputer : Component
 	}
 
 	/// <summary>
-	/// Install an app. Returns false if it doesn't exist or is already installed.
+	/// Install an app. Returns false if it doesn't exist, is already installed, or is a Store app the game doesn't allow
+	/// (<see cref="NaviStore.OfficialOnly"/>), even one whose code is loaded.
 	/// </summary>
 	public bool Install( string id )
 	{
 		if ( !IsAuthority )
 			return false;
+
+		// A Store app's id is its package ident; other apps' ids are asset paths, which aren't.
+		if ( NaviStore.NormalizeIdent( id ) is not null && !NaviStore.IsAllowed( id ) )
+		{
+			Log.Warning( $"NaviComputer: '{id}' isn't from an allowed org; this game allows only official apps" );
+			return false;
+		}
 
 		var app = NaviAppRegistry.Find( id );
 		if ( app is null )

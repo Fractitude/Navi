@@ -209,6 +209,7 @@ How the Store works:
 - The Store lists packages of type `napp`. These are shared by every game with the library.
 - Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The manifest names the panel class, and the app is then found like any other app. A system app asks for root before it is installed; other apps have their declared permissions reviewed on first launch.
 - Installed Store packages are kept in `NaviComputer.InstalledPackages` and downloaded again when the game starts.
+- A game can allow only official apps: `NaviStore.OfficialOnly = true`, plus `NaviStore.AllowedOrgs` for other orgs it trusts. The Store then asks sbox.game only for those orgs' apps (one search per org), and nothing else is downloaded: not on install, not from a save, not on a client whose host has it. Set both in the game's code before its computers start, e.g. in a `GameObjectSystem`'s constructor, so the host and every client agree. An org is the first part of a package ident, which only its members can publish under.
 - Addon code must pass the s&box API whitelist, like all game code.
 - Uninstalling a Store app keeps its code loaded until the game restarts.
 - Each game has its own copy of the library's source. Keep `NaviAppResource`, the `navi.call` methods (`NaviSystemCalls`) and the permission ids stable, or published apps can break. The older `navi.close`, `navi.minimize` and `navi.maximize` events still work.
