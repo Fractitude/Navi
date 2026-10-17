@@ -183,6 +183,20 @@
 	{
 		base.Tick();
 
+		// The engine draws the scrollbar over the list instead of taking room from it, and scrollbar-gutter keeps
+		// room whether or not the list scrolls. So the room is made here, only while the bar is there: the engine
+		// adds the bar to the end of the scrolling panel's children.
+		foreach ( var child in Children )
+		{
+			if ( !child.HasClass( "list" ) ) continue;
+
+			var scrolling = false;
+			foreach ( var bar in child.Children )
+				scrolling |= bar is Sandbox.UI.ScrollBar;
+
+			child.SetClass( "scrolling", scrolling );
+		}
+
 		if ( !polling && sincePoll > 0.25f )
 			_ = PollAsync();
 	}

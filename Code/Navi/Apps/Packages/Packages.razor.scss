@@ -79,6 +79,13 @@ Packages
 	}
 }
 
+// Room for the scrollbar, only while the list has one: it is drawn over the content, and a gutter would keep
+// the same room when there is nothing to scroll.
+.list.scrolling
+{
+	padding-right: 10px;
+}
+
 // A message about the last action, e.g. a denied permission. Click to dismiss.
 .notice
 {
