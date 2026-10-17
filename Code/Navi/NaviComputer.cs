@@ -255,8 +255,52 @@ public sealed partial class NaviComputer : Component
 		return (new Vector3( 0, -offset.x, -offset.y ), size);
 	}
 
+	/// <summary>
+	/// How far behind the screen its black back plane sits, in the GameObject's local units. Enough that it doesn't z-fight
+	/// with the panel.
+	/// </summary>
+	const float BackPlaneOffset = 0.1f;
+
+	GameObject backPlane;
+
+	/// <summary>
+	/// Keep a black plane just behind the screen, facing away from it, so the back of the screen is black rather than the
+	/// panel seen from behind. Every client makes its own: it isn't saved or sent over the network.
+	/// </summary>
+	void UpdateBackPlane()
+	{
+		if ( Components.Get<WorldPanel>() is not { } panel )
+		{
+			if ( backPlane.IsValid() )
+				backPlane.Destroy();
+
+			backPlane = null;
+			return;
+		}
+
+		if ( !backPlane.IsValid() )
+		{
+			backPlane = new GameObject( GameObject, true, "Navi Back Plane" );
+			backPlane.Flags |= GameObjectFlags.NotSaved;
+			backPlane.NetworkMode = NetworkMode.Never;
+
+			var renderer = backPlane.Components.Create<ModelRenderer>();
+			renderer.Model = Model.Load( "models/dev/plane.vmdl" );
+			renderer.Tint = Color.Black;
+			renderer.RenderType = ModelRenderer.ShadowRenderType.Off;
+		}
+
+		// The plane model lies flat, facing up (+Z); pitched down it faces backward, its x along Up.
+		var (center, size) = ScreenRect( panel );
+		var local = new Transform( center - Vector3.Forward * BackPlaneOffset, Rotation.FromPitch( -90 ), new Vector3( size.y / 100f, size.x / 100f, 1f ) );
+
+		if ( backPlane.LocalTransform != local )
+			backPlane.LocalTransform = local;
+	}
+
 	protected override void OnUpdate()
 	{
+		UpdateBackPlane();
 		UpdateSolid();
 		UpdateNetwork();
 
