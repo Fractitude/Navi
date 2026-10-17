@@ -37,6 +37,11 @@ csharp_style_conditional_delegate_call = true:suggestion
 # Code-block preferences
 csharp_prefer_braces = true:silent
 
+# Modifier preferences
+# Class members are private unless stated, so we don't state it: no `private` on fields, methods or
+# nested types. Only a non-default modifier is written.
+dotnet_style_require_accessibility_modifiers = omit_if_default:suggestion
+
 # Expression-level preferences
 csharp_prefer_simple_default_expression = true:suggestion
 csharp_style_deconstructed_variable_declaration = true:suggestion
