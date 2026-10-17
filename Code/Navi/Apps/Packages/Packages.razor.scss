@@ -1,5 +1,7 @@
 Packages
 {
+	// The filter menu is positioned against this panel, not against the window it sits in.
+	position: relative;
 	width: 320px;
 	height: 200px;
 	flex-direction: column;
@@ -41,6 +43,80 @@ Packages
 .spacer
 {
 	flex-grow: 1;
+}
+
+// The filter button, at the right edge of the tabs row while the Apps tab is up.
+.filter
+{
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+	justify-content: center;
+	align-items: center;
+	font-size: 16px;
+	color: #2a2840;
+	border: 1px solid #8a8472;
+	cursor: pointer;
+
+	&:hover
+	{
+		color: #f2eee2;
+		background-color: #2a2840;
+		border-color: #2a2840;
+	}
+}
+
+// The kinds of app the list can show, under the tabs row's right edge: the padding, then the row's height. Last
+// in the panel, so it draws over the list.
+.filter-menu
+{
+	position: absolute;
+	top: 34px;
+	right: 6px;
+	width: 120px;
+	flex-direction: column;
+	padding: 2px;
+	color: #2a2840;
+	background-color: #dcd6c4;
+	border: 2px solid #2a2840;
+	box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+	.item
+	{
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 6px;
+		font-size: 12px;
+		font-weight: 700;
+		white-space: nowrap;
+		cursor: pointer;
+
+		i
+		{
+			width: 14px;
+			flex-shrink: 0;
+			font-size: 14px;
+		}
+
+		&:hover
+		{
+			color: #f2eee2;
+			background-color: #2a2840;
+		}
+	}
+}
+
+// Under the filter menu, to close it on a click anywhere else. It starts below the tabs row, so the tabs and the
+// button above it stay clickable while the menu is up.
+.filter-backdrop
+{
+	position: absolute;
+	top: 34px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	pointer-events: all;
 }
 
 // The Store search field. The engine's TextEntry is dark; Navi's panels are paper.

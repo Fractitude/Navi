@@ -16,6 +16,11 @@
 		{
 			<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = FetchStoreAsync( false ))><i>refresh</i></div>
 		}
+		else
+		{
+			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
+			<div class="filter" tooltip="Show: @FilterName" @onclick=@(() => SetFilterOpen( !FilterOpen ))><i>filter_list</i></div>
+		}
 	</div>
 
 	@* Store search. Enter runs it; the refresh button re-runs the text that is in the field. *@
@@ -102,7 +107,14 @@
 		}
 		else
 		{
-			@foreach ( var app in Apps.Where( x => x.Type != "core" ) )
+			var visible = Apps.Where( x => Matches( AppFilter, x.Type, StoreAppIds.Contains( x.Id ) ) );
+
+			@if ( !visible.Any() )
+			{
+				<div class="status">@EmptyText</div>
+			}
+
+			@foreach ( var app in visible )
 			{
 				var id = app.Id;
 
@@ -111,19 +123,20 @@
 					<div class="info">
 						<div class="title-row">
 							<div class="name">@app.Name</div>
-							@if ( app.Type == "system" )
+							@if ( app.Type is "core" or "system" )
 							{
-								<div class="root" tooltip="System app: asks for full system access"><i>shield</i></div>
+								<div class="root" tooltip=@( app.Type == "core" ? "Core app: part of the OS" : "System app: asks for full system access" )><i>shield</i></div>
 							}
 						</div>
 						<div class="description">@app.Description</div>
 					</div>
 
-					@if ( app.Installed )
+					@* A core app is part of the OS: always installed, and it can't be uninstalled. *@
+					@if ( app.Type != "core" && app.Installed )
 					{
 						<div class="button" @onclick=@(() => Run( "uninstall apps", () => Navi.Uninstall( this, id ) ))>Uninstall</div>
 					}
-					else
+					else if ( app.Type != "core" )
 					{
 						<div class="button install" @onclick=@(() => Run( "install apps", () => Navi.Install( this, id ) ))>Install</div>
 					}
@@ -131,6 +144,23 @@
 			}
 		}
 	</div>
+
+	@* Which apps the list shows. Drawn after the list, so it paints over it, with a backdrop that closes it. The *@
+	@* backdrop starts under the tabs row, so the tabs and this button stay clickable while the menu is up. *@
+	@if ( FilterOpen && !ShowStore )
+	{
+		<div class="filter-backdrop" @onmousedown=@(() => SetFilterOpen( false ))></div>
+
+		<div class="filter-menu">
+			@foreach ( var (key, name) in Filters )
+			{
+				<div class="item @( AppFilter == key ? "active" : "" )" @onclick=@(() => ChooseFilter( key ))>
+					<i>@( AppFilter == key ? "check" : "" )</i>
+					<div class="label">@name</div>
+				</div>
+			}
+		</div>
+	}
 
 	@* How much of the Store the list holds, and the way to the next page of it. *@
 	@if ( ShowStore && !Refreshing && StoreTotal > 0 )
@@ -151,6 +181,31 @@
 	bool ShowStore;
 
 	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] Apps = [];
+
+	/// <summary>
+	/// Ids of the apps that came from the Store. The app list doesn't say where an app came from, so it's a second call.
+	/// </summary>
+	HashSet<string> StoreAppIds = new();
+
+	/// <summary>
+	/// What the Apps tab lists: one of the <see cref="Filters"/> keys. It has nothing to do with the Store tab.
+	/// </summary>
+	string AppFilter = "all";
+
+	/// <summary>
+	/// The kinds of app the Apps tab can show, in menu order.
+	/// </summary>
+	static readonly (string Key, string Name)[] Filters = [ ("all", "All"), ("store", "Store"), ("core", "Core"), ("system", "System")];
+
+	/// <summary>
+	/// The current filter's name, for the button's tooltip.
+	/// </summary>
+	string FilterName => Filters.First( x => x.Key == AppFilter ).Name;
+
+	/// <summary>
+	/// The filter menu is up.
+	/// </summary>
+	bool FilterOpen;
 
 	/// <summary>
 	/// The Store entries fetched so far, and how many match the current search in all. The backend pages them, so
@@ -214,6 +269,7 @@
 
 			knownVersion = version;
 			Apps = await Navi.GetApps( this );
+			StoreAppIds = ( await Navi.GetStoreApps( this ) ).ToHashSet();
 
 			var (installed, installing) = await Navi.GetStoreStatus( this );
 			InstalledPackages = installed.ToHashSet();
@@ -347,6 +403,9 @@
 	{
 		ShowStore = true;
 
+		// The filter belongs to the Apps tab; the button is gone now, and a menu with no button to anchor it is a ghost.
+		FilterOpen = false;
+
 		if ( !StoreLoaded )
 			_ = FetchStoreAsync( false );
 	}
@@ -397,5 +456,41 @@
 		storeVersion++;
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( knownVersion, ShowStore, storeVersion, Notice );
+	/// <summary>
+	/// Does an app belong in the list under <paramref name="filter"/>? Store apps came from the Store, core apps are
+	/// part of the OS, and system apps ask for full system access, whether they ship with the game or with a Store
+	/// package, so an app can match more than one of these. All matches every app, and nothing else does.
+	/// </summary>
+	static bool Matches( string filter, string type, bool fromStore ) => filter switch
+	{
+		"store" => fromStore,
+		"core" => type is "core",
+		"system" => type is "core" or "system",
+		_ => true,
+	};
+
+	/// <summary>
+	/// Shown in the list when no app matches the filter.
+	/// </summary>
+	string EmptyText => AppFilter switch
+	{
+		"store" => "No apps have come from the Store.",
+		"core" => "No apps are part of the OS.",
+		"system" => "No apps ask for full system access.",
+		_ => "No apps.",
+	};
+
+	void SetFilterOpen( bool open )
+	{
+		FilterOpen = open;
+		storeVersion++;
+	}
+
+	void ChooseFilter( string filter )
+	{
+		AppFilter = filter;
+		SetFilterOpen( false );
+	}
+
+	protected override int BuildHash() => System.HashCode.Combine( knownVersion, ShowStore, storeVersion, Notice, FilterOpen, AppFilter );
 }

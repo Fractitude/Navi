@@ -129,6 +129,11 @@ public static class Navi
 		Call<(string, string, string, string, string, bool, string)[]>( app, "apps.list" );
 
 	/// <summary>
+	/// Ids of the apps that came from the Store: every app whose manifest didn't ship with the game or a library.
+	/// </summary>
+	public static Task<string[]> GetStoreApps( Panel app ) => Call<string[]>( app, "apps.from-store" );
+
+	/// <summary>
 	/// Open an installed app, or bring it to the front.
 	/// </summary>
 	public static Task<bool> Launch( Panel app, string id ) => Call<bool>( app, "apps.launch", id );

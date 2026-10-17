@@ -84,6 +84,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The app's own window | |
 | `Navi.HasInput( this )` | True while the app has the player's controls (not async) | |
 | `Navi.GetApps( this )` | Every app, with installed and system flags | |
+| `Navi.GetStoreApps( this )` | Ids of the apps that came from the Store | |
 | `Navi.Launch( this, id )` | Open an app | |
 | `Navi.Install( this, id )`, `Uninstall` | Install or uninstall an app | `navi.apps.install` |
 | `Navi.CloseApp( this, id )` | Close another app | `navi.apps.manage` |

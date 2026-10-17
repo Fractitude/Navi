@@ -69,6 +69,12 @@ public static class NaviSystemCalls
 					.Select( x => (x.Id, x.Name, x.Description, x.Icon, x.Color, computer.IsInstalled( x ), x.IsCore ? "core" : x.IsSystem ? "system" : "app") )
 					.ToArray();
 
+			case "apps.from-store":
+				// The apps whose manifest didn't ship with the game or a library, which in a published game means the ones
+				// installed from the Store. It isn't "downloaded this session": a Store app uninstalled a moment ago is
+				// still loaded, and in the editor an app lives in an addon project rather than in the package cache.
+				return NaviAppRegistry.All.Where( x => !x.IsPrepackaged ).Select( x => x.Id ).ToArray();
+
 			case "apps.launch":
 				return computer.Launch( Arg<string>( args, 0, method ) );
 
