@@ -109,6 +109,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		{
 			WarnIfNotNetworked();
 			UpdateTransmit();
+			UpdateStandIn();
 			UpdateSeat();
 
 			if ( sinceSnapshot > SnapshotInterval )
@@ -184,6 +185,50 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return true;
 
 		return connection.DistanceSquared( WorldPosition ) <= NetworkRange * NetworkRange;
+	}
+
+	/// <summary>
+	/// The color the screen shows to players out of <see cref="NetworkRange"/>. The engine turns the whole computer off
+	/// for them, panel and all, so a plane of this color stands in for the screen (<see cref="NaviScreenStandIn"/>).
+	/// </summary>
+	[Property] public Color OutOfRangeColor { get; set; } = Color.Black;
+
+	GameObject standIn;
+
+	/// <summary>
+	/// On the host: spawn the stand-in for the screen. It is its own network object, sent to everyone, because a player
+	/// who joins out of range doesn't get the computer at all.
+	/// </summary>
+	void UpdateStandIn()
+	{
+		if ( standIn.IsValid() || NetworkRange <= 0 || !GameObject.Network.Active || Components.Get<WorldPanel>() is not { } panel )
+			return;
+
+		// The plane model lies flat, facing up (+Z); pitched up it faces the panel's forward, its x along Down.
+		var (center, size) = ScreenRect( panel );
+		var local = new Transform( center, Rotation.FromPitch( 90 ), new Vector3( size.y / 100f, size.x / 100f, 1f ) );
+
+		standIn = new GameObject( false, $"{GameObject.Name} (out of range)" );
+		standIn.Flags |= GameObjectFlags.NotSaved;
+		standIn.WorldTransform = GameObject.WorldTransform.ToWorld( local );
+
+		var renderer = standIn.Components.Create<ModelRenderer>();
+		renderer.Model = Model.Load( "models/dev/plane.vmdl" );
+		renderer.Tint = OutOfRangeColor;
+		renderer.RenderType = ModelRenderer.ShadowRenderType.Off;
+
+		standIn.Components.Create<NaviScreenStandIn>().Computer = GameObject.Id;
+
+		standIn.Enabled = true;
+		standIn.NetworkSpawn( new NetworkSpawnOptions { AlwaysTransmit = true } );
+	}
+
+	void DestroyStandIn()
+	{
+		if ( standIn.IsValid() )
+			standIn.Destroy();
+
+		standIn = null;
 	}
 
 	NaviComputerSnapshot CaptureSnapshot() => new()

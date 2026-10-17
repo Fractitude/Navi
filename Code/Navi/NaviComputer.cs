@@ -231,6 +231,18 @@ public sealed partial class NaviComputer : Component
 			solidCollider.Static = true;
 		}
 
+		var (center, size) = ScreenRect( panel );
+		var scale = new Vector3( SolidThickness, size.x, size.y );
+
+		if ( solidCollider.Center != center ) solidCollider.Center = center;
+		if ( solidCollider.Scale != scale ) solidCollider.Scale = scale;
+	}
+
+	/// <summary>
+	/// Where the panel's screen is on this GameObject, in local units: its center, and its width and height.
+	/// </summary>
+	static (Vector3 Center, Vector2 Size) ScreenRect( WorldPanel panel )
+	{
 		// Same maths as NaviInputCapture.ScreenView, in local units: panel x along Right (-Y), y along Down (-Z).
 		var size = panel.PanelSize * Sandbox.UI.WorldPanel.ScreenToWorldScale;
 
@@ -240,11 +252,7 @@ public sealed partial class NaviComputer : Component
 		if ( panel.VerticalAlign == WorldPanel.VAlignment.Top ) offset.y = size.y * 0.5f;
 		if ( panel.VerticalAlign == WorldPanel.VAlignment.Bottom ) offset.y = -size.y * 0.5f;
 
-		var center = new Vector3( 0, -offset.x, -offset.y );
-		var scale = new Vector3( SolidThickness, size.x, size.y );
-
-		if ( solidCollider.Center != center ) solidCollider.Center = center;
-		if ( solidCollider.Scale != scale ) solidCollider.Scale = scale;
+		return (new Vector3( 0, -offset.x, -offset.y ), size);
 	}
 
 	protected override void OnUpdate()
@@ -272,6 +280,11 @@ public sealed partial class NaviComputer : Component
 			solidCollider.Destroy();
 
 		solidCollider = null;
+
+		// On clients this runs when the computer goes out of range too, and the stand-in must stay for that. The host's
+		// computer is never out of range, so here it was really turned off.
+		if ( IsAuthority )
+			DestroyStandIn();
 
 		if ( AutoSave && IsAuthority && savedVersion != Version )
 			Save();
