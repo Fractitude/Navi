@@ -9,7 +9,7 @@ namespace Sandbox;
 /// The computer's GameObject must be a network object: Network Mode: Object in the scene, or network-spawned by the game
 /// if it is made at runtime. Scene objects default to Snapshot, which is sent to clients only once, as they join.
 /// </summary>
-public sealed partial class NaviComputer
+public sealed partial class NaviComputer : Component.INetworkVisible
 {
 	bool warnedNotNetworked;
 
@@ -90,6 +90,7 @@ public sealed partial class NaviComputer
 		if ( IsAuthority )
 		{
 			WarnIfNotNetworked();
+			UpdateTransmit();
 			UpdateSeat();
 
 			if ( sinceSnapshot > SnapshotInterval )
@@ -110,6 +111,34 @@ public sealed partial class NaviComputer
 			appliedSnapshot = snapshot;
 			ApplySnapshot( snapshot );
 		}
+	}
+
+	// Who it is sent to.
+
+	/// <summary>
+	/// How close a player must be, in world units, for the host to send them this computer's state. Players further away
+	/// get nothing until they come back in range, and then get the latest state. The user always gets it.
+	/// 0 sends it to everyone, wherever they are.
+	/// </summary>
+	[Property] public float NetworkRange { get; set; } = 1500f;
+
+	/// <summary>
+	/// On the host: send only to players in <see cref="NetworkRange"/>. The network asks <see cref="IsVisibleToConnection"/>
+	/// only for objects that aren't always transmitted.
+	/// </summary>
+	void UpdateTransmit()
+	{
+		var always = NetworkRange <= 0;
+		if ( GameObject.Network.AlwaysTransmit != always )
+			GameObject.Network.AlwaysTransmit = always;
+	}
+
+	bool Component.INetworkVisible.IsVisibleToConnection( Connection connection, in BBox worldBounds )
+	{
+		if ( NetworkRange <= 0 || connection.Id == UserId )
+			return true;
+
+		return connection.DistanceSquared( WorldPosition ) <= NetworkRange * NetworkRange;
 	}
 
 	NaviComputerSnapshot CaptureSnapshot() => new()
