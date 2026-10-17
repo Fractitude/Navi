@@ -48,7 +48,10 @@ public static class NaviSystemCalls
 
 			// Permissions.
 			case "permissions.get":
-				return process.Permissions.ToArray();
+				return process.IsRoot ? NaviPermissions.All.Select( x => x.Id ).ToArray() : process.Permissions.ToArray();
+
+			case "permissions.root":
+				return process.IsRoot;
 
 			case "permissions.request":
 			{
@@ -63,7 +66,7 @@ public static class NaviSystemCalls
 
 			case "apps.list":
 				return NaviAppRegistry.All
-					.Select( x => (x.Id, x.Name, x.Description, x.Icon, x.Color, computer.IsInstalled( x ), x.IsSystem) )
+					.Select( x => (x.Id, x.Name, x.Description, x.Icon, x.Color, computer.IsInstalled( x ), x.IsCore ? "core" : x.IsSystem ? "system" : "app") )
 					.ToArray();
 
 			case "apps.launch":

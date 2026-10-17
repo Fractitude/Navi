@@ -65,8 +65,9 @@ public sealed class NaviAppResource : GameResource
 	[Property] public List<string> Permissions { get; set; } = new();
 
 	/// <summary>
-	/// A system app: always installed, can't be uninstalled, and gets all its <see cref="Permissions"/> without asking.
-	/// Only counts for apps that ship with the game or a library. A Store app with this set is a normal app.
+	/// A system app: it asks for full system access (root), which allows everything, whatever <see cref="Permissions"/> lists.
+	/// A Store app gets it only after the player accepts, when they install it. One that ships with the game or a library
+	/// is part of the OS: it has root without asking, is always installed, and can't be uninstalled.
 	/// </summary>
 	[Property] public bool IsSystem { get; set; }
 

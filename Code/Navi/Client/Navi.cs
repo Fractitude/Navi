@@ -81,6 +81,12 @@ public static class Navi
 		Call<(string[], string[])>( app, "permissions.request", new object[] { permissions } );
 
 	/// <summary>
+	/// True if this app has full system access (root): it is a system app the player accepted, or part of the OS.
+	/// Root has every permission.
+	/// </summary>
+	public static Task<bool> HasRoot( Panel app ) => Call<bool>( app, "permissions.root" );
+
+	/// <summary>
 	/// The permission a call failed for, or null if it failed for another reason.
 	/// </summary>
 	public static string MissingPermission( Exception e )
@@ -116,10 +122,11 @@ public static class Navi
 	// Apps.
 
 	/// <summary>
-	/// Every app on the computer, sorted by name. System apps are always installed and can't be uninstalled.
+	/// Every app on the computer, sorted by name. Type is "core" for apps that are part of the OS (always installed,
+	/// can't be uninstalled), "system" for other apps with full system access, or "app".
 	/// </summary>
-	public static Task<(string Id, string Name, string Description, string Icon, string Color, bool Installed, bool System)[]> GetApps( Panel app ) =>
-		Call<(string, string, string, string, string, bool, bool)[]>( app, "apps.list" );
+	public static Task<(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[]> GetApps( Panel app ) =>
+		Call<(string, string, string, string, string, bool, string)[]>( app, "apps.list" );
 
 	/// <summary>
 	/// Open an installed app, or bring it to the front.

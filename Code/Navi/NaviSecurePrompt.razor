@@ -1,0 +1,144 @@
+@using Sandbox.UI
+@inherits PanelComponent
+@namespace Sandbox
+
+@* The secure layer: Navi's permission prompts, like Windows' secure desktop. NaviDesktop creates it on its own panel, *@
+@* in front of the screen, so it draws above everything and gets clicks first. While a prompt is open it covers the *@
+@* whole screen, so apps can't be clicked. Apps can't reach it through their panel's ancestors, and every control *@
+@* in it only reacts to a real mouse press made after the prompt has been up for a moment. See the Security section *@
+@* of AGENTS.md for what this does and doesn't protect against. *@
+
+<root class="@(Request is null ? "" : "active")">
+	@if ( Request is { } request )
+	{
+		var heading = request.IsRoot
+			? (request.Launch ? $"{request.App.Name} wants full system access" : $"Install {request.App.Name} with full system access?")
+			: request.IsReview
+				? (request.Launch ? $"Open {request.App.Name} with permissions" : $"{request.App.Name}'s permissions")
+				: $"{request.App.Name} asks for permissions";
+
+		<div class="dialog @(Armed ? "" : "arming")">
+			<div class="dialog-title">
+				<div class="icon" style="background-color: @request.App.Color;"><i>@request.App.Icon</i></div>
+				<div class="heading">@heading</div>
+				<i class="lock" tooltip="Navi is asking this, not an app">lock</i>
+			</div>
+
+			@if ( request.IsRoot )
+			{
+				<div class="root-warning">
+					<i>shield</i>
+					<div class="perm-text">
+						<div class="perm-title">This is a system app</div>
+						<div class="perm-description">With root access it can do anything on this computer: install and remove apps, close other apps, and everything else apps can be allowed. Only accept if you trust who made it.</div>
+					</div>
+				</div>
+			}
+			else
+			{
+				<div class="dialog-text">Tick what @request.App.Name may do. It keeps them, and you can change them from its taskbar menu.</div>
+			}
+
+			@foreach ( var permission in request.Permissions )
+			{
+				var info = NaviPermissions.Describe( permission );
+				var ticked = !Unticked.Contains( permission );
+
+				<div class="permission @(ticked ? "ticked" : "")"
+					@onmousedown=@(( PanelEvent e ) => Press( e ))
+					@onclick=@(( PanelEvent e ) => Release( e, () => TogglePermission( permission ) ))>
+					<i class="check">@(ticked ? "check_box" : "check_box_outline_blank")</i>
+					<i class="glyph">@info.Icon</i>
+					<div class="perm-text">
+						<div class="perm-title">@info.Title</div>
+						<div class="perm-description">@info.Description</div>
+					</div>
+				</div>
+			}
+
+			<div class="dialog-buttons">
+				<div class="button"
+					@onmousedown=@(( PanelEvent e ) => Press( e ))
+					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.DismissPermissionRequest( request ) ))>
+					@(request.IsReview || request.IsRoot ? "Cancel" : "Deny all")
+				</div>
+				<div class="button primary"
+					@onmousedown=@(( PanelEvent e ) => Press( e ))
+					@onclick=@(( PanelEvent e ) => Release( e, () => Computer.AnswerPermissionRequest( request, request.Permissions.Except( Unticked ) ) ))>
+					@(request.IsRoot ? (request.Launch ? "Allow and open" : "Install") : request.IsReview ? (request.Launch ? "Open" : "Save") : "Allow ticked")
+				</div>
+			</div>
+		</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>
+	/// The computer whose prompts this shows. Set by <see cref="NaviDesktop"/>, which creates this layer.
+	/// </summary>
+	public NaviComputer Computer { get; set; }
+
+	/// <summary>
+	/// Seconds a prompt is shown before its controls react, so a click meant for something else can't land on it.
+	/// </summary>
+	[Property] public float ArmTime { get; set; } = 0.75f;
+
+	NaviPermissionRequest Request => Computer.IsValid() ? Computer.PermissionRequests.FirstOrDefault() : null;
+
+	bool Armed => sinceShown > ArmTime;
+
+	NaviPermissionRequest shownRequest;
+	RealTimeSince sinceShown;
+
+	// Permissions unticked in the prompt. Reset for each new request, from what it starts with ticked.
+	readonly HashSet<string> Unticked = new();
+
+	// The control a real mouse press started on. A click only counts on the control it started on.
+	Panel pressed;
+
+	protected override void OnUpdate()
+	{
+		var request = Request;
+		if ( request == shownRequest )
+			return;
+
+		shownRequest = request;
+		sinceShown = 0;
+		pressed = null;
+		Unticked.Clear();
+
+		if ( request is not null )
+			Unticked.UnionWith( request.Permissions.Except( request.Ticked ) );
+	}
+
+	/// <summary>
+	/// A mouse press on a control. It only counts if the player is really holding the mouse button: apps can raise panel
+	/// events, but can't fake the hardware state behind <see cref="Input.Keyboard"/>.
+	/// </summary>
+	void Press( PanelEvent e )
+	{
+		pressed = Armed && Input.Keyboard.Down( "MOUSE1" ) ? e.This : null;
+	}
+
+	/// <summary>
+	/// A click on a control. Runs <paramref name="action"/> only if a real press started on this control, the prompt was
+	/// armed, and the pointer is still over it.
+	/// </summary>
+	void Release( PanelEvent e, System.Action action )
+	{
+		var real = Armed && pressed is not null && pressed == e.This && e.This.HasHovered;
+		pressed = null;
+
+		if ( real )
+			action();
+	}
+
+	void TogglePermission( string permission )
+	{
+		if ( !Unticked.Remove( permission ) )
+			Unticked.Add( permission );
+	}
+
+	protected override int BuildHash() => System.HashCode.Combine( Request, Armed, Unticked.Count, string.Join( ",", Unticked ) );
+}

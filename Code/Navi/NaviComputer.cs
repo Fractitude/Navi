@@ -40,7 +40,12 @@ public sealed class NaviProcess
 	/// </summary>
 	public HashSet<string> Permissions { get; } = new();
 
-	public bool HasPermission( string permission ) => Permissions.Contains( permission );
+	/// <summary>
+	/// Full system access: every permission. Only system apps the player accepted, or that are part of the OS.
+	/// </summary>
+	public bool IsRoot { get; init; }
+
+	public bool HasPermission( string permission ) => IsRoot || Permissions.Contains( permission );
 }
 
 /// <summary>
@@ -66,6 +71,12 @@ public sealed class NaviPermissionRequest
 	/// for more, and the ticked ones are added.
 	/// </summary>
 	public bool IsReview { get; init; }
+
+	/// <summary>
+	/// A system app asking for full system access (root), as it is installed or before it opens. Accept or cancel; there is
+	/// nothing to tick.
+	/// </summary>
+	public bool IsRoot { get; init; }
 
 	/// <summary>
 	/// Open the app once the player answers. Cancelling doesn't open it.
@@ -101,6 +112,11 @@ public sealed class NaviComputer : Component
 	/// first launch, before it runs.
 	/// </summary>
 	[Property] public List<string> ReviewedApps { get; set; } = new();
+
+	/// <summary>
+	/// Store system apps the player accepted full system access (root) for. Prepackaged system apps have it without this.
+	/// </summary>
+	[Property] public List<string> RootApps { get; set; } = new();
 
 	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
@@ -168,7 +184,12 @@ public sealed class NaviComputer : Component
 
 	public bool IsInstalled( string id ) => NaviAppRegistry.Find( id ) is { } app && IsInstalled( app );
 
-	public bool IsInstalled( NaviAppInfo app ) => app.IsSystem || (InstalledApps?.Contains( app.Id ) ?? false);
+	public bool IsInstalled( NaviAppInfo app ) => app.IsCore || (InstalledApps?.Contains( app.Id ) ?? false);
+
+	/// <summary>
+	/// Has full system access: a system app that is part of the OS, or that the player accepted.
+	/// </summary>
+	public bool HasRoot( NaviAppInfo app ) => app.IsSystem && (app.IsPrepackaged || (RootApps?.Contains( app.Id ) ?? false));
 
 	public bool IsRunning( string id ) => running.Any( x => x.App.Id == id );
 
@@ -197,6 +218,18 @@ public sealed class NaviComputer : Component
 		var app = await DownloadPackageAsync( packageIdent );
 		if ( app is null )
 			return false;
+
+		// A system app asks for root before it is installed. The manifest can only be read once it is downloaded.
+		if ( app.IsSystem && !HasRoot( app ) )
+		{
+			downloading.Add( packageIdent );
+			var accepted = await RequestRootAsync( app, launch: false );
+			downloading.Remove( packageIdent );
+			Version++;
+
+			if ( !accepted )
+				return false;
+		}
 
 		InstalledPackages ??= new();
 		InstalledPackages.Add( packageIdent );
@@ -253,7 +286,7 @@ public sealed class NaviComputer : Component
 	public bool Uninstall( string id )
 	{
 		var app = NaviAppRegistry.Find( id );
-		if ( app is not null && app.IsSystem )
+		if ( app is not null && app.IsCore )
 			return false;
 
 		if ( InstalledApps is null || !InstalledApps.Remove( id ) )
@@ -267,6 +300,7 @@ public sealed class NaviComputer : Component
 		// A reinstall starts over, and asks again.
 		GrantedPermissions?.RemoveAll( x => x.StartsWith( id + " " ) );
 		ReviewedApps?.Remove( id );
+		RootApps?.Remove( id );
 		Version++;
 		return true;
 	}
@@ -287,6 +321,13 @@ public sealed class NaviComputer : Component
 		if ( app is null || !IsInstalled( app ) )
 			return false;
 
+		// A Store system app whose root the player hasn't accepted, e.g. because an update made it one, asks first.
+		if ( app.IsSystem && !HasRoot( app ) )
+		{
+			_ = RequestRootAsync( app, launch: true );
+			return true;
+		}
+
 		if ( NeedsReview( app ) )
 		{
 			ReviewPermissions( id );
@@ -306,6 +347,7 @@ public sealed class NaviComputer : Component
 			App = app,
 			Position = new Vector2( 16f + offset, 8f + offset ),
 			ZIndex = ++topZIndex,
+			IsRoot = HasRoot( app ),
 		};
 
 		process.Permissions.UnionWith( GetPermissions( app ) );
@@ -331,12 +373,12 @@ public sealed class NaviComputer : Component
 	public bool NeedsReview( NaviAppInfo app ) => !app.IsSystem && app.Permissions.Count > 0 && !(ReviewedApps?.Contains( app.Id ) ?? false);
 
 	/// <summary>
-	/// The permissions an app has: all it declares for a system app, otherwise those the player granted.
+	/// The permissions an app has: all of them with root, otherwise those the player granted.
 	/// </summary>
 	public IEnumerable<string> GetPermissions( NaviAppInfo app )
 	{
-		if ( app.IsSystem )
-			return app.Permissions;
+		if ( HasRoot( app ) )
+			return NaviPermissions.All.Select( x => x.Id );
 
 		var prefix = app.Id + " ";
 		return GrantedPermissions?.Where( x => x.StartsWith( prefix ) ).Select( x => x[prefix.Length..] ).Where( app.Permissions.Contains ) ?? [];
@@ -353,7 +395,7 @@ public sealed class NaviComputer : Component
 		GrantedPermissions.RemoveAll( x => x.StartsWith( app.Id + " " ) );
 		GrantedPermissions.AddRange( granted.Select( x => $"{app.Id} {x}" ) );
 
-		if ( GetProcess( app.Id ) is { } process && !app.IsSystem )
+		if ( GetProcess( app.Id ) is { } process && !process.IsRoot )
 		{
 			process.Permissions.Clear();
 			process.Permissions.UnionWith( granted );
@@ -409,6 +451,26 @@ public sealed class NaviComputer : Component
 	}
 
 	/// <summary>
+	/// Ask the player to accept full system access (root) for a system app. Returns whether they did. With
+	/// <paramref name="launch"/>, the app opens if they do.
+	/// </summary>
+	public async Task<bool> RequestRootAsync( NaviAppInfo app, bool launch )
+	{
+		if ( HasRoot( app ) )
+			return true;
+
+		var request = permissionRequests.FirstOrDefault( x => x.App.Id == app.Id && x.IsRoot );
+		if ( request is null )
+		{
+			request = new NaviPermissionRequest { App = app, Permissions = [], Ticked = [], IsRoot = true, Launch = launch };
+			permissionRequests.Add( request );
+			Version++;
+		}
+
+		return (await request.Answer.Task).Length > 0;
+	}
+
+	/// <summary>
 	/// The player closed a permission dialog without answering: nothing changes, an app that asked gets nothing more,
 	/// and an app waiting to open doesn't open.
 	/// </summary>
@@ -431,6 +493,20 @@ public sealed class NaviComputer : Component
 
 		var answer = ticked?.Where( request.Permissions.Contains ).ToArray() ?? [];
 		var app = request.App;
+
+		if ( request.IsRoot )
+		{
+			RootApps ??= new();
+			if ( !RootApps.Contains( app.Id ) )
+				RootApps.Add( app.Id );
+
+			if ( request.Launch && !IsRunning( app.Id ) && IsInstalled( app ) )
+				Open( app );
+
+			request.Answer.TrySetResult( NaviPermissions.All.Select( x => x.Id ).ToArray() );
+			Version++;
+			return;
+		}
 
 		if ( request.IsReview )
 		{

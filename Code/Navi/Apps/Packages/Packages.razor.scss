@@ -217,6 +217,14 @@ Packages
 	}
 }
 
+// A system app, which asks for full system access.
+.root
+{
+	flex-shrink: 0;
+	font-size: 12px;
+	color: #2a2840;
+}
+
 .name
 {
 	font-size: 13px;

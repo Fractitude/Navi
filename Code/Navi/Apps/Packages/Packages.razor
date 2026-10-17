@@ -90,14 +90,20 @@
 		}
 		else
 		{
-			@foreach ( var app in Apps.Where( x => !x.System ) )
+			@foreach ( var app in Apps.Where( x => x.Type != "core" ) )
 			{
 				var id = app.Id;
 
 				<div class="row">
 					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 					<div class="info">
-						<div class="name">@app.Name</div>
+						<div class="title-row">
+							<div class="name">@app.Name</div>
+							@if ( app.Type == "system" )
+							{
+								<div class="root" tooltip="System app: asks for full system access"><i>shield</i></div>
+							}
+						</div>
 						<div class="description">@app.Description</div>
 					</div>
 
@@ -119,7 +125,7 @@
 {
 	bool ShowStore;
 
-	(string Id, string Name, string Description, string Icon, string Color, bool Installed, bool System)[] Apps = [];
+	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] Apps = [];
 
 	(Package Package, bool Official)[] StorePackages = [];
 	HashSet<string> InstalledPackages = new();

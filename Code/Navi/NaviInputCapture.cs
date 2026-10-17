@@ -243,7 +243,7 @@ public sealed class NaviInputCapture : Component
 	/// <summary>
 	/// Where the camera goes so the computer's screen fills the view: centred in front of it, far enough back to fit it.
 	/// </summary>
-	Transform ScreenView( CameraComponent camera )
+	internal Transform ScreenView( CameraComponent camera )
 	{
 		if ( !Components.TryGet<WorldPanel>( out var panel ) )
 			return playerView;

@@ -20,9 +20,9 @@
 					<i class="glyph">@app.Icon</i>
 					<div class="name">@app.Name</div>
 
-					@if ( process.Permissions.Count > 0 )
+					@if ( process.IsRoot )
 					{
-						<i class="glyph shield" tooltip=@PermissionSummary( process )>shield</i>
+						<i class="glyph shield" tooltip="Full system access">shield</i>
 					}
 
 					@if ( app.CanMinimize )
@@ -87,7 +87,7 @@
 						@if ( app.Permissions.Count > 0 && !app.IsSystem )
 						{
 							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.ReviewPermissions( app.Id ) ))>
-								<i>shield</i>@(process is null ? "Open with permissions..." : "Permissions...")
+								<i>tune</i>@(process is null ? "Open with permissions..." : "Permissions...")
 							</div>
 						}
 
@@ -101,45 +101,6 @@
 		}
 	</div>
 
-	@if ( Computer.PermissionRequests.FirstOrDefault() is { } request )
-	{
-		var heading = request.IsReview
-			? (request.Launch ? $"Open {request.App.Name} with permissions" : $"{request.App.Name}'s permissions")
-			: $"{request.App.Name} asks for permissions";
-
-		<div class="dialog-backdrop">
-			<div class="dialog">
-				<div class="dialog-title">
-					<div class="icon" style="background-color: @request.App.Color;"><i>@request.App.Icon</i></div>
-					<div class="heading">@heading</div>
-				</div>
-
-				<div class="dialog-text">Tick what @request.App.Name may do. It keeps them, and you can change them from its taskbar menu.</div>
-
-				@foreach ( var permission in request.Permissions )
-				{
-					var info = NaviPermissions.Describe( permission );
-					var ticked = !Unticked.Contains( permission );
-
-					<div class="permission @(ticked ? "ticked" : "")" @onclick=@(() => TogglePermission( permission ))>
-						<i class="check">@(ticked ? "check_box" : "check_box_outline_blank")</i>
-						<i class="glyph">@info.Icon</i>
-						<div class="perm-text">
-							<div class="perm-title">@info.Title</div>
-							<div class="perm-description">@info.Description</div>
-						</div>
-					</div>
-				}
-
-				<div class="dialog-buttons">
-					<div class="button" @onclick=@(() => Computer.DismissPermissionRequest( request ))>@(request.IsReview ? "Cancel" : "Deny all")</div>
-					<div class="button primary" @onclick=@(() => Computer.AnswerPermissionRequest( request, request.Permissions.Except( Unticked ) ))>
-						@(request.IsReview ? (request.Launch ? "Open" : "Save") : "Allow ticked")
-					</div>
-				</div>
-			</div>
-		</div>
-	}
 </root>
 
 @code
@@ -183,22 +144,62 @@
 	/// </summary>
 	string MenuApp;
 
-	// Permissions unticked in the dialog. Reset for each new request, from what it starts with ticked.
-	readonly HashSet<string> Unticked = new();
-	NaviPermissionRequest tickedRequest;
+
+	/// <summary>
+	/// How far in front of the screen the secure layer floats, in world units. Less than 1 and the screen can still draw
+	/// over it. It is shrunk to match, so it lines up with the screen when the camera is framed on it.
+	/// </summary>
+	const float SecureLayerOffset = 1f;
+
+	/// <summary>
+	/// Create the secure layer that shows permission prompts (<see cref="NaviSecurePrompt"/>): a panel of its own, in front
+	/// of this one, so no app panel is above it or can reach it through its ancestors. It isn't saved with the scene.
+	/// </summary>
+	protected override void OnStart()
+	{
+		base.OnStart();
+
+		var layer = new GameObject( GameObject, true, "Navi Secure Layer" );
+		layer.Flags |= GameObjectFlags.NotSaved;
+		layer.WorldRotation = WorldRotation;
+		layer.WorldPosition = WorldPosition + WorldRotation.Forward * SecureLayerOffset;
+
+		// Nearer the camera, so smaller by the same perspective to look the same size from where the player views it.
+		if ( InputCapture.IsValid() && Scene.Camera is { } camera )
+		{
+			var distance = Vector3.Dot( InputCapture.ScreenView( camera ).Position - WorldPosition, WorldRotation.Forward );
+			if ( distance > SecureLayerOffset * 2f )
+				layer.WorldScale = WorldScale * ((distance - SecureLayerOffset) / distance);
+		}
+
+		if ( Components.TryGet<WorldPanel>( out var world ) )
+		{
+			var panel = layer.Components.Create<WorldPanel>( false );
+			panel.PanelSize = world.PanelSize;
+			panel.HorizontalAlign = world.HorizontalAlign;
+			panel.VerticalAlign = world.VerticalAlign;
+			panel.LookAtCamera = world.LookAtCamera;
+			panel.InteractionRange = world.InteractionRange;
+			panel.RenderScale = world.RenderScale;
+			panel.Enabled = true;
+		}
+		else if ( Components.TryGet<ScreenPanel>( out var screen ) )
+		{
+			var panel = layer.Components.Create<ScreenPanel>( false );
+			panel.Opacity = screen.Opacity;
+			panel.Scale = screen.Scale;
+			panel.AutoScreenScale = screen.AutoScreenScale;
+			panel.ZIndex = screen.ZIndex + 1000;
+			panel.Enabled = true;
+		}
+
+		var prompt = layer.Components.Create<NaviSecurePrompt>( false );
+		prompt.Computer = Computer;
+		prompt.Enabled = true;
+	}
 
 	protected override void OnUpdate()
 	{
-		var request = Computer.PermissionRequests.FirstOrDefault();
-		if ( request != tickedRequest )
-		{
-			tickedRequest = request;
-			Unticked.Clear();
-
-			if ( request is not null )
-				Unticked.UnionWith( request.Permissions.Except( request.Ticked ) );
-		}
-
 		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
 			MenuApp = null;
 
@@ -237,15 +238,6 @@
 		MenuApp = null;
 		action();
 	}
-
-	void TogglePermission( string permission )
-	{
-		if ( !Unticked.Remove( permission ) )
-			Unticked.Add( permission );
-	}
-
-	static string PermissionSummary( NaviProcess process ) =>
-		"Allowed: " + string.Join( ", ", process.Permissions.Select( x => NaviPermissions.Describe( x ).Title ) );
 
 	void OnTitleDoubleClick( NaviProcess process, PanelEvent e )
 	{
@@ -476,5 +468,5 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count,
-		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft, MenuApp, Unticked.Count, tickedRequest );
+		InputCapture?.ShowQuitHint, InputCapture?.QuitPressesLeft, MenuApp );
 }

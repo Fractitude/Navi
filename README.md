@@ -24,7 +24,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - Drag a corner to resize. Double-click the title bar, or use its button, to maximize.
 - Minimize hides the window and keeps the app running. Click the taskbar icon to bring it back. Clicking the icon of the window in front minimizes it.
 - Right-click a taskbar icon for its menu: Open, Permissions..., Close.
-- A shield in a window's title bar means the app holds permissions.
+- A shield in a window's title bar means the app has full system access (root). Nothing else shows it.
 
 ## Make an app
 
@@ -73,7 +73,7 @@ The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 
 | `CanResize` | Can be resized by its corners. Default `true`. |
 | `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
 | `Permissions` | The permissions the app may have. It is never granted others. See below. |
-| `IsSystem` | A system app: always installed, can't be uninstalled, and has all its `Permissions` without asking. Only counts for apps that ship with a game or a library, never for Store apps. |
+| `IsSystem` | A system app: it asks for full system access (root), which allows everything. See "System apps" below. |
 
 ## Talking to the computer
 
@@ -91,7 +91,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.GetStoreStatus( this )` | Installed and downloading package idents | |
 | `Navi.InstallPackage( this, ident )` | Download and install a Store app | `navi.store.install` |
 | `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
-| `Navi.GetPermissions( this )`, `RequestPermissions` | See below | |
+| `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
 
 ## Permissions
 
@@ -103,9 +103,21 @@ Every app can open apps, list them and control its own window. Anything more nee
 - **Missing permissions fail.** A call without its permission throws `UnauthorizedAccessException`. `Navi.MissingPermission( e )` says which one. `Navi.WithPermission( this, () => Navi.Install( this, id ) )` makes a call, asks for a missing permission, and tries once more.
 - **Grants are remembered** per app (`NaviComputer.GrantedPermissions`), across launches. Uninstalling forgets them.
 - **The player can change them** from the taskbar menu: Permissions... (or Open with permissions... when the app is closed) shows every declared permission, ticked as granted. Unticking revokes.
-- **System apps** (`IsSystem`, pre-packaged only) have all their declared permissions without asking. Packages is one.
+- **System apps** have root, which allows everything, and skip these dialogs. See below.
 
 The app's job is to cope with what it was denied: hide or disable those features, or explain why they don't work.
+
+Permission and root prompts are shown by Navi's secure layer (`NaviSecurePrompt`), like Windows' secure desktop. It is a panel of its own, floating just in front of the screen, so it draws above every app and gets clicks first. While a prompt is open it covers the screen, so no app can be clicked. Apps can't reach it through their panel's parents. Its controls only react to a real left mouse press, made at least `ArmTime` (0.75 s) after the prompt appeared and released on the same control. An app raising fake click events gets nothing.
+
+### System apps (root)
+
+An app with `IsSystem` in its manifest asks for full system access: root. Root has every permission, declared or not, and its window shows a shield.
+
+- **Pre-packaged system apps** (shipped with a game or a library) are part of the OS. They have root without asking, are always installed and can't be uninstalled. Packages is one.
+- **Store system apps** ask when they are installed. After the download, before anything is installed, the player sees "Install ... with full system access?". Cancel, and the app isn't installed. The Store can't tell before the download, because the manifest is inside the package.
+- If a Store app becomes a system app in an update, it asks once before its next launch.
+- Accepted apps are kept in `NaviComputer.RootApps`. Uninstalling forgets them.
+- `Navi.HasRoot( this )` tells an app whether it has root.
 
 ## Apps that take over the controls
 
@@ -136,7 +148,7 @@ Players make apps in their own addon project and publish them to sbox.game. Othe
 How the Store works:
 
 - The Store lists packages of type `napp`. These are shared by every game with the library.
-- Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The manifest names the panel class, and the app is then found like any other app. Its declared permissions are reviewed on its first launch.
+- Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The manifest names the panel class, and the app is then found like any other app. A system app asks for root before it is installed; other apps have their declared permissions reviewed on first launch.
 - Installed Store packages are kept in `NaviComputer.InstalledPackages` and downloaded again when the game starts.
 - Addon code must pass the s&box API whitelist, like all game code.
 - Uninstalling a Store app keeps its code loaded until the game restarts.

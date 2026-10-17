@@ -23,10 +23,14 @@ public sealed class NaviAppInfo
 	public bool IsPrepackaged { get; init; }
 
 	/// <summary>
-	/// Always installed, can't be uninstalled, and has all its <see cref="Permissions"/> without asking.
-	/// Only a prepackaged app can be one. See <see cref="NaviAppResource.IsSystem"/>.
+	/// Asks for full system access (root). See <see cref="NaviAppResource.IsSystem"/>.
 	/// </summary>
 	public bool IsSystem { get; init; }
+
+	/// <summary>
+	/// A prepackaged system app: part of the OS. Always installed, can't be uninstalled, and has root without asking.
+	/// </summary>
+	public bool IsCore => IsSystem && IsPrepackaged;
 
 	/// <summary>
 	/// The permissions the app may ask for. See <see cref="NaviPermissions"/>.
@@ -64,7 +68,7 @@ public sealed class NaviAppInfo
 			CanResize = resource.CanResize,
 			CapturesInput = resource.CapturesInput,
 			IsPrepackaged = prepackaged,
-			IsSystem = prepackaged && resource.IsSystem,
+			IsSystem = resource.IsSystem,
 			Permissions = resource.Permissions?.Where( NaviPermissions.IsKnown ).Distinct().ToArray() ?? [],
 			PanelType = panelType,
 			Resource = resource,
