@@ -10,8 +10,12 @@
 
 <root>
 	<div class="tabs">
-		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => ViewModel.OpenApps() )>Apps</div>
-		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => ViewModel.OpenStore() )>Store</div>
+		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => ViewModel.OpenApps() )>
+			Apps
+		</div>
+		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => ViewModel.OpenStore() )>
+			Store
+		</div>
 		<div class="spacer"></div>
 
 		@if ( UiState.ShowStore )
@@ -43,7 +47,9 @@
 	<div class="list">
 		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>@UiState.Notice</div>
+			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+				@UiState.Notice
+			</div>
 		}
 
 		@if ( UiState.ShowStore )
@@ -139,11 +145,15 @@
 
 					@if ( app.Action == AppAction.Uninstall )
 					{
-						<div class="button" @onclick=@( () => ViewModel.UninstallApp( app.Id ) )>Uninstall</div>
+						<div class="button" @onclick=@( () => ViewModel.UninstallApp( app.Id ) )>
+							Uninstall
+						</div>
 					}
 					else if ( app.Action == AppAction.Install )
 					{
-						<div class="button install" @onclick=@( () => ViewModel.InstallApp( app.Id ) )>Install</div>
+						<div class="button install" @onclick=@( () => ViewModel.InstallApp( app.Id ) )>
+							Install
+						</div>
 					}
 				</div>
 			}
@@ -176,7 +186,9 @@
 
 			@if ( UiState.HasMore )
 			{
-				<div class="button" @onclick=@( () => ViewModel.LoadMore() )>More</div>
+				<div class="button" @onclick=@( () => ViewModel.LoadMore() )>
+					More
+				</div>
 			}
 		</div>
 	}
