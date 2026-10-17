@@ -109,7 +109,7 @@
 		{
 			var visible = Apps
 				.Select( x => (App: x, FromStore: StoreAppIds.Contains( x.Id )) )
-				.Where( x => IsListed( x.App.Installed, x.FromStore ) && Matches( AppFilter, x.App.Type, x.FromStore ) )
+				.Where( x => Matches( AppFilter, x.App.Installed, x.App.Type, x.FromStore ) )
 				.Select( x => x.App );
 
 			@if ( !visible.Any() )
@@ -193,17 +193,19 @@
 	/// <summary>
 	/// What the Apps tab lists: one of the <see cref="Filters"/> keys. It has nothing to do with the Store tab.
 	/// </summary>
-	string AppFilter = "all";
+	string AppFilter = "installed";
 
 	/// <summary>
 	/// The kinds of app the Apps tab can show, in menu order.
 	/// </summary>
-	static readonly (string Key, string Name)[] Filters = [ ("all", "All"), ("store", "Store"), ("core", "Core"), ("system", "System")];
+	static readonly (string Key, string Name)[] Filters = [ ("installed", "Installed"), ("store", "Store"), ("core", "Core"), ("system", "System"), ("prepackaged", "Pre-packaged")];
 
 	/// <summary>
-	/// The current filter's name, for the button's tooltip.
+	/// The current filter's name, for the button's tooltip. Falls back to the first kind if the filter is one this
+	/// build doesn't know: a hot reload can leave an instance holding an older one, and a missing name shouldn't take
+	/// the panel down with it.
 	/// </summary>
-	string FilterName => Filters.First( x => x.Key == AppFilter ).Name;
+	string FilterName => Filters.FirstOrDefault( x => x.Key == AppFilter ).Name ?? Filters[0].Name;
 
 	/// <summary>
 	/// The filter menu is up.
@@ -460,23 +462,19 @@
 	}
 
 	/// <summary>
-	/// Is the app in the list at all? An installed one is. So is one that ships with the game or a library: the
-	/// Store is no way to get it back, so this list is, and it can be installed and uninstalled here. A Store app
-	/// that isn't installed is left to the Store tab, where it's installed from.
+	/// Is the app in the list under <paramref name="filter"/>? Installed apps are in every filter. Pre-packaged is the
+	/// apps that ship with the game or a library but aren't part of the OS: they are in it whether or not they are
+	/// installed, because the Store can't bring them back, and the rest are Store apps, which are left to the Store tab
+	/// when they aren't installed. Core apps are part of the OS, and system apps ask for full system access, whether
+	/// they ship with the game or with a Store package, so an app can match more than one of these.
 	/// </summary>
-	static bool IsListed( bool installed, bool fromStore ) => installed || !fromStore;
-
-	/// <summary>
-	/// Does an app belong in the list under <paramref name="filter"/>? Store apps came from the Store, core apps are
-	/// part of the OS, and system apps ask for full system access, whether they ship with the game or with a Store
-	/// package, so an app can match more than one of these. All matches every app, and nothing else does.
-	/// </summary>
-	static bool Matches( string filter, string type, bool fromStore ) => filter switch
+	static bool Matches( string filter, bool installed, string type, bool fromStore ) => filter switch
 	{
-		"store" => fromStore,
+		"store" => installed && fromStore,
 		"core" => type is "core",
-		"system" => type is "core" or "system",
-		_ => true,
+		"system" => installed && ( type is "core" or "system" ),
+		"prepackaged" => !fromStore && type is not "core",
+		_ => installed,
 	};
 
 	/// <summary>
@@ -487,7 +485,8 @@
 		"store" => "No Store apps are installed.",
 		"core" => "No apps are part of the OS.",
 		"system" => "No apps ask for full system access.",
-		_ => "No apps.",
+		"prepackaged" => "No apps come with the game.",
+		_ => "No apps are installed.",
 	};
 
 	void SetFilterOpen( bool open )
@@ -504,3 +503,4 @@
 
 	protected override int BuildHash() => System.HashCode.Combine( knownVersion, ShowStore, storeVersion, Notice, FilterOpen, AppFilter );
 }
+
