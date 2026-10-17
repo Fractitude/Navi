@@ -14,7 +14,7 @@
 
 		@if ( ShowStore )
 		{
-			<div class="button" @onclick=@(() => _ = RefreshStoreAsync())><i>refresh</i></div>
+			<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = RefreshStoreAsync())><i>refresh</i></div>
 		}
 	</div>
 
@@ -209,6 +209,18 @@
 	int storeVersion;
 
 	/// <summary>
+	/// True while the Store search is running. <see cref="RefreshStoreAsync"/> ignores calls made while it is on, so
+	/// only one search runs at a time; the button is disabled too, but the guard is what makes that a rule.
+	/// </summary>
+	bool Refreshing;
+
+	/// <summary>
+	/// How long a refresh shows as running at least. A Store search usually answers within a frame or two, and a
+	/// refresh that finishes before it is drawn looks like a click that did nothing.
+	/// </summary>
+	const float RefreshVisibleTime = 0.35f;
+
+	/// <summary>
 	/// Idents of the Store entries showing their details.
 	/// </summary>
 	HashSet<string> Expanded = new();
@@ -284,13 +296,20 @@
 
 	async Task RefreshStoreAsync()
 	{
+		// One search at a time, whatever asked for it: two at once would race to fill the same list.
+		if ( Refreshing )
+			return;
+
+		Refreshing = true;
 		StoreLoaded = true;
 		StoreStatus = "Connecting to the Wired...";
-		StorePackages = [];
 		storeVersion++;
+
+		RealTimeSince elapsed = 0;
 
 		try
 		{
+			// Keep the old list on screen while searching instead of blanking it: the status above says it's a refresh.
 			StorePackages = await Navi.SearchStore( this );
 			StoreStatus = StorePackages.Length == 0 ? "No apps have been published yet." : null;
 		}
@@ -300,6 +319,13 @@
 			StoreStatus = "Couldn't reach the Store.";
 		}
 
+		// Hold the running state for a moment and clear it in one go: the search often answers within a frame or
+		// two, and a refresh that is drawn only after it already finished looks like a click that did nothing.
+		var remaining = RefreshVisibleTime - elapsed;
+		if ( remaining > 0 )
+			await Task.Delay( (int)( remaining * 1000 ) );
+
+		Refreshing = false;
 		storeVersion++;
 	}
 
