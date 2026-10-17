@@ -24,6 +24,11 @@ public static class NaviPermissions
 	public const string ManageApps = "navi.apps.manage";
 
 	/// <summary>
+	/// Change the computer's settings, such as the display scale.
+	/// </summary>
+	public const string ChangeSettings = "navi.settings.change";
+
+	/// <summary>
 	/// How a permission is shown to the player.
 	/// </summary>
 	public record Info( string Id, string Title, string Description, string Icon );
@@ -33,6 +38,7 @@ public static class NaviPermissions
 		new( InstallApps, "Install apps", "Install and uninstall apps on this computer.", "apps" ),
 		new( InstallFromStore, "Use the Store", "Download apps from the Store and install them.", "cloud_download" ),
 		new( ManageApps, "Manage apps", "Close other apps' windows.", "tab" ),
+		new( ChangeSettings, "Change settings", "Change this computer's settings, such as the display scale.", "settings" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );

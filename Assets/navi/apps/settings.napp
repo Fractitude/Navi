@@ -1,0 +1,18 @@
+{
+  "AppId": "settings",
+  "Title": "Settings",
+  "Description": "Change how this computer looks and works.",
+  "Icon": "settings",
+  "Color": "#7a8a72",
+  "PanelType": "NaviApps.Settings",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "CapturesInput": false,
+  "Permissions": [
+    "navi.settings.change"
+  ],
+  "IsSystem": true,
+  "__references": [],
+  "__version": 0
+}

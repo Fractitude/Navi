@@ -180,6 +180,9 @@
 			panel.InteractionRange = world.InteractionRange;
 			panel.RenderScale = world.RenderScale;
 			panel.Enabled = true;
+
+			worldPanels = [world, panel];
+			baseScale = world.RenderScale;
 		}
 		else if ( Components.TryGet<ScreenPanel>( out var screen ) )
 		{
@@ -189,6 +192,9 @@
 			panel.AutoScreenScale = screen.AutoScreenScale;
 			panel.ZIndex = screen.ZIndex + 1000;
 			panel.Enabled = true;
+
+			screenPanels = [screen, panel];
+			baseScale = screen.Scale;
 		}
 
 		var prompt = layer.Components.Create<NaviSecurePrompt>( false );
@@ -196,8 +202,36 @@
 		prompt.Enabled = true;
 	}
 
+	// The desktop's panel and the secure layer's, which are scaled together, and the scale they started with: 100%.
+	WorldPanel[] worldPanels = [];
+	ScreenPanel[] screenPanels = [];
+	float baseScale = 1f;
+
+	/// <summary>
+	/// Draw the desktop and the secure layer at the computer's <see cref="NaviComputer.DisplayScale"/>. A world panel's
+	/// render scale is its layout scale too, so a bigger one fits fewer panel pixels on the same screen.
+	/// </summary>
+	void ApplyDisplayScale()
+	{
+		var scale = baseScale * Computer.DisplayScale;
+
+		foreach ( var panel in worldPanels )
+		{
+			if ( panel.IsValid() && panel.RenderScale != scale )
+				panel.RenderScale = scale;
+		}
+
+		foreach ( var panel in screenPanels )
+		{
+			if ( panel.IsValid() && panel.Scale != scale )
+				panel.Scale = scale;
+		}
+	}
+
 	protected override void OnUpdate()
 	{
+		ApplyDisplayScale();
+
 		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
 			MenuApp = null;
 

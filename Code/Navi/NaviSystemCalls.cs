@@ -96,6 +96,14 @@ public static class NaviSystemCalls
 				return null;
 			}
 
+			// Settings.
+			case "display.scale":
+				return (computer.DisplayScale, NaviComputer.DisplayScales.ToArray());
+
+			case "display.set-scale":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetDisplayScale( Arg<float>( args, 0, method ) );
+
 			// The Store.
 			case "store.search":
 			{

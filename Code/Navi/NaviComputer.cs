@@ -126,6 +126,30 @@ public sealed class NaviComputer : Component
 	[Property] public List<string> SystemAppFolders { get; set; } = new() { "navi/system/" };
 
 	/// <summary>
+	/// The display scales the player can pick, like Windows' display scaling. 1 is the panel's own size.
+	/// </summary>
+	public static IReadOnlyList<float> DisplayScales { get; } = [0.5f, 0.75f, 1f, 1.25f, 1.5f];
+
+	/// <summary>
+	/// How big the desktop and its windows are drawn: one of <see cref="DisplayScales"/>. Bigger shows less on the screen.
+	/// <see cref="NaviDesktop"/> applies it to its panel, on top of the scale the panel started with.
+	/// </summary>
+	[Property] public float DisplayScale { get; set; } = 1f;
+
+	/// <summary>
+	/// Set <see cref="DisplayScale"/>. Returns false if the scale isn't one of <see cref="DisplayScales"/>.
+	/// </summary>
+	public bool SetDisplayScale( float scale )
+	{
+		if ( !DisplayScales.Any( x => System.MathF.Abs( x - scale ) < 0.001f ) )
+			return false;
+
+		DisplayScale = scale;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
 	public int Version { get; private set; }

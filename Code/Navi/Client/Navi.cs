@@ -36,6 +36,11 @@ public static class Navi
 		/// Close other apps' windows.
 		/// </summary>
 		public const string ManageApps = "navi.apps.manage";
+
+		/// <summary>
+		/// Change the computer's settings, such as the display scale.
+		/// </summary>
+		public const string ChangeSettings = "navi.settings.change";
 	}
 
 	/// <summary>
@@ -157,6 +162,20 @@ public static class Navi
 	/// Goes up whenever apps are installed, opened or closed, or packages change. Poll it to know when to refresh.
 	/// </summary>
 	public static Task<int> GetVersion( Panel app ) => Call<int>( app, "system.version" );
+
+	// Settings.
+
+	/// <summary>
+	/// How big the desktop is drawn (1 is 100%), and the scales the player can pick from.
+	/// </summary>
+	public static Task<(float Scale, float[] Options)> GetDisplayScale( Panel app ) =>
+		Call<(float, float[])>( app, "display.scale" );
+
+	/// <summary>
+	/// Draw the desktop at one of the scales <see cref="GetDisplayScale"/> lists. Needs <see cref="Permission.ChangeSettings"/>.
+	/// False if the scale isn't one of them.
+	/// </summary>
+	public static Task<bool> SetDisplayScale( Panel app, float scale ) => Call<bool>( app, "display.set-scale", scale );
 
 	// The Store.
 

@@ -1,0 +1,72 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* The computer's settings: a sidebar of pages, and the page that is open. A core app (Assets/navi/apps/settings.napp), *@
+@* so it has root and can change them. Like Packages, the panel only draws SettingsUiState and calls the view model. *@
+
+<root>
+	<div class="sidebar">
+		@foreach ( var category in UiState.Categories )
+		{
+			<div class="category @( category.Selected ? "active" : "" )"
+			     @onclick=@( () => ViewModel.OpenCategory( category.Key ) )>
+				<i>@category.Icon</i>
+				<div class="label">@category.Label</div>
+			</div>
+		}
+	</div>
+
+	<div class="page">
+		@if ( UiState.Notice is not null )
+		{
+			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+				@UiState.Notice
+			</div>
+		}
+
+		@switch ( UiState.Category )
+		{
+			case SettingsCategory.Display:
+				<div class="heading">Display</div>
+
+				<div class="setting">
+					<div class="name">Scale</div>
+					<div class="description">Make text, windows and the taskbar bigger or smaller.</div>
+
+					<div class="options">
+						@foreach ( var option in UiState.ScaleOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => ViewModel.ChooseScale( option.Scale ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+				break;
+		}
+	</div>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state. Made on first use: calls need the panel, which is this.
+	/// </summary>
+	SettingsViewModel ViewModel => field ??= new(this);
+
+	/// <summary>
+	/// What is drawn above. Read only.
+	/// </summary>
+	SettingsUiState UiState => ViewModel.UiState;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		ViewModel.Tick();
+	}
+
+	protected override int BuildHash() => ViewModel.Revision;
+}

@@ -15,7 +15,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
 - `NaviPermissions` lists what apps can be allowed to do.
-- `Packages` and `Calculator` are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
+- `Packages`, `Settings` and `Calculator` are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
 
 ## Windows
 
@@ -116,6 +116,8 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.GetStoreStatus( this )` | Installed and downloading package idents | |
 | `Navi.InstallPackage( this, ident )` | Download and install a Store app | `navi.store.install` |
 | `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
+| `Navi.GetDisplayScale( this )` | The display scale (1 is 100%) and the scales the player can pick | |
+| `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
 | `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
 
 ## Permissions
@@ -138,7 +140,7 @@ Permission and root prompts are shown by Navi's secure layer (`NaviSecurePrompt`
 
 An app with `IsSystem` in its manifest asks for full system access: root. Root has every permission, declared or not, and its window shows a shield.
 
-- **Pre-packaged system apps** are part of the OS. They have root without asking, are always installed and can't be uninstalled. Packages is one.
+- **Pre-packaged system apps** are part of the OS. They have root without asking, are always installed and can't be uninstalled. Packages and Settings are.
 - **Pre-packaged means a trusted folder.** Only a manifest in one of `NaviAppRegistry.SystemAppFolders` counts: the library's own `navi/apps/`, plus the folders a game lists in `NaviComputer.SystemAppFolders` (default `navi/system/`, so a game's system apps go in `Assets/navi/system/`). A manifest downloaded through the Store never counts, even in one of those folders. Anything else is a normal app, so a system app from an unknown source has to ask for root like a Store one.
 - **Ids can't be taken over.** If two manifests share an app id, a core app wins, then a pre-packaged one, so a Store app can never replace an app that ships with the game.
 - **Store system apps** ask when they are installed. After the download, before anything is installed, the player sees "Install ... with full system access?". Cancel, and the app isn't installed. The Store can't tell before the download, because the manifest is inside the package.
