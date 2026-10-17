@@ -108,20 +108,19 @@ Packages
 // Apps from NaviStore.OfficialOrgs.
 .official
 {
-	flex-direction: row;
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+	justify-content: center;
 	align-items: center;
-	gap: 2px;
-	padding: 1px 4px;
-	font-size: 8px;
-	font-weight: 700;
-	letter-spacing: 1px;
+	border-radius: 50%;
 	color: #2a2840;
 	background-color: #f2d64a;
 	border: 1px solid #2a2840;
 
 	i
 	{
-		font-size: 9px;
+		font-size: 10px;
 	}
 }
 
