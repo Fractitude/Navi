@@ -10,7 +10,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Parts
 
-- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector), the open windows and the permissions granted to apps. Gameplay code can call `Install`, `Uninstall`, `Launch` and `Close` with an app id.
+- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector), the open windows and the permissions granted to apps. Gameplay code can call `Install`, `Uninstall`, `Launch` and `Close` with an app id (see "App ids").
 - `NaviDesktop` (panel component) draws the desktop, windows, taskbar and permission dialogs. It adds a `NaviComputer` to its GameObject if there is none.
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
@@ -53,7 +53,7 @@ Every app is made the same way, whether it is built in, part of a game, or publi
    }
    ```
 
-3. In `Assets/`, create a Navi App asset (`.napp`). Set App Id, Title and Panel Type (the panel's full class name, e.g. `NotesApp.Notes`), and fill in the rest of the manifest below.
+3. In `Assets/`, create a Navi App asset (`.napp`). Set Title and Panel Type (the panel's full class name, e.g. `NotesApp.Notes`), and fill in the rest of the manifest below.
 4. Save. The app is now in Packages. Click Install, then click its taskbar icon.
 
 The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 312 high, so keep apps small.
@@ -86,7 +86,6 @@ The full contract — where each kind of rule goes, async and threads, the optio
 
 | Field | Meaning |
 |---|---|
-| `AppId` | Stable unique id. It is saved in `InstalledApps`, so do not change it after you use it. |
 | `Title` | Name on the taskbar tooltip, window title and package list. |
 | `Description` | One line in the package list. |
 | `Icon` | Material icon name, e.g. `calculate`. |
@@ -98,6 +97,15 @@ The full contract — where each kind of rule goes, async and threads, the optio
 | `CapturesInput` | Takes over the player's controls while its window is in front. See below. Default `false`. |
 | `Permissions` | The permissions the app may have. It is never granted others. See below. |
 | `IsSystem` | A system app: it asks for full system access (root), which allows everything. See "System apps" below. |
+
+### App ids
+
+The manifest doesn't choose its app's id. Navi derives it (`NaviAppRegistry.IdOf`):
+
+- **A Store app's id is its package ident**, e.g. `fractitude.napp_counter`. sbox.game keeps idents unique, and only the package's org can publish under one.
+- **Any other app's id is its manifest's resource path**, e.g. `navi/apps/packages.napp` (`NaviAppRegistry.PackagesApp`). This includes an addon's app while you test it in the editor.
+
+Ids are saved in `InstalledApps` and the other lists of granted rights, so don't move or rename a manifest once it is used. A path with spaces isn't an id, and its app isn't listed. Idents have no `/` and paths always do, so a Store app can never get the id of another app.
 
 ## Talking to the computer
 
@@ -151,7 +159,7 @@ An app with `IsSystem` in its manifest asks for full system access: root. Root h
 
 - **Pre-packaged system apps** are part of the OS. They have root without asking, are always installed and can't be uninstalled. Packages and Settings are.
 - **Pre-packaged means a trusted folder.** Only a manifest in one of `NaviAppRegistry.SystemAppFolders` counts: the library's own `navi/apps/`, plus the folders a game lists in `NaviComputer.SystemAppFolders` (default `navi/system/`, so a game's system apps go in `Assets/navi/system/`). A manifest downloaded through the Store never counts, even in one of those folders. Anything else is a normal app, so a system app from an unknown source has to ask for root like a Store one.
-- **Ids can't be taken over.** If two manifests share an app id, a core app wins, then a pre-packaged one, so a Store app can never replace an app that ships with the game.
+- **Ids can't be taken over.** A manifest can't choose its app id (see "App ids"), so a Store app can't pass for another app and inherit its root or permissions.
 - **Store system apps** ask when they are installed. After the download, before anything is installed, the player sees "Install ... with full system access?". Cancel, and the app isn't installed. The Store can't tell before the download, because the manifest is inside the package.
 - If a Store app becomes a system app in an update, it asks once before its next launch.
 - Accepted apps are kept in `NaviComputer.RootApps`. Uninstalling forgets them.

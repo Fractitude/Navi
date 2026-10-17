@@ -53,14 +53,14 @@ public sealed class NaviAppInfo
 	/// </summary>
 	public Panel Create() => PanelType.Create<Panel>();
 
-	internal static NaviAppInfo FromResource( NaviAppResource resource, TypeDescription panelType )
+	internal static NaviAppInfo FromResource( string id, NaviAppResource resource, TypeDescription panelType )
 	{
 		var prepackaged = NaviAppRegistry.IsPrepackaged( resource );
 
 		return new()
 		{
-			Id = resource.AppId,
-			Name = resource.Title ?? resource.AppId,
+			Id = id,
+			Name = resource.Title ?? id,
 			Description = resource.Description ?? "",
 			Icon = resource.Icon,
 			Color = resource.Color,
@@ -87,6 +87,11 @@ public static class NaviAppRegistry
 	/// The library's own apps, such as Packages and Calculator (<c>Assets/navi/apps/</c>).
 	/// </summary>
 	public const string BuiltInFolder = "navi/apps/";
+
+	/// <summary>
+	/// Id of the built-in Packages app, which the NAVI button opens.
+	/// </summary>
+	public const string PackagesApp = BuiltInFolder + "packages.napp";
 
 	static readonly HashSet<string> systemAppFolders = new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder };
 
@@ -132,14 +137,32 @@ public static class NaviAppRegistry
 	}
 
 	/// <summary>
-	/// Every app, sorted by name. If two apps share an id, a core app wins, then a prepackaged one, so a Store app can
-	/// never replace an app that ships with the game.
+	/// An app's id, which nothing in its manifest can choose. A Store app's is the package ident it was downloaded
+	/// from, e.g. "fractitude.napp_counter": unique on sbox.game, and only the package's org can publish under it. Any
+	/// other app's is its resource path, e.g. "navi/apps/packages.napp", so moving or renaming the manifest changes
+	/// it. Idents have no '/' and paths do, so the two can't meet. Null for a path with whitespace, which can't be an
+	/// id because <see cref="NaviComputer.GrantedPermissions"/> separates the id from the permission with a space.
+	/// </summary>
+	public static string IdOf( NaviAppResource resource )
+	{
+		if ( NaviStore.PackageOf( resource ) is { } ident )
+			return ident;
+
+		var path = resource?.ResourcePath?.Replace( '\\', '/' ).TrimStart( '/' ).ToLowerInvariant();
+		if ( string.IsNullOrEmpty( path ) || path.Any( char.IsWhiteSpace ) )
+			return null;
+
+		return path;
+	}
+
+	/// <summary>
+	/// Every app, sorted by name. Ids are unique, but if two resources ever share one, a core app wins, then a
+	/// prepackaged one, so a Store app can never replace an app that ships with the game.
 	/// </summary>
 	public static IEnumerable<NaviAppInfo> All => ResourceLibrary.GetAll<NaviAppResource>()
-		.Where( x => !string.IsNullOrWhiteSpace( x.AppId ) )
-		.Select( x => (Resource: x, Panel: x.FindPanelType()) )
-		.Where( x => x.Panel is not null )
-		.Select( x => NaviAppInfo.FromResource( x.Resource, x.Panel ) )
+		.Select( x => (Resource: x, Id: IdOf( x ), Panel: x.FindPanelType()) )
+		.Where( x => x.Id is not null && x.Panel is not null )
+		.Select( x => NaviAppInfo.FromResource( x.Id, x.Resource, x.Panel ) )
 		.OrderBy( x => x.IsCore ? 0 : x.IsPrepackaged ? 1 : 2 )
 		.DistinctBy( x => x.Id )
 		.OrderBy( x => x.Name );

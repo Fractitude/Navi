@@ -4,16 +4,12 @@ namespace Sandbox;
 /// Defines a Navi app: a <see cref="Sandbox.UI.Panel"/> class plus how it appears and what it may ask for. Every app is
 /// one of these. Built-in apps are in the library's assets; players publish theirs to the Store (sbox.game) from an addon.
 /// The panel doesn't use Navi types. It talks to the computer through the <c>Navi</c> client (<c>Code/Navi/Client/Navi.cs</c>),
-/// so an app published from an addon works in every game with the Navi library.
+/// so an app published from an addon works in every game with the Navi library. The app's id isn't set here: see
+/// <see cref="NaviAppRegistry.IdOf"/>.
 /// </summary>
 [AssetType( Name = "Navi App", Extension = NaviStore.PackageType, Category = "Navi", Flags = AssetTypeFlags.NoEmbedding )]
 public sealed class NaviAppResource : GameResource
 {
-	/// <summary>
-	/// Unique, stable id. Saved in <see cref="NaviComputer.InstalledApps"/>, so don't change it once published.
-	/// </summary>
-	[Property] public string AppId { get; set; }
-
 	/// <summary>
 	/// Name shown on the taskbar tooltip, window title and package list.
 	/// </summary>
@@ -85,9 +81,9 @@ public sealed class NaviAppResource : GameResource
 
 	public override void ConfigurePublishing( ResourcePublishContext context )
 	{
-		if ( string.IsNullOrWhiteSpace( AppId ) || string.IsNullOrWhiteSpace( Title ) )
+		if ( string.IsNullOrWhiteSpace( Title ) )
 		{
-			context.SetPublishingDisabled( "Set App Id and Title." );
+			context.SetPublishingDisabled( "Set Title." );
 			return;
 		}
 

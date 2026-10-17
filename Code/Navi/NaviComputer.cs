@@ -95,7 +95,8 @@ public sealed class NaviComputer : Component
 	/// <summary>
 	/// Ids of the installed apps. System apps are always installed and don't need to be listed.
 	/// </summary>
-	[Property] public List<string> InstalledApps { get; set; } = new() { "calculator" };
+	[Property]
+	public List<string> InstalledApps { get; set; } = new() { NaviAppRegistry.BuiltInFolder + "calculator.napp" };
 
 	/// <summary>
 	/// Store packages (sbox.game idents, e.g. "org.notes") installed on this computer. They are downloaded when the game starts.

@@ -24,15 +24,37 @@ public static class NaviStore
 	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && OfficialOrgs.Contains( org );
 
 	/// <summary>
-	/// Resource paths of the apps downloaded from the Store. They are never trusted as shipped with the game, even in one
-	/// of the <see cref="NaviAppRegistry.SystemAppFolders"/>.
+	/// Resource paths of the apps downloaded from the Store, to the package each came from. They are never trusted as
+	/// shipped with the game, even in one of the <see cref="NaviAppRegistry.SystemAppFolders"/>.
 	/// </summary>
-	static readonly HashSet<string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
+	static readonly Dictionary<string, string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
 
 	/// <summary>
 	/// Was this app downloaded from the Store? A false doesn't mean it shipped with the game: see <see cref="NaviAppRegistry.IsPrepackaged"/>.
 	/// </summary>
-	public static bool IsDownloaded( NaviAppResource resource ) => resource?.ResourcePath is { } path && downloaded.Contains( path );
+	public static bool IsDownloaded( NaviAppResource resource ) => PackageOf( resource ) is not null;
+
+	/// <summary>
+	/// The ident of the Store package this app was downloaded from, e.g. "fractitude.napp_counter", or null if it
+	/// wasn't.
+	/// </summary>
+	public static string PackageOf( NaviAppResource resource ) =>
+		resource?.ResourcePath is { } path && downloaded.TryGetValue( path, out var ident ) ? ident : null;
+
+	const string IdentPattern = @"^[a-z0-9_\-]+\.[a-z0-9_\-]+$";
+
+	/// <summary>
+	/// A package ident as an app id: "org.name", lowercase, without a version. Null if it isn't a package ident, so it
+	/// can't pass for a resource path or another package.
+	/// </summary>
+	public static string NormalizeIdent( string ident )
+	{
+		var normalized = ident?.Split( '#' )[0].Trim().ToLowerInvariant();
+		if ( normalized is null || !System.Text.RegularExpressions.Regex.IsMatch( normalized, IdentPattern ) )
+			return null;
+
+		return normalized;
+	}
 
 	/// <summary>
 	/// Store apps fetched by a call that doesn't ask for a size.
@@ -56,20 +78,27 @@ public static class NaviStore
 	}
 
 	/// <summary>
-	/// Download a published app and load its code. Returns the app, or null if the package isn't a working Navi app.
+	/// Download a published app and load its code. Returns the app, whose id is the package ident, or null if the package
+	/// isn't a working Navi app.
 	/// </summary>
 	public static async Task<NaviAppInfo> DownloadAsync( string packageIdent )
 	{
-		var resource = await Cloud.Load<NaviAppResource>( packageIdent, withCode: true );
-		if ( resource is null )
+		if ( NormalizeIdent( packageIdent ) is not { } ident )
 		{
-			Log.Warning( $"NaviStore: '{packageIdent}' is not a Navi app" );
+			Log.Warning( $"NaviStore: '{packageIdent}' is not a package ident" );
 			return null;
 		}
 
-		downloaded.Add( resource.ResourcePath );
+		var resource = await Cloud.Load<NaviAppResource>( ident, withCode: true );
+		if ( resource?.ResourcePath is null )
+		{
+			Log.Warning( $"NaviStore: '{ident}' is not a Navi app" );
+			return null;
+		}
 
-		var app = NaviAppRegistry.Find( resource.AppId );
+		downloaded[resource.ResourcePath] = ident;
+
+		var app = NaviAppRegistry.Find( ident );
 		if ( app is null )
 		{
 			Log.Warning( $"NaviStore: '{packageIdent}' has no panel class '{resource.PanelType}' in its code" );

@@ -64,7 +64,7 @@
 	}
 
 	<div class="taskbar">
-		<div class="start" @onclick=@(() => Computer.Launch( "packages" ))>NAVI</div>
+		<div class="start" @onclick=@(() => Computer.Launch( NaviAppRegistry.PackagesApp ))>NAVI</div>
 
 		@foreach ( var app in Computer.Installed )
 		{
