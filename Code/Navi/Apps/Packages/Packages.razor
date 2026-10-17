@@ -5,143 +5,131 @@
 
 @* A Navi app like any other: a plain panel, described by Assets/navi/apps/packages.napp, that talks to the computer *@
 @* through the Navi client. It is a system app there, so it starts with the permissions it lists. *@
+@* *@
+@* The panel is a view and nothing more: every value below is read from the view model's PackagesUiState, and every *@
+@* control calls a method on the view model, which replaces the state. It keeps no app state of its own. *@
 
 <root>
 	<div class="tabs">
-		<div class="tab @(ShowStore ? "" : "active")" @onclick=@(() => ShowStore = false)>Apps</div>
-		<div class="tab @(ShowStore ? "active" : "")" @onclick=@OpenStore>Store</div>
+		<div class="tab @(State.ShowStore ? "" : "active")" @onclick=@(() => Model.OpenApps())>Apps</div>
+		<div class="tab @(State.ShowStore ? "active" : "")" @onclick=@(() => Model.OpenStore())>Store</div>
 		<div class="spacer"></div>
 
-		@if ( ShowStore )
+		@if ( State.ShowStore )
 		{
-			<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = FetchStoreAsync( false ))><i>refresh</i></div>
+			<div class="button @(State.Refreshing ? "disabled" : "")" @onclick=@(() => Model.SubmitSearch())><i>refresh</i></div>
 		}
 		else
 		{
 			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
-			<div class="filter" tooltip="Show: @FilterName" @onclick=@(() => SetFilterOpen( !FilterOpen ))><i>filter_list</i></div>
+			<div class="filter" tooltip="Show: @State.FilterName" @onclick=@(() => Model.ToggleFilterMenu())><i>filter_list</i></div>
 		}
 	</div>
 
 	@* Store search. Enter runs it; the refresh button re-runs the text that is in the field. *@
-	@if ( ShowStore )
+	@if ( State.ShowStore )
 	{
 		<div class="search">
-			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => _ = FetchStoreAsync( false )) />
+			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => Model.SubmitSearch()) />
 		</div>
 	}
 
 	<div class="list">
-		@if ( Notice is not null )
+		@if ( State.Notice is not null )
 		{
-			<div class="notice" @onclick=@(() => Notice = null)>@Notice</div>
+			<div class="notice" @onclick=@(() => Model.DismissNotice())>@State.Notice</div>
 		}
 
-		@if ( ShowStore )
+		@if ( State.ShowStore )
 		{
-			@if ( Refreshing || StoreStatus is not null )
+			@if ( State.Refreshing || State.StoreStatus is not null )
 			{
-				<div class="status">@( Refreshing ? "Connecting to the Wired..." : StoreStatus )</div>
+				<div class="status">@( State.Refreshing ? "Connecting to the Wired..." : State.StoreStatus )</div>
 			}
 
 			@* While a page loads the status takes the list's place, so a slow search reads as work rather than as the same list. *@
-			@if ( !Refreshing )
+			@if ( !State.Refreshing )
 			{
-				@foreach ( var (package, official) in StorePackages )
+				@foreach ( var entry in State.StoreRows )
 				{
-					var ident = package.FullIdent;
-					var isExpanded = Expanded.Contains( ident );
-
 					<div class="entry">
-					<div class="row">
-						<img class="thumb" src=@package.Thumb />
-						<div class="info">
-							<div class="title-row">
-								<div class="name">@package.Title</div>
-								@if ( official )
-								{
-									<div class="official" tooltip="Official"><i>verified</i></div>
-								}
+						<div class="row">
+							<img class="thumb" src=@entry.Thumb />
+							<div class="info">
+								<div class="title-row">
+									<div class="name">@entry.Title</div>
+									@if ( entry.Official )
+									{
+										<div class="official" tooltip="Official"><i>verified</i></div>
+									}
+								</div>
+								<div class="description">@entry.Summary</div>
 							</div>
-							<div class="description">@package.Summary</div>
-						</div>
 
-						@if ( InstallingPackages.Contains( ident ) )
-						{
-							<div class="button disabled">Installing...</div>
-						}
-						else if ( InstalledPackages.Contains( ident ) )
-						{
-							<div class="button disabled">Installed</div>
-						}
-						else
-						{
-							<div class="button install" @onclick=@(() => Run( "install this app", () => Navi.InstallPackage( this, ident ) ))>Install</div>
-						}
+							@if ( entry.Action == PackageAction.Installing )
+							{
+								<div class="button disabled">Installing...</div>
+							}
+							else if ( entry.Action == PackageAction.Installed )
+							{
+								<div class="button disabled">Installed</div>
+							}
+							else
+							{
+								<div class="button install" @onclick=@(() => Model.InstallPackage( entry.Ident ))>Install</div>
+							}
 
-						<div class="expand" tooltip=@(isExpanded ? "Less" : "More") @onclick=@(() => ToggleDetails( package ))>
-							<i>@(isExpanded ? "expand_less" : "expand_more")</i>
-						</div>
-					</div>
-
-					@if ( isExpanded )
-					{
-						var full = Details.GetValueOrDefault( ident ) ?? package;
-
-						<div class="details">
-							<div class="about">@About( full )</div>
-
-							<div class="facts">
-								<div class="fact"><i>person</i><div class="key">Author</div><div class="value">@(full.Org?.Title ?? "Unknown")</div></div>
-								<div class="fact"><i>thumb_up</i><div class="key">Rating</div><div class="value">@Rating( full )</div></div>
-								<div class="fact"><i>group</i><div class="key">Players</div><div class="value">@full.Usage.Total.Users.ToString( "N0" )</div></div>
-								<div class="fact"><i>update</i><div class="key">Updated</div><div class="value">@full.Updated.ToLocalTime().ToString( "d MMM yyyy" )</div></div>
-								<div class="fact"><i>sell</i><div class="key">Version</div><div class="value">@(full.Revision?.VersionId.ToString() ?? "...")</div></div>
-								<div class="fact"><i>save</i><div class="key">Size</div><div class="value">@Size( full )</div></div>
+							<div class="expand" tooltip=@(entry.Expanded ? "Less" : "More") @onclick=@(() => Model.ToggleDetails( entry.Ident ))>
+								<i>@(entry.Expanded ? "expand_less" : "expand_more")</i>
 							</div>
 						</div>
-					}
+
+						@if ( entry.Expanded )
+						{
+							<div class="details">
+								<div class="about">@entry.About</div>
+
+								<div class="facts">
+									@foreach ( var fact in entry.Facts )
+									{
+										<div class="fact"><i>@fact.Icon</i><div class="key">@fact.Key</div><div class="value">@fact.Value</div></div>
+									}
+								</div>
+							</div>
+						}
 					</div>
 				}
 			}
 		}
 		else
 		{
-			var visible = Apps
-				.Select( x => (App: x, FromStore: StoreAppIds.Contains( x.Id )) )
-				.Where( x => Matches( AppFilter, x.App.Installed, x.App.Type, x.FromStore ) )
-				.Select( x => x.App );
-
-			@if ( !visible.Any() )
+			@if ( State.AppListEmpty )
 			{
-				<div class="status">@EmptyText</div>
+				<div class="status">@State.EmptyText</div>
 			}
 
-			@foreach ( var app in visible )
+			@foreach ( var app in State.AppRows )
 			{
-				var id = app.Id;
-
 				<div class="row">
 					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 					<div class="info">
 						<div class="title-row">
 							<div class="name">@app.Name</div>
-							@if ( app.Type is "core" or "system" )
+							@if ( app.Shield )
 							{
-								<div class="root" tooltip=@( app.Type == "core" ? "Core app: part of the OS" : "System app: asks for full system access" )><i>shield</i></div>
+								<div class="root" tooltip=@app.ShieldTooltip><i>shield</i></div>
 							}
 						</div>
 						<div class="description">@app.Description</div>
 					</div>
 
-					@* A core app is part of the OS: always installed, and it can't be uninstalled. *@
-					@if ( app.Type != "core" && app.Installed )
+					@if ( app.Action == AppAction.Uninstall )
 					{
-						<div class="button" @onclick=@(() => Run( "uninstall apps", () => Navi.Uninstall( this, id ) ))>Uninstall</div>
+						<div class="button" @onclick=@(() => Model.UninstallApp( app.Id ))>Uninstall</div>
 					}
-					else if ( app.Type != "core" )
+					else if ( app.Action == AppAction.Install )
 					{
-						<div class="button install" @onclick=@(() => Run( "install apps", () => Navi.Install( this, id ) ))>Install</div>
+						<div class="button install" @onclick=@(() => Model.InstallApp( app.Id ))>Install</div>
 					}
 				</div>
 			}
@@ -150,30 +138,30 @@
 
 	@* Which apps the list shows. Drawn after the list, so it paints over it, with a backdrop that closes it. The *@
 	@* backdrop starts under the tabs row, so the tabs and this button stay clickable while the menu is up. *@
-	@if ( FilterOpen && !ShowStore )
+	@if ( State.FilterOpen && !State.ShowStore )
 	{
-		<div class="filter-backdrop" @onmousedown=@(() => SetFilterOpen( false ))></div>
+		<div class="filter-backdrop" @onmousedown=@(() => Model.CloseFilterMenu())></div>
 
 		<div class="filter-menu">
-			@foreach ( var (key, name) in Filters )
+			@foreach ( var kind in State.Filters )
 			{
-				<div class="item @( AppFilter == key ? "active" : "" )" @onclick=@(() => ChooseFilter( key ))>
-					<i>@( AppFilter == key ? "check" : "" )</i>
-					<div class="label">@name</div>
+				<div class="item @(kind.Selected ? "active" : "")" @onclick=@(() => Model.ChooseFilter( kind.Key ))>
+					<i>@(kind.Selected ? "check" : "")</i>
+					<div class="label">@kind.Label</div>
 				</div>
 			}
 		</div>
 	}
 
 	@* How much of the Store the list holds, and the way to the next page of it. *@
-	@if ( ShowStore && !Refreshing && StoreTotal > 0 )
+	@if ( State.ShowStore && !State.Refreshing && State.StoreTotal > 0 )
 	{
 		<div class="footer">
-			<div class="count">Showing @StorePackages.Length of @StoreTotal apps</div>
+			<div class="count">Showing @State.StoreShown of @State.StoreTotal apps</div>
 
-			@if ( StorePackages.Length < StoreTotal )
+			@if ( State.HasMore )
 			{
-				<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = FetchStoreAsync( true ))>More</div>
+				<div class="button" @onclick=@(() => Model.LoadMore())>More</div>
 			}
 		</div>
 	}
@@ -181,72 +169,49 @@
 
 @code
 {
-	bool ShowStore;
-
-	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] Apps = [];
+	PackagesViewModel model;
 
 	/// <summary>
-	/// Ids of the apps that came from the Store. The app list doesn't say where an app came from, so it's a second call.
+	/// The app's logic and its state. Made on first use, because every call it makes to the computer is made with the
+	/// app's own panel, which is this.
 	/// </summary>
-	HashSet<string> StoreAppIds = new();
+	PackagesViewModel Model => model ??= new( this );
 
 	/// <summary>
-	/// What the Apps tab lists: one of the <see cref="Filters"/> keys. It has nothing to do with the Store tab.
+	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw.
 	/// </summary>
-	string AppFilter = "installed";
+	PackagesUiState State => Model.State;
 
 	/// <summary>
-	/// The kinds of app the Apps tab can show, in menu order. A property, not a field: a hot reload patches methods, so
-	/// a change to this list shows up in a running game, while a field's initializer only runs once per load.
+	/// The Store search field binds to this. Typing isn't a reason to redraw the list: Enter, or the refresh button,
+	/// is what searches for what it holds.
 	/// </summary>
-	static (string Key, string Name)[] Filters => [ ("installed", "Installed"), ("store", "Store"), ("core", "Core"), ("system", "System"), ("prepackaged", "Pre-packaged")];
-
-	/// <summary>
-	/// The current filter's name, for the button's tooltip. Falls back to the first kind if the filter is one this
-	/// build doesn't know: a hot reload can leave an instance holding an older one, and a missing name shouldn't take
-	/// the panel down with it.
-	/// </summary>
-	string FilterName => Filters.FirstOrDefault( x => x.Key == AppFilter ).Name ?? Filters[0].Name;
-
-	/// <summary>
-	/// The filter menu is up.
-	/// </summary>
-	bool FilterOpen;
-
-	/// <summary>
-	/// The Store entries fetched so far, and how many match the current search in all. The backend pages them, so
-	/// the list grows with "More" instead of downloading every app up front.
-	/// </summary>
-	(Package Package, bool Official)[] StorePackages = [];
-	int StoreTotal;
-
-	/// <summary>
-	/// What the search field holds. Enter runs it; the refresh button runs it again.
-	/// </summary>
-	string SearchText = "";
-
-	HashSet<string> InstalledPackages = new();
-	HashSet<string> InstallingPackages = new();
-
-	/// <summary>
-	/// Message shown above the list, e.g. when the player denied a permission. Click to dismiss.
-	/// </summary>
-	string Notice;
-
-	/// <summary>
-	/// The computer's version when the lists were last fetched. They are fetched again when it changes.
-	/// </summary>
-	int? knownVersion;
-	bool polling;
-	RealTimeSince sincePoll;
+	string SearchText
+	{
+		get => Model.SearchText;
+		set => Model.SearchText = value;
+	}
 
 	public override void Tick()
 	{
 		base.Tick();
 
-		// The engine draws the scrollbar over the list instead of taking room from it, and scrollbar-gutter keeps
-		// room whether or not the list scrolls. So the room is made here, only while the bar is there: the engine
-		// adds the bar to the end of the scrolling panel's children.
+		FitScrollbarGutter();
+
+		Model.Tick();
+	}
+
+	/// <summary>
+	/// The engine draws the scrollbar over the list instead of taking room from it, and scrollbar-gutter keeps room
+	/// whether or not the list scrolls. So the room is made here, only while the bar is there: the engine adds the bar
+	/// to the end of the scrolling panel's children.
+	/// </summary>
+	/// <remarks>
+	/// This is the panel doing to its own tree what CSS can't, and it does the same thing every frame: it isn't app
+	/// state, so it stays out of the view model.
+	/// </remarks>
+	void FitScrollbarGutter()
+	{
 		foreach ( var child in Children )
 		{
 			if ( !child.HasClass( "list" ) ) continue;
@@ -257,252 +222,7 @@
 
 			child.SetClass( "scrolling", scrolling );
 		}
-
-		if ( !polling && sincePoll > 0.25f )
-			_ = PollAsync();
 	}
 
-	async Task PollAsync()
-	{
-		polling = true;
-		sincePoll = 0;
-
-		try
-		{
-			var version = await Navi.GetVersion( this );
-			if ( version == knownVersion )
-				return;
-
-			knownVersion = version;
-			Apps = await Navi.GetApps( this );
-			StoreAppIds = ( await Navi.GetStoreApps( this ) ).ToHashSet();
-
-			var (installed, installing) = await Navi.GetStoreStatus( this );
-			InstalledPackages = installed.ToHashSet();
-			InstallingPackages = installing.ToHashSet();
-			storeVersion++;
-		}
-		finally
-		{
-			polling = false;
-		}
-	}
-
-	/// <summary>
-	/// Make a call that needs a permission, asking the player for it if this app doesn't have it.
-	/// </summary>
-	async void Run( string what, System.Func<Task<bool>> call )
-	{
-		Notice = null;
-
-		try
-		{
-			await Navi.WithPermission( this, call );
-		}
-		catch ( System.UnauthorizedAccessException )
-		{
-			Notice = $"Packages isn't allowed to {what}.";
-		}
-		catch ( System.Exception e )
-		{
-			Log.Warning( e, $"Packages: couldn't {what}: {e.Message}" );
-			Notice = $"Couldn't {what}.";
-		}
-
-		storeVersion++;
-	}
-
-	/// <summary>
-	/// The result message shown above the Store list, or null. While a refresh runs the view shows its own message
-	/// instead, so this one can't cut it short.
-	/// </summary>
-	string StoreStatus;
-
-	bool StoreLoaded;
-	int storeVersion;
-
-	/// <summary>
-	/// True while a Store page is being fetched. <see cref="FetchStoreAsync"/> ignores calls made while it is on, so
-	/// only one search runs at a time; the button is disabled too, but the guard is what makes that a rule.
-	/// </summary>
-	bool Refreshing;
-
-	/// <summary>
-	/// How long a refresh shows as running at least. A Store search usually answers within a frame or two, and a
-	/// refresh that finishes before it is drawn looks like a click that did nothing, so the status and the disabled
-	/// button stay up this long even when the search is instant.
-	/// </summary>
-	const float RefreshVisibleTime = 0.5f;
-
-	/// <summary>
-	/// Store apps fetched per request. The backend pages them, so this is how many a refresh or a "More" adds.
-	/// </summary>
-	const int StorePageSize = 20;
-
-	/// <summary>
-	/// Idents of the Store entries showing their details.
-	/// </summary>
-	HashSet<string> Expanded = new();
-
-	/// <summary>
-	/// Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.
-	/// </summary>
-	Dictionary<string, Package> Details = new();
-
-	void ToggleDetails( Package package )
-	{
-		var ident = package.FullIdent;
-		storeVersion++;
-
-		if ( !Expanded.Add( ident ) )
-		{
-			Expanded.Remove( ident );
-			return;
-		}
-
-		if ( !Details.ContainsKey( ident ) )
-			_ = FetchDetailsAsync( ident );
-	}
-
-	async Task FetchDetailsAsync( string ident )
-	{
-		try
-		{
-			if ( await Package.FetchAsync( ident, false ) is { } full )
-				Details[ident] = full;
-		}
-		catch ( System.Exception e )
-		{
-			Log.Warning( e, $"Packages: couldn't fetch {ident}: {e.Message}" );
-		}
-
-		storeVersion++;
-	}
-
-	static string About( Package package )
-	{
-		if ( !string.IsNullOrWhiteSpace( package.Description ) ) return package.Description;
-		if ( !string.IsNullOrWhiteSpace( package.Summary ) ) return package.Summary;
-		return "No description yet.";
-	}
-
-	static string Rating( Package package )
-	{
-		if ( package.Reviews.Total > 0 )
-			return $"{package.Reviews.Score * 100:0}% positive ({package.Reviews.Total})";
-
-		if ( package.VotesUp + package.VotesDown > 0 )
-			return $"{package.VotesUp} up, {package.VotesDown} down";
-
-		return "No ratings yet";
-	}
-
-	static string Size( Package package )
-	{
-		if ( package.Revision is not { } revision )
-			return "...";
-
-		return $"{System.Math.Max( 1, revision.TotalSize / 1024 )} KB";
-	}
-
-	void OpenStore()
-	{
-		ShowStore = true;
-
-		// The filter belongs to the Apps tab; the button is gone now, and a menu with no button to anchor it is a ghost.
-		FilterOpen = false;
-
-		if ( !StoreLoaded )
-			_ = FetchStoreAsync( false );
-	}
-
-	/// <summary>
-	/// Fetch one page of the Store. A refresh (<paramref name="append"/> false) starts over from the first entry; loading
-	/// more adds the page after the entries already shown. Ignores a call made while a page is being fetched.
-	/// </summary>
-	async Task FetchStoreAsync( bool append )
-	{
-		// One page at a time, whatever asked for it: two at once would race to fill the same list.
-		if ( Refreshing )
-			return;
-
-		Refreshing = true;
-		StoreLoaded = true;
-		storeVersion++;
-
-		RealTimeSince elapsed = 0;
-
-		var text = SearchText.Trim();
-		var skip = append ? StorePackages.Length : 0;
-
-		try
-		{
-			// The old entries stay on screen while the page loads: the status above says it's a refresh.
-			var (packages, total) = await Navi.SearchStore( this, text, skip, StorePageSize );
-
-			StorePackages = append ? [.. StorePackages, .. packages] : packages;
-			StoreTotal = total;
-			StoreStatus = total > 0 ? null
-				: text.Length > 0 ? "No apps found matching your filter."
-				: "No apps have been published yet.";
-		}
-		catch ( System.Exception e )
-		{
-			Log.Warning( e, $"Packages: Store search failed: {e.Message}" );
-			StoreStatus = "Couldn't reach the Store.";
-		}
-
-		// Hold the running state, and with it the "Connecting" status, for a moment: the search often answers within
-		// a frame or two, and a refresh drawn only after it already finished looks like a click that did nothing.
-		var remaining = RefreshVisibleTime - elapsed;
-		if ( remaining > 0 )
-			await Task.Delay( (int)( remaining * 1000 ) );
-
-		Refreshing = false;
-		storeVersion++;
-	}
-
-	/// <summary>
-	/// Is the app in the list under <paramref name="filter"/>? Installed is the plain apps that are installed: core and
-	/// system apps are left to their own kinds. Pre-packaged is the apps that ship with the game or a library but
-	/// aren't part of the OS, whether or not they are installed, because the Store can't bring them back; the rest are
-	/// Store apps, which are left to the Store tab when they aren't installed. Core apps are part of the OS, and
-	/// system apps ask for full system access, whether they ship with the game or with a Store package, so an app can
-	/// match more than one of these.
-	/// </summary>
-	static bool Matches( string filter, bool installed, string type, bool fromStore ) => filter switch
-	{
-		"store" => installed && fromStore,
-		"core" => type is "core",
-		"system" => installed && ( type is "core" or "system" ),
-		"prepackaged" => !fromStore && type is not "core",
-		_ => installed && type is "app",
-	};
-
-	/// <summary>
-	/// Shown in the list when no app matches the filter.
-	/// </summary>
-	string EmptyText => AppFilter switch
-	{
-		"store" => "No Store apps are installed.",
-		"core" => "No apps are part of the OS.",
-		"system" => "No apps ask for full system access.",
-		"prepackaged" => "No apps come with the game.",
-		_ => "No apps are installed.",
-	};
-
-	void SetFilterOpen( bool open )
-	{
-		FilterOpen = open;
-		storeVersion++;
-	}
-
-	void ChooseFilter( string filter )
-	{
-		AppFilter = filter;
-		SetFilterOpen( false );
-	}
-
-	protected override int BuildHash() => System.HashCode.Combine( knownVersion, ShowStore, storeVersion, Notice, FilterOpen, AppFilter );
+	protected override int BuildHash() => Model.Revision;
 }
-

@@ -1,0 +1,470 @@
+using Sandbox.UI;
+using System.Threading.Tasks;
+
+namespace NaviApps;
+
+/// <summary>
+/// Everything the Packages app does: what the computer knows, what each kind of app means, and which call a click
+/// becomes. The panel (<c>Packages.razor</c>) holds an instance of this and nothing else — it draws
+/// <see cref="State"/> and calls the methods below, and those replace <see cref="State"/> and touch nothing in the
+/// panel tree.
+/// </summary>
+/// <remarks>
+/// The division is the two halves of a UI: this class is the app, the panel is one way of drawing it. Nothing here
+/// reads a panel, so every rule can be exercised without one — a console probe can select a filter, search the
+/// Store or install an app and print the state that came out.
+/// </remarks>
+public sealed class PackagesViewModel
+{
+	/// <summary>
+	/// The app's panel. Every call to the computer is made with it, and it is the window the computer answers as.
+	/// </summary>
+	readonly Panel app;
+
+	/// <summary>The kind the Apps tab starts on.</summary>
+	const string StartFilter = "installed";
+
+	/// <summary>How often the computer's version is polled, in seconds: a change there is what makes the lists stale.</summary>
+	const float PollInterval = 0.25f;
+
+	/// <summary>
+	/// How long a refresh shows as running at least. A Store search usually answers within a frame or two, and a
+	/// refresh that finishes before it is drawn looks like a click that did nothing, so the status and the disabled
+	/// button stay up this long even when the search is instant.
+	/// </summary>
+	const float RefreshVisibleTime = 0.5f;
+
+	/// <summary>
+	/// Store apps fetched per request. The backend pages them, so this is how many a refresh or a "More" adds.
+	/// </summary>
+	const int StorePageSize = 20;
+
+	/// <summary>
+	/// The kinds of app the Apps tab can show, in menu order. A property, not a field: a hot reload patches methods,
+	/// so a change to this list shows up in a running game, while a field's initializer only runs once per load.
+	/// </summary>
+	static (string Key, string Name)[] Kinds => [
+		("installed", "Installed"),
+		("store", "Store"),
+		("core", "Core"),
+		("system", "System"),
+		("prepackaged", "Pre-packaged"),
+	];
+
+	// What the computer said, kept apart from what is drawn from it: drawing formats and filters, this is the data.
+
+	/// <summary>Every app on the computer, installed or not. See <see cref="Navi.GetApps"/>.</summary>
+	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] apps = [];
+
+	/// <summary>Ids of the apps that came from the Store. The app list doesn't say where an app came from, so it's a second call.</summary>
+	HashSet<string> storeAppIds = new();
+
+	HashSet<string> installedPackages = new();
+	HashSet<string> installingPackages = new();
+
+	/// <summary>The Store entries fetched so far, and how many match the current search in all.</summary>
+	(Package Package, bool Official)[] storePackages = [];
+	int storeTotal;
+
+	/// <summary>The computer's version when the lists were last fetched. They are fetched again when it changes.</summary>
+	int? knownVersion;
+	bool polling;
+	RealTimeSince sincePoll;
+
+	/// <summary>The guard for <see cref="FetchStoreAsync"/>; <see cref="PackagesUiState.Refreshing"/> is its reflection.</summary>
+	bool refreshing;
+	bool storeLoaded;
+
+	/// <summary>Idents of the Store entries showing their details.</summary>
+	HashSet<string> expanded = new();
+
+	/// <summary>Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.</summary>
+	Dictionary<string, Package> details = new();
+
+	public PackagesViewModel( Panel app )
+	{
+		this.app = app ?? throw new System.ArgumentNullException( nameof( app ) );
+
+		State = new PackagesUiState
+		{
+			Filter = StartFilter,
+			Filters = BuildFilters( StartFilter ),
+			FilterName = NameOf( StartFilter ),
+			EmptyText = EmptyTextFor( StartFilter ),
+		};
+	}
+
+	/// <summary>
+	/// What the panel draws. Replaced whole on every change, and only ever read by the panel.
+	/// </summary>
+	public PackagesUiState State { get; private set; }
+
+	/// <summary>The panel's <c>BuildHash</c>: the state's revision is the panel's reason to redraw.</summary>
+	public int Revision => State.Revision;
+
+	/// <summary>
+	/// What the Store search field holds. Typing is no reason to redraw the list, so this replaces the state without
+	/// bumping its revision; Enter (<see cref="SubmitSearch"/>) is what searches.
+	/// </summary>
+	public string SearchText
+	{
+		get => State.SearchText;
+		set => State = State with { SearchText = value ?? "" };
+	}
+
+	/// <summary>
+	/// Called every frame by the panel. Nothing here is a click: the lists are refetched when the computer's version
+	/// changes, so an install made anywhere else shows up without the player doing anything.
+	/// </summary>
+	public void Tick()
+	{
+		if ( !polling && sincePoll > PollInterval )
+			_ = PollAsync();
+	}
+
+	// Tabs.
+
+	/// <summary>Show the apps on this computer.</summary>
+	public void OpenApps() => Update( s => s with { ShowStore = false } );
+
+	/// <summary>Show the Store, fetching its first page the first time.</summary>
+	public void OpenStore()
+	{
+		// The filter belongs to the Apps tab: the button is gone now, and a menu with no button to anchor it is a ghost.
+		Update( s => s with { ShowStore = true, FilterOpen = false } );
+
+		if ( !storeLoaded )
+			_ = FetchStoreAsync( false );
+	}
+
+	// The kinds of app the Apps tab shows.
+
+	public void ToggleFilterMenu() => Update( s => s with { FilterOpen = !s.FilterOpen } );
+
+	public void CloseFilterMenu() => Update( s => s with { FilterOpen = false } );
+
+	/// <summary>Show the apps of one <see cref="Kinds"/> kind.</summary>
+	public void ChooseFilter( string filter )
+	{
+		Update( s => s with
+		{
+			Filter = filter,
+			FilterOpen = false,
+			Filters = BuildFilters( filter ),
+			FilterName = NameOf( filter ),
+			EmptyText = EmptyTextFor( filter ),
+			AppRows = BuildAppRows( filter ),
+		} );
+	}
+
+	/// <summary>Dismiss the notice above the list.</summary>
+	public void DismissNotice()
+	{
+		if ( State.Notice is not null )
+			Update( s => s with { Notice = null } );
+	}
+
+	// The Store.
+
+	/// <summary>Search again from the first entry, with whatever the field holds.</summary>
+	public void SubmitSearch() => _ = FetchStoreAsync( false );
+
+	/// <summary>Fetch the page of the Store after the entries listed.</summary>
+	public void LoadMore() => _ = FetchStoreAsync( true );
+
+	/// <summary>Show or hide a Store entry's details, fetching them the first time it is opened.</summary>
+	public void ToggleDetails( string ident )
+	{
+		if ( !expanded.Add( ident ) )
+		{
+			expanded.Remove( ident );
+			Update( s => s with { StoreRows = BuildStoreRows() } );
+			return;
+		}
+
+		Update( s => s with { StoreRows = BuildStoreRows() } );
+
+		if ( !details.ContainsKey( ident ) )
+			_ = FetchDetailsAsync( ident );
+	}
+
+	/// <summary>Download and install a Store app.</summary>
+	public void InstallPackage( string ident ) => Run( "install this app", () => Navi.InstallPackage( app, ident ) );
+
+	/// <summary>Install an app that ships with the game or a library.</summary>
+	public void InstallApp( string id ) => Run( "install apps", () => Navi.Install( app, id ) );
+
+	/// <summary>Uninstall an app.</summary>
+	public void UninstallApp( string id ) => Run( "uninstall apps", () => Navi.Uninstall( app, id ) );
+
+	// The work behind the events.
+
+	async Task PollAsync()
+	{
+		polling = true;
+		sincePoll = 0;
+
+		try
+		{
+			var version = await Navi.GetVersion( app );
+			if ( version == knownVersion )
+				return;
+
+			knownVersion = version;
+
+			apps = await Navi.GetApps( app );
+			storeAppIds = ( await Navi.GetStoreApps( app ) ).ToHashSet();
+
+			var (installed, installing) = await Navi.GetStoreStatus( app );
+			installedPackages = installed.ToHashSet();
+			installingPackages = installing.ToHashSet();
+
+			Update( s => s with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
+		}
+		finally
+		{
+			polling = false;
+		}
+	}
+
+	/// <summary>
+	/// Fetch one page of the Store. A refresh (<paramref name="append"/> false) starts over from the first entry;
+	/// loading more adds the page after the entries already shown. Ignores a call made while a page is being fetched.
+	/// </summary>
+	async Task FetchStoreAsync( bool append )
+	{
+		// One page at a time, whatever asked for it: two at once would race to fill the same list.
+		if ( refreshing )
+			return;
+
+		refreshing = true;
+		storeLoaded = true;
+		Update( s => s with { Refreshing = true } );
+
+		RealTimeSince elapsed = 0;
+
+		var text = State.SearchText.Trim();
+		var skip = append ? storePackages.Length : 0;
+		string status;
+
+		try
+		{
+			// The old entries stay on screen while the page loads: the status above says it's a refresh.
+			var (packages, total) = await Navi.SearchStore( app, text, skip, StorePageSize );
+
+			storePackages = append ? storePackages.Concat( packages ).ToArray() : packages;
+			storeTotal = total;
+			status = total > 0 ? null
+				: text.Length > 0 ? "No apps found matching your filter."
+				: "No apps have been published yet.";
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: Store search failed: {e.Message}" );
+			status = "Couldn't reach the Store.";
+		}
+
+		// Hold the running state, and with it the "Connecting" status, for a moment: the search often answers within
+		// a frame or two, and a refresh drawn only after it already finished looks like a click that did nothing.
+		var remaining = RefreshVisibleTime - elapsed;
+		if ( remaining > 0 )
+			await Task.Delay( (int)( remaining * 1000 ) );
+
+		refreshing = false;
+		Update( s => s with
+		{
+			Refreshing = false,
+			StoreStatus = status,
+			StoreRows = BuildStoreRows(),
+			StoreTotal = storeTotal,
+		} );
+	}
+
+	/// <summary>
+	/// Fetch the full package an entry's details are built from. It goes straight to the engine rather than through
+	/// <see cref="Navi"/>: it reads public package metadata and touches nothing on the computer, so there is nothing
+	/// for the computer to authorize.
+	/// </summary>
+	async Task FetchDetailsAsync( string ident )
+	{
+		try
+		{
+			if ( await Package.FetchAsync( ident, false ) is { } full )
+				details[ident] = full;
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: couldn't fetch {ident}: {e.Message}" );
+		}
+
+		Update( s => s with { StoreRows = BuildStoreRows() } );
+	}
+
+	/// <summary>
+	/// Make a call that needs a permission, asking the player for it if this app doesn't have it. What the call
+	/// changed reaches the panel through <see cref="PollAsync"/>: the computer's version goes up, and the lists are
+	/// fetched again.
+	/// </summary>
+	async void Run( string what, System.Func<Task<bool>> call )
+	{
+		DismissNotice();
+
+		try
+		{
+			await Navi.WithPermission( app, call );
+		}
+		catch ( System.UnauthorizedAccessException )
+		{
+			Update( s => s with { Notice = $"Packages isn't allowed to {what}." } );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: couldn't {what}: {e.Message}" );
+			Update( s => s with { Notice = $"Couldn't {what}." } );
+		}
+	}
+
+	/// <summary>
+	/// Replace the state and make the panel redraw. Every change something is drawn from goes through here, which is
+	/// why <see cref="Revision"/> is the only thing the panel's hash needs.
+	/// </summary>
+	void Update( System.Func<PackagesUiState, PackagesUiState> change ) =>
+		State = change( State ) with { Revision = State.Revision + 1 };
+
+	// What the state is built from.
+
+	IReadOnlyList<PackageRow> BuildStoreRows() => storePackages
+		.Select( x => BuildRow( x.Package, x.Official ) )
+		.ToArray();
+
+	PackageRow BuildRow( Package package, bool official )
+	{
+		var ident = package.FullIdent;
+		var isExpanded = expanded.Contains( ident );
+
+		// Search results carry the short info; the revision and the long description come from the details fetch.
+		var full = isExpanded ? details.GetValueOrDefault( ident ) ?? package : package;
+
+		return new PackageRow
+		{
+			Ident = ident,
+			Title = package.Title,
+			Summary = package.Summary,
+			Thumb = package.Thumb,
+			Official = official,
+			Action = installingPackages.Contains( ident ) ? PackageAction.Installing
+				: installedPackages.Contains( ident ) ? PackageAction.Installed
+				: PackageAction.Install,
+			Expanded = isExpanded,
+			About = isExpanded ? About( full ) : "",
+			Facts = isExpanded ? Facts( full ) : [],
+		};
+	}
+
+	IReadOnlyList<AppRow> BuildAppRows( string filter = null )
+	{
+		var kind = filter ?? State.Filter;
+
+		return apps
+			.Select( x => (App: x, FromStore: storeAppIds.Contains( x.Id )) )
+			.Where( x => Matches( kind, x.App.Installed, x.App.Type, x.FromStore ) )
+			.Select( x => BuildRow( x.App ) )
+			.ToArray();
+	}
+
+	static AppRow BuildRow( (string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type) app )
+	{
+		var shielded = app.Type is "core" or "system";
+
+		return new AppRow
+		{
+			Id = app.Id,
+			Name = app.Name,
+			Description = app.Description,
+			Icon = app.Icon,
+			Color = app.Color,
+			Shield = shielded,
+			ShieldTooltip = app.Type == "core" ? "Core app: part of the OS" : "System app: asks for full system access",
+			Action = app.Type == "core" ? AppAction.None
+				: app.Installed ? AppAction.Uninstall
+				: AppAction.Install,
+		};
+	}
+
+	static IReadOnlyList<FilterItem> BuildFilters( string selected ) => Kinds
+		.Select( x => new FilterItem( x.Key, x.Name, x.Key == selected ) )
+		.ToArray();
+
+	/// <summary>
+	/// The current kind's name, for the button's tooltip. Falls back to the first kind if the filter is one this
+	/// build doesn't know: a hot reload can leave an instance holding an older one, and a missing name shouldn't
+	/// take the panel down with it.
+	/// </summary>
+	static string NameOf( string filter ) => Kinds.FirstOrDefault( x => x.Key == filter ).Name ?? Kinds[0].Name;
+
+	/// <summary>
+	/// Is the app in the list under <paramref name="filter"/>? Installed is the plain apps that are installed: core and
+	/// system apps are left to their own kinds. Pre-packaged is the apps that ship with the game or a library but
+	/// aren't part of the OS, whether or not they are installed, because the Store can't bring them back; the rest are
+	/// Store apps, which are left to the Store tab when they aren't installed. Core apps are part of the OS, and
+	/// system apps ask for full system access, whether they ship with the game or with a Store package, so an app can
+	/// match more than one of these.
+	/// </summary>
+	static bool Matches( string filter, bool installed, string type, bool fromStore ) => filter switch
+	{
+		"store" => installed && fromStore,
+		"core" => type is "core",
+		"system" => installed && ( type is "core" or "system" ),
+		"prepackaged" => !fromStore && type is not "core",
+		_ => installed && type is "app",
+	};
+
+	/// <summary>
+	/// Shown in the Apps list when no app matches the kind being shown.
+	/// </summary>
+	static string EmptyTextFor( string filter ) => filter switch
+	{
+		"store" => "No Store apps are installed.",
+		"core" => "No apps are part of the OS.",
+		"system" => "No apps ask for full system access.",
+		"prepackaged" => "No apps come with the game.",
+		_ => "No apps are installed.",
+	};
+
+	// Formatting for the details, done here so the panel prints values rather than working them out.
+
+	static string About( Package package )
+	{
+		if ( !string.IsNullOrWhiteSpace( package.Description ) ) return package.Description;
+		if ( !string.IsNullOrWhiteSpace( package.Summary ) ) return package.Summary;
+		return "No description yet.";
+	}
+
+	static IReadOnlyList<PackageFact> Facts( Package package ) => [
+		new( "person", "Author", package.Org?.Title ?? "Unknown" ),
+		new( "thumb_up", "Rating", Rating( package ) ),
+		new( "group", "Players", package.Usage.Total.Users.ToString( "N0" ) ),
+		new( "update", "Updated", package.Updated.ToLocalTime().ToString( "d MMM yyyy" ) ),
+		new( "sell", "Version", package.Revision?.VersionId.ToString() ?? "..." ),
+		new( "save", "Size", Size( package ) ),
+	];
+
+	static string Rating( Package package )
+	{
+		if ( package.Reviews.Total > 0 )
+			return $"{package.Reviews.Score * 100:0}% positive ({package.Reviews.Total})";
+
+		if ( package.VotesUp + package.VotesDown > 0 )
+			return $"{package.VotesUp} up, {package.VotesDown} down";
+
+		return "No ratings yet";
+	}
+
+	static string Size( Package package )
+	{
+		if ( package.Revision is not { } revision )
+			return "...";
+
+		return $"{System.Math.Max( 1, revision.TotalSize / 1024 )} KB";
+	}
+}
