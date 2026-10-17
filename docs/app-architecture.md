@@ -92,10 +92,8 @@ public sealed class PackagesViewModel
 ```razor
 @code
 {
-	PackagesViewModel viewModel;
-
 	/// <summary>The app's logic and its state. Made on first use: calls need the panel, which is `this`.</summary>
-	PackagesViewModel ViewModel => viewModel ??= new( this );
+	PackagesViewModel ViewModel => field ??= new(this);
 
 	/// <summary>What is drawn below. Read only.</summary>
 	PackagesUiState UiState => ViewModel.UiState;
@@ -130,7 +128,7 @@ Naming, so this file and the next one read the same:
 | Thing | Name |
 |---|---|
 | The view model object | `ViewModel` |
-| Its backing field in the panel | `viewModel` |
+| Its backing field in the panel | none — `field` (C# 14) declares it |
 | The state, in the panel | `UiState` (property, `=> ViewModel.UiState`) |
 | The state, in the view model | `UiState` (property, `private set`) |
 | The lambda parameter in `Update` | `uiState` — `Update( uiState => uiState with { … } )` |
@@ -156,6 +154,39 @@ class, because the engine draws its scrollbar over the content and `scrollbar-gu
 even when nothing scrolls. That's a correction to the panel's own tree, it holds no state, and it
 means nothing to the view model — so it stays in the panel, with a comment saying why. Anything
 like it (measuring a rendered box, nudging a class on a child) belongs there too, and only there.
+
+## Bindings: the one edge that isn't a method call
+
+The engine's widgets are stateful by design: `TextEntry` owns its text, its caret, its undo history
+and its IME composition. A panel can't be more stateless than the tree it builds — what it can do is
+own nothing itself and hand every write to the view model. A `Value:bind` is where that gets blurred,
+because Razor then wants a settable property on the panel, and a setter is exactly the kind of member
+someone later "simplifies":
+
+```csharp
+string SearchText => ViewModel.SearchText;   // CS0200: the binding assigns to it
+```
+
+So a field that reports edits is wired as a method, like every other control:
+
+```razor
+<TextEntry Value=@( UiState.SearchText )
+           OnTextEdited=@SearchEdited
+           onsubmit=@( () => ViewModel.SubmitSearch() )/>
+```
+
+```csharp
+void SearchEdited( string text ) => ViewModel.SetSearchText( text );
+```
+
+`Value` is one-way, and the edit comes back through `TextEntry.OnTextEdited` — as a method group,
+because a lambda there doesn't compile ("the delegate type could not be inferred") and the panel's own
+method supplies the type. `SetSearchText` replaces the state without going through `Update`, so typing
+doesn't bump `Revision` and the list doesn't rebuild under the caret.
+
+What this depends on: the panel pushes `Value` on every rebuild, so `SearchText` has to live in the
+state and be replaced on every edit. Then the pushed value equals what the field already holds and the
+widget keeps the caret where it was (checking this is how to catch a state that moved out).
 
 ## Async, threads and `Revision`
 
