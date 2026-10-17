@@ -6,13 +6,14 @@
 	<div class="screen">
 		<div class="title">COPLAND OS</div>
 
-		@foreach ( var process in Computer.Running )
+		@* Back to front: panels draw in child order, and s&box ignores z-index for that. *@
+		@foreach ( var process in Computer.Running.OrderBy( x => x.ZIndex ) )
 		{
 			var app = process.App;
 			var state = (process == Computer.Focused ? "focused " : "") + (process.IsMinimized ? "minimized " : "") + (process.IsMaximized ? "maximized" : "");
 
 			@* Position and size are set every frame in UpdateWindows, so dragging doesn't rebuild the tree. *@
-			<div @key=@app.Id class="window @state" style="z-index: @process.ZIndex;" @onmousedown=@(() => Computer.Focus( app.Id ))>
+			<div @key=@app.Id class="window @state" @onmousedown=@(() => Computer.Focus( app.Id ))>
 				<div class="titlebar"
 					@onmousedown=@( ( PanelEvent e ) => StartMove( process, e ) )
 					@ondoubleclick=@( ( PanelEvent e ) => OnTitleDoubleClick( process, e ) )>
@@ -48,7 +49,6 @@
 	@if ( InputCapture?.ShowQuitHint == true )
 	{
 		<div class="quit-hint">
-			<div class="hint-text">Press Esc @InputCapture.QuitPressesLeft more @(InputCapture.QuitPressesLeft == 1 ? "time" : "times") to quit</div>
 			<div class="bar"><div class="fill" style="width: @(InputCapture.QuitProgress * 100)%;"></div></div>
 		</div>
 	}
@@ -255,6 +255,30 @@
 			window.Style.Top = Length.Pixels( process.Position.y );
 			window.Style.Width = process.Size is { } w ? Length.Pixels( w.x ) : null;
 			window.Style.Height = process.Size is { } h ? Length.Pixels( h.y ) : null;
+		}
+
+		StackWindows( screen );
+	}
+
+	/// <summary>
+	/// Put the window panels in <see cref="NaviProcess.ZIndex"/> order, so the focused one draws on top and gets the clicks.
+	/// The markup is already in that order, but a rebuild can keep existing panels where they were.
+	/// </summary>
+	static void StackWindows( Panel screen )
+	{
+		static int Order( Panel panel ) => panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Process?.ZIndex ?? int.MinValue;
+
+		var last = int.MinValue;
+		foreach ( var child in screen.Children )
+		{
+			var order = Order( child );
+			if ( order < last )
+			{
+				screen.SortChildren( Order );
+				return;
+			}
+
+			last = order;
 		}
 	}
 

@@ -234,7 +234,7 @@ NaviDesktop
 	}
 }
 
-// Shown while an app has the player's input, after an Escape press. The bar fills with each press.
+// Shown while an app has the player's input, after an Escape press. The bar fills with each press, up to a force-quit.
 .quit-hint
 {
 	position: absolute;
@@ -246,17 +246,6 @@ NaviDesktop
 	gap: 4px;
 	z-index: 1000;
 	pointer-events: none;
-
-	.hint-text
-	{
-		padding: 3px 10px;
-		font-size: 12px;
-		font-weight: 700;
-		letter-spacing: 1px;
-		color: #f2eee2;
-		background-color: #2a2840;
-		border: 1px solid #f2eee2;
-	}
 
 	.bar
 	{
