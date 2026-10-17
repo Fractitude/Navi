@@ -89,6 +89,10 @@
 							{
 								<div class="button disabled">Installed</div>
 							}
+							else if ( entry.Action == PackageAction.Blacklisted )
+							{
+								<div class="button disabled" tooltip="This game blocks this app">Blacklisted</div>
+							}
 							else
 							{
 								<div class="button install" @onclick=@( () => Navi.Act( this, PackagesViewModel.InstallPackageAction, entry.Ident ) )>

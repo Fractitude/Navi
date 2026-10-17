@@ -123,6 +123,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.CloseApp( this, id )` | Close another app | `navi.apps.manage` |
 | `Navi.SearchStore( this )` | Store packages, with an official flag | |
 | `Navi.GetStoreStatus( this )` | Installed and downloading package idents | |
+| `Navi.GetStoreBlacklist( this )` | Package idents the game blocks | |
 | `Navi.InstallPackage( this, ident )` | Download and install a Store app | `navi.store.install` |
 | `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
 | `Navi.GetDisplayScale( this )` | The display scale (1 is 100%) and the scales the player can pick | |
@@ -209,7 +210,9 @@ How the Store works:
 - The Store lists packages of type `napp`. These are shared by every game with the library.
 - Install downloads the package with `Cloud.Load<NaviAppResource>( ident, withCode: true )`, which loads its code. The manifest names the panel class, and the app is then found like any other app. A system app asks for root before it is installed; other apps have their declared permissions reviewed on first launch.
 - Installed Store packages are kept in `NaviComputer.InstalledPackages` and downloaded again when the game starts.
-- A game can allow only official apps: `NaviStore.OfficialOnly = true`, plus `NaviStore.AllowedOrgs` for other orgs it trusts. The Store then asks sbox.game only for those orgs' apps (one search per org), and nothing else is downloaded: not on install, not from a save, not on a client whose host has it. Set both in the game's code before its computers start, e.g. in a `GameObjectSystem`'s constructor, so the host and every client agree. An org is the first part of a package ident, which only its members can publish under.
+- A game can limit the Store, in its own code before its computers start (e.g. in a `GameObjectSystem`'s constructor), so the host and every client agree:
+  - `NaviStore.AllowedOrgs`: the orgs whose apps are allowed. Empty allows every org. Official apps are always allowed and can't be turned off, so listing an official org (`fractitude`) allows only official apps. The Store asks sbox.game only for allowed orgs' apps (one search per org), and nothing else is downloaded: not on install, not from a save, not on a client whose host has it. An org is the first part of a package ident, which only its members can publish under.
+  - `NaviStore.BlacklistApps`: package idents to block, official ones included. They still show in the Store, with a disabled Blacklisted button, and the host refuses to install or download them.
 - Addon code must pass the s&box API whitelist, like all game code.
 - Uninstalling a Store app keeps its code loaded until the game restarts.
 - Each game has its own copy of the library's source. Keep `NaviAppResource`, the `navi.call` methods (`NaviSystemCalls`) and the permission ids stable, or published apps can break. The older `navi.close`, `navi.minimize` and `navi.maximize` events still work.

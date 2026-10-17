@@ -195,6 +195,11 @@ public static class Navi
 		Call<(string[], string[])>( app, "store.status" );
 
 	/// <summary>
+	/// Idents of the Store packages the game blocks. They can't be installed.
+	/// </summary>
+	public static Task<string[]> GetStoreBlacklist( Panel app ) => Call<string[]>( app, "store.blacklist" );
+
+	/// <summary>
 	/// Download a Store package and install its app. Needs <see cref="Permission.InstallFromStore"/>. False if it failed.
 	/// </summary>
 	public static Task<bool> InstallPackage( Panel app, string ident ) => Call<bool>( app, "store.install", ident );

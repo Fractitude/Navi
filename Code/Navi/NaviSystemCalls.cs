@@ -137,6 +137,9 @@ public static class NaviSystemCalls
 			case "store.status":
 				return (computer.InstalledPackages?.ToArray() ?? [], computer.DownloadingPackages.ToArray());
 
+			case "store.blacklist":
+				return NaviStore.Blacklisted;
+
 			case "store.install":
 				Require( process, NaviPermissions.InstallFromStore );
 				return await computer.InstallPackageAsync( Arg<string>( args, 0, method ) );

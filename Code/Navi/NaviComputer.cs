@@ -451,7 +451,7 @@ public sealed partial class NaviComputer : Component
 
 	/// <summary>
 	/// Download an app from the Store and install it. Returns false if the download failed, or the game doesn't allow
-	/// the package (<see cref="NaviStore.OfficialOnly"/>).
+	/// the package (<see cref="NaviStore.IsAllowed"/>).
 	/// </summary>
 	public async Task<bool> InstallPackageAsync( string packageIdent )
 	{
@@ -503,7 +503,7 @@ public sealed partial class NaviComputer : Component
 
 	/// <summary>
 	/// Install an app. Returns false if it doesn't exist, is already installed, or is a Store app the game doesn't allow
-	/// (<see cref="NaviStore.OfficialOnly"/>), even one whose code is loaded.
+	/// (<see cref="NaviStore.IsAllowed"/>), even one whose code is loaded.
 	/// </summary>
 	public bool Install( string id )
 	{
@@ -513,7 +513,7 @@ public sealed partial class NaviComputer : Component
 		// A Store app's id is its package ident; other apps' ids are asset paths, which aren't.
 		if ( NaviStore.NormalizeIdent( id ) is not null && !NaviStore.IsAllowed( id ) )
 		{
-			Log.Warning( $"NaviComputer: '{id}' isn't from an allowed org; this game allows only official apps" );
+			Log.Warning( $"NaviComputer: this game doesn't allow '{id}'" );
 			return false;
 		}
 

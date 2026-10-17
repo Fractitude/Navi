@@ -16,49 +16,70 @@ public static class NaviStore
 	/// sbox.game organisations whose apps the Store marks as official. Only an org's members can publish under its
 	/// ident, so the mark can't be faked by other publishers.
 	/// </summary>
-	public static HashSet<string> OfficialOrgs { get; } = new( System.StringComparer.OrdinalIgnoreCase ) { "fractitude" };
+	public static IEnumerable<string> OfficialOrgs => officialOrgs.Select( x => x );
+
+	static readonly HashSet<string> officialOrgs = new( System.StringComparer.OrdinalIgnoreCase ) { "fractitude" };
 
 	/// <summary>
 	/// Was this package published by one of the <see cref="OfficialOrgs"/>?
 	/// </summary>
-	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && OfficialOrgs.Contains( org );
+	public static bool IsOfficial( Package package ) => package?.Org?.Ident is { } org && officialOrgs.Contains( org );
+
+	// What a game allows. A game sets these in its own code before its computers start (e.g. in a GameObjectSystem's
+	// constructor), so they hold on the host and on every client.
 
 	/// <summary>
-	/// Allow only Store apps from the <see cref="OfficialOrgs"/> and the <see cref="AllowedOrgs"/>, on every computer in
-	/// the game. Others don't show in the Store and are never downloaded, so their code never loads: not from a save, nor
-	/// on a client whose host has them. Off by default. A game sets it in its own code, before its computers start (e.g.
-	/// in a <see cref="GameObjectSystem"/>'s constructor), so it holds on the host and on every client.
-	/// </summary>
-	public static bool OfficialOnly { get; set; }
-
-	/// <summary>
-	/// sbox.game organisations whose apps are allowed besides the official ones when <see cref="OfficialOnly"/> is on.
-	/// They don't get the official mark. Ignored while it is off, when every org is allowed.
+	/// sbox.game organisations whose Store apps the game allows. Empty allows every org. Otherwise only these orgs' apps
+	/// and the official ones are allowed: the official orgs can't be turned off, so listing one of them allows only
+	/// official apps. Apps from other orgs don't show in the Store and are never downloaded, so their code never loads:
+	/// not on install, not from a save, not on a client whose host has them.
 	/// </summary>
 	public static HashSet<string> AllowedOrgs { get; } = new( System.StringComparer.OrdinalIgnoreCase );
 
 	/// <summary>
-	/// The orgs whose apps are allowed, or null if every org is.
+	/// Store packages the game blocks, by ident (e.g. "org.napp_name"), official ones included. They still show in the
+	/// Store, marked Blacklisted, but can't be installed or downloaded.
 	/// </summary>
-	static string[] AllowedOrgIdents => OfficialOnly
-		? OfficialOrgs.Concat( AllowedOrgs )
+	public static HashSet<string> BlacklistApps { get; } = new( System.StringComparer.OrdinalIgnoreCase );
+
+	/// <summary>
+	/// The orgs whose apps are allowed, or null if every org is. See <see cref="AllowedOrgs"/>.
+	/// </summary>
+	static string[] AllowedOrgIdents => AllowedOrgs.Count == 0
+		? null
+		: officialOrgs.Concat( AllowedOrgs )
 			.Select( x => x?.Trim().ToLowerInvariant() )
 			.Where( x => !string.IsNullOrEmpty( x ) && System.Text.RegularExpressions.Regex.IsMatch( x, @"^[a-z0-9_\-]+$" ) )
 			.Distinct()
-			.ToArray()
-		: null;
+			.ToArray();
 
 	/// <summary>
-	/// May this package be downloaded? Its org is the first part of its ident, which only the org's members can publish
-	/// under. See <see cref="OfficialOnly"/>.
+	/// Is this package from an org the game allows? Its org is the first part of its ident, which only the org's members
+	/// can publish under. See <see cref="AllowedOrgs"/>.
 	/// </summary>
-	public static bool IsAllowed( string packageIdent )
+	public static bool IsOrgAllowed( string packageIdent )
 	{
 		if ( NormalizeIdent( packageIdent ) is not { } ident )
 			return false;
 
 		return AllowedOrgIdents is not { } orgs || orgs.Contains( ident.Split( '.' )[0] );
 	}
+
+	/// <summary>
+	/// Did the game block this package? See <see cref="BlacklistApps"/>.
+	/// </summary>
+	public static bool IsBlacklisted( string packageIdent ) =>
+		NormalizeIdent( packageIdent ) is { } ident && BlacklistApps.Any( x => NormalizeIdent( x ) == ident );
+
+	/// <summary>
+	/// May this package be installed and downloaded: its org is allowed and it isn't blacklisted?
+	/// </summary>
+	public static bool IsAllowed( string packageIdent ) => IsOrgAllowed( packageIdent ) && !IsBlacklisted( packageIdent );
+
+	/// <summary>
+	/// The blacklisted packages, as app ids.
+	/// </summary>
+	public static string[] Blacklisted => BlacklistApps.Select( NormalizeIdent ).Where( x => x is not null ).Distinct().ToArray();
 
 	/// <summary>
 	/// Resource paths of the apps downloaded from the Store, to the package each came from. They are never trusted as
@@ -101,7 +122,7 @@ public static class NaviStore
 	/// <summary>
 	/// One page of published apps matching <paramref name="text"/>, and how many match in all. The page leaves out
 	/// the first <paramref name="skip"/> matches and holds at most <paramref name="pageSize"/> of them. Only apps that
-	/// are allowed (<see cref="OfficialOnly"/>) are listed.
+	/// are from an allowed org (<see cref="AllowedOrgs"/>) are listed; blacklisted ones are listed too.
 	/// </summary>
 	public static async Task<(List<Package> Packages, int Total)> SearchAsync( string text = "", int skip = 0, int pageSize = PageSize )
 	{
@@ -136,7 +157,7 @@ public static class NaviStore
 
 		// The backend ignores a type filter until a package of that type exists, so check the type here too. The org is
 		// checked too, in case the backend let another through.
-		var packages = result?.Packages?.Where( x => x.TypeName == PackageType && IsAllowed( x.FullIdent ) ).ToList() ?? new();
+		var packages = result?.Packages?.Where( x => x.TypeName == PackageType && IsOrgAllowed( x.FullIdent ) ).ToList() ?? new();
 
 		// Never report fewer matches than the page holds, in case the filter let some other type through.
 		return (packages, System.Math.Max( result?.TotalCount ?? 0, skip + packages.Count ));
@@ -156,7 +177,7 @@ public static class NaviStore
 
 		if ( !IsAllowed( ident ) )
 		{
-			Log.Warning( $"NaviStore: '{ident}' isn't from an allowed org; this game allows only official apps" );
+			Log.Warning( $"NaviStore: this game doesn't allow '{ident}'" );
 			return null;
 		}
 

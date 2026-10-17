@@ -63,6 +63,9 @@ public sealed class PackagesViewModel
 	HashSet<string> installedPackages = new();
 	HashSet<string> installingPackages = new();
 
+	/// <summary>Idents of the packages the game blocks. See <see cref="Navi.GetStoreBlacklist"/>.</summary>
+	HashSet<string> blacklistedPackages = new( System.StringComparer.OrdinalIgnoreCase );
+
 	/// <summary>The Store entries fetched so far. The backend pages them, so the list grows with "More".</summary>
 	(Package Package, bool Official)[] storePackages = [];
 
@@ -262,6 +265,7 @@ public sealed class PackagesViewModel
 			var (installed, installing) = await Navi.GetStoreStatus( app );
 			installedPackages = installed.ToHashSet();
 			installingPackages = installing.ToHashSet();
+			blacklistedPackages = (await Navi.GetStoreBlacklist( app )).ToHashSet( System.StringComparer.OrdinalIgnoreCase );
 
 			Update( uiState => uiState with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
 		}
@@ -414,6 +418,7 @@ public sealed class PackagesViewModel
 			Official = official,
 			Action = installingPackages.Contains( ident ) ? PackageAction.Installing
 				: installedPackages.Contains( ident ) ? PackageAction.Installed
+				: blacklistedPackages.Contains( ident ) ? PackageAction.Blacklisted
 				: PackageAction.Install,
 			Expanded = isExpanded,
 			About = isExpanded ? About( full ) : "",

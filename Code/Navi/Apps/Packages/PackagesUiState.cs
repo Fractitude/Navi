@@ -15,6 +15,9 @@ public enum PackageAction
 
 	/// <summary>On this computer: the row says Installed.</summary>
 	Installed,
+
+	/// <summary>The game blocks it: the row says Blacklisted, and it can't be installed.</summary>
+	Blacklisted,
 }
 
 /// <summary>
