@@ -8,19 +8,6 @@ NaviDesktop
 	color: #e8e4d8;
 }
 
-// The title bar shield's tooltip, drawn on the desktop so the windows can't cover it and the app's content can't clip it.
-.shield-hint
-{
-	position: absolute;
-	padding: 3px 6px;
-	font-size: 11px;
-	color: #f2eee2;
-	background-color: #2a2840;
-	border: 1px solid #f2eee2;
-	white-space: nowrap;
-	pointer-events: none;
-}
-
 .screen
 {
 	position: relative;
@@ -42,8 +29,10 @@ NaviDesktop
 	box-shadow: 4px 4px 0 rgba( 0, 0, 0, 0.35 );
 	pointer-events: all;
 
+	// First in the column, though the body comes first in the markup so this draws after it (see the markup).
 	> .titlebar
 	{
+		order: -1;
 		flex-shrink: 0;
 		height: 24px;
 		flex-direction: row;
@@ -59,11 +48,34 @@ NaviDesktop
 			font-size: 14px;
 		}
 
-		// The app has full system access (root).
+		// The app has full system access (root). The tooltip is the one the taskbar uses.
 		> .shield
 		{
+			position: relative;
 			flex-shrink: 0;
+			justify-content: center;
+			align-items: center;
 			color: #f2d64a;
+
+			.tooltip
+			{
+				position: absolute;
+				top: 100%;
+				right: 0;
+				opacity: 0;
+				pointer-events: none;
+				padding: 3px 6px;
+				font-size: 12px;
+				color: #f2eee2;
+				background-color: #2a2840;
+				border: 1px solid #f2eee2;
+				white-space: nowrap;
+			}
+
+			&:hover .tooltip
+			{
+				opacity: 1;
+			}
 		}
 
 		> .name
