@@ -93,8 +93,10 @@ public static class NaviSystemCalls
 			// The Store.
 			case "store.search":
 			{
-				var packages = await NaviStore.SearchAsync( args.Length > 0 ? args[0] as string ?? "" : "" );
-				return packages.Select( x => (x, NaviStore.IsOfficial( x )) ).ToArray();
+				var (packages, total) = await NaviStore.SearchAsync(
+					Opt( args, 0, "" ), Opt( args, 1, 0 ), Opt( args, 2, NaviStore.PageSize ) );
+
+				return (packages.Select( x => (x, NaviStore.IsOfficial( x )) ).ToArray(), total);
 			}
 
 			case "store.status":
@@ -113,6 +115,12 @@ public static class NaviSystemCalls
 		if ( !process.HasPermission( permission ) )
 			throw NaviPermissions.Missing( permission );
 	}
+
+	/// <summary>
+	/// The argument at <paramref name="index"/>, or <paramref name="fallback"/> when the app left it out.
+	/// </summary>
+	static T Opt<T>( object[] args, int index, T fallback ) =>
+		index < args.Length && args[index] is T value ? value : fallback;
 
 	static T Arg<T>( object[] args, int index, string method )
 	{

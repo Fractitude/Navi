@@ -14,9 +14,17 @@
 
 		@if ( ShowStore )
 		{
-			<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = RefreshStoreAsync())><i>refresh</i></div>
+			<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = FetchStoreAsync( false ))><i>refresh</i></div>
 		}
 	</div>
+
+	@* Store search. Enter runs it; the refresh button re-runs the text that is in the field. *@
+	@if ( ShowStore )
+	{
+		<div class="search">
+			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => _ = FetchStoreAsync( false )) />
+		</div>
+	}
 
 	<div class="list">
 		@if ( Notice is not null )
@@ -119,6 +127,19 @@
 			}
 		}
 	</div>
+
+	@* How much of the Store the list holds, and the way to the next page of it. *@
+	@if ( ShowStore && StoreTotal > 0 )
+	{
+		<div class="footer">
+			<div class="count">Showing @StorePackages.Length of @StoreTotal apps</div>
+
+			@if ( StorePackages.Length < StoreTotal )
+			{
+				<div class="button @(Refreshing ? "disabled" : "")" @onclick=@(() => _ = FetchStoreAsync( true ))>More</div>
+			}
+		</div>
+	}
 </root>
 
 @code
@@ -127,7 +148,18 @@
 
 	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] Apps = [];
 
+	/// <summary>
+	/// The Store entries fetched so far, and how many match the current search in all. The backend pages them, so
+	/// the list grows with "More" instead of downloading every app up front.
+	/// </summary>
 	(Package Package, bool Official)[] StorePackages = [];
+	int StoreTotal;
+
+	/// <summary>
+	/// What the search field holds. Enter runs it; the refresh button runs it again.
+	/// </summary>
+	string SearchText = "";
+
 	HashSet<string> InstalledPackages = new();
 	HashSet<string> InstallingPackages = new();
 
@@ -210,7 +242,7 @@
 	int storeVersion;
 
 	/// <summary>
-	/// True while the Store search is running. <see cref="RefreshStoreAsync"/> ignores calls made while it is on, so
+	/// True while a Store page is being fetched. <see cref="FetchStoreAsync"/> ignores calls made while it is on, so
 	/// only one search runs at a time; the button is disabled too, but the guard is what makes that a rule.
 	/// </summary>
 	bool Refreshing;
@@ -221,6 +253,11 @@
 	/// button stay up this long even when the search is instant.
 	/// </summary>
 	const float RefreshVisibleTime = 0.5f;
+
+	/// <summary>
+	/// Store apps fetched per request. The backend pages them, so this is how many a refresh or a "More" adds.
+	/// </summary>
+	const int StorePageSize = 20;
 
 	/// <summary>
 	/// Idents of the Store entries showing their details.
@@ -293,12 +330,16 @@
 		ShowStore = true;
 
 		if ( !StoreLoaded )
-			_ = RefreshStoreAsync();
+			_ = FetchStoreAsync( false );
 	}
 
-	async Task RefreshStoreAsync()
+	/// <summary>
+	/// Fetch one page of the Store. A refresh (<paramref name="append"/> false) starts over from the first entry; loading
+	/// more adds the page after the entries already shown. Ignores a call made while a page is being fetched.
+	/// </summary>
+	async Task FetchStoreAsync( bool append )
 	{
-		// One search at a time, whatever asked for it: two at once would race to fill the same list.
+		// One page at a time, whatever asked for it: two at once would race to fill the same list.
 		if ( Refreshing )
 			return;
 
@@ -308,11 +349,19 @@
 
 		RealTimeSince elapsed = 0;
 
+		var text = SearchText.Trim();
+		var skip = append ? StorePackages.Length : 0;
+
 		try
 		{
-			// Keep the old list on screen while searching instead of blanking it: the status above says it's a refresh.
-			StorePackages = await Navi.SearchStore( this );
-			StoreStatus = StorePackages.Length == 0 ? "No apps have been published yet." : null;
+			// The old entries stay on screen while the page loads: the status above says it's a refresh.
+			var (packages, total) = await Navi.SearchStore( this, text, skip, StorePageSize );
+
+			StorePackages = append ? [.. StorePackages, .. packages] : packages;
+			StoreTotal = total;
+			StoreStatus = total > 0 ? null
+				: text.Length > 0 ? $"No apps match \"{text}\"."
+				: "No apps have been published yet.";
 		}
 		catch ( System.Exception e )
 		{

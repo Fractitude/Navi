@@ -156,10 +156,12 @@ public static class Navi
 	// The Store.
 
 	/// <summary>
-	/// Apps published to the Store that match <paramref name="text"/>, or all of them. Official ones are by the Navi makers.
+	/// One page of apps published to the Store that match <paramref name="text"/>, and how many match in all. The page
+	/// leaves out the first <paramref name="skip"/> matches and holds at most <paramref name="take"/> of them. Official
+	/// ones are by the Navi makers.
 	/// </summary>
-	public static Task<(Package Package, bool Official)[]> SearchStore( Panel app, string text = "" ) =>
-		Call<(Package, bool)[]>( app, "store.search", text );
+	public static Task<((Package Package, bool Official)[] Packages, int Total)> SearchStore( Panel app, string text = "", int skip = 0, int take = 20 ) =>
+		Call<((Package, bool)[], int)>( app, "store.search", text, skip, take );
 
 	/// <summary>
 	/// Idents of the Store packages installed on this computer, and of those downloading now.

@@ -43,6 +43,23 @@ Packages
 	flex-grow: 1;
 }
 
+// The Store search field. The engine's TextEntry is dark; Navi's panels are paper.
+.search
+{
+	flex-shrink: 0;
+
+	.textentry
+	{
+		width: 100%;
+		min-width: 0;
+		padding: 3px 6px;
+		font-size: 11px;
+		color: #2a2840;
+		background-color: #f2eee2;
+		border: 1px solid #8a8472;
+	}
+}
+
 .list
 {
 	flex-grow: 1;
@@ -68,6 +85,24 @@ Packages
 	justify-content: center;
 	font-size: 11px;
 	opacity: 0.7;
+}
+
+// How much of the Store the list holds, and the way to the rest of it.
+.footer
+{
+	flex-shrink: 0;
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
+	padding-top: 4px;
+	border-top: 1px solid #8a8472;
+
+	.count
+	{
+		flex-grow: 1;
+		font-size: 10px;
+		opacity: 0.7;
+	}
 }
 
 .row

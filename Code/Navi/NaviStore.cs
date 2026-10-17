@@ -34,14 +34,24 @@ public static class NaviStore
 	public static bool IsDownloaded( NaviAppResource resource ) => resource?.ResourcePath is { } path && downloaded.Contains( path );
 
 	/// <summary>
-	/// Published apps matching <paramref name="text"/>, or all of them when it is empty.
+	/// Store apps fetched by a call that doesn't ask for a size.
 	/// </summary>
-	public static async Task<List<Package>> SearchAsync( string text = "" )
+	public const int PageSize = 20;
+
+	/// <summary>
+	/// One page of published apps matching <paramref name="text"/>, and how many match in all. The page leaves out
+	/// the first <paramref name="skip"/> matches and holds at most <paramref name="pageSize"/> of them.
+	/// </summary>
+	public static async Task<(List<Package> Packages, int Total)> SearchAsync( string text = "", int skip = 0, int pageSize = PageSize )
 	{
-		var result = await Package.FindAsync( $"type:{PackageType} {text}".Trim() );
+		// Package.FindAsync takes the page size before the offset, and doesn't search for a page past the last one.
+		var result = await Package.FindAsync( $"type:{PackageType} {text}".Trim(), pageSize, skip );
 
 		// The backend ignores a type filter until a package of that type exists, so check the type here too.
-		return result?.Packages?.Where( x => x.TypeName == PackageType ).ToList() ?? new();
+		var packages = result?.Packages?.Where( x => x.TypeName == PackageType ).ToList() ?? new();
+
+		// Never report fewer matches than the page holds, in case the filter let some other type through.
+		return (packages, System.Math.Max( result?.TotalCount ?? 0, skip + packages.Count ));
 	}
 
 	/// <summary>
