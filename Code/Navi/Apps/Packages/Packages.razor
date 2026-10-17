@@ -364,7 +364,7 @@
 			StorePackages = append ? [.. StorePackages, .. packages] : packages;
 			StoreTotal = total;
 			StoreStatus = total > 0 ? null
-				: text.Length > 0 ? $"No apps match \"{text}\"."
+				: text.Length > 0 ? "No apps found matching your filter."
 				: "No apps have been published yet.";
 		}
 		catch ( System.Exception e )
