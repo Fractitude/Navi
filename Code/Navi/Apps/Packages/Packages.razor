@@ -11,18 +11,20 @@
 
 <root>
 	<div class="tabs">
-		<div class="tab @(UiState.ShowStore ? "" : "active")" @onclick=@(() => ViewModel.OpenApps())>Apps</div>
-		<div class="tab @(UiState.ShowStore ? "active" : "")" @onclick=@(() => ViewModel.OpenStore())>Store</div>
+		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => ViewModel.OpenApps() )>Apps</div>
+		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => ViewModel.OpenStore() )>Store</div>
 		<div class="spacer"></div>
 
 		@if ( UiState.ShowStore )
 		{
-			<div class="button @(UiState.Refreshing ? "disabled" : "")" @onclick=@(() => ViewModel.SubmitSearch())><i>refresh</i></div>
+			<div class="button @( UiState.Refreshing ? "disabled" : "" )" @onclick=@( () => ViewModel.SubmitSearch() )>
+				<i>refresh</i></div>
 		}
 		else
 		{
 			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button here instead. *@
-			<div class="filter" tooltip="Show: @UiState.FilterName" @onclick=@(() => ViewModel.ToggleFilterMenu())><i>filter_list</i></div>
+			<div class="filter" tooltip="Show: @UiState.FilterName" @onclick=@( () => ViewModel.ToggleFilterMenu() )><i>filter_list</i>
+			</div>
 		}
 	</div>
 
@@ -30,14 +32,15 @@
 	@if ( UiState.ShowStore )
 	{
 		<div class="search">
-			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter" HasClearButton=@true MaxLength=@( 80 ) onsubmit=@(() => ViewModel.SubmitSearch()) />
+			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter"
+			           HasClearButton=@true MaxLength=@( 80 ) onsubmit=@( () => ViewModel.SubmitSearch() )/>
 		</div>
 	}
 
 	<div class="list">
 		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@(() => ViewModel.DismissNotice())>@UiState.Notice</div>
+			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>@UiState.Notice</div>
 		}
 
 		@if ( UiState.ShowStore )
@@ -54,7 +57,7 @@
 				{
 					<div class="entry">
 						<div class="row">
-							<img class="thumb" src=@entry.Thumb />
+							<img class="thumb" src=@entry.Thumb/>
 							<div class="info">
 								<div class="title-row">
 									<div class="name">@entry.Title</div>
@@ -76,11 +79,14 @@
 							}
 							else
 							{
-								<div class="button install" @onclick=@(() => ViewModel.InstallPackage( entry.Ident ))>Install</div>
+								<div class="button install" @onclick=@( () => ViewModel.InstallPackage( entry.Ident ) )>
+									Install
+								</div>
 							}
 
-							<div class="expand" tooltip=@(entry.Expanded ? "Less" : "More") @onclick=@(() => ViewModel.ToggleDetails( entry.Ident ))>
-								<i>@(entry.Expanded ? "expand_less" : "expand_more")</i>
+							<div class="expand" tooltip=@( entry.Expanded ? "Less" : "More" )
+							     @onclick=@( () => ViewModel.ToggleDetails( entry.Ident ) )>
+								<i>@( entry.Expanded ? "expand_less" : "expand_more" )</i>
 							</div>
 						</div>
 
@@ -92,7 +98,10 @@
 								<div class="facts">
 									@foreach ( var fact in entry.Facts )
 									{
-										<div class="fact"><i>@fact.Icon</i><div class="key">@fact.Key</div><div class="value">@fact.Value</div></div>
+										<div class="fact"><i>@fact.Icon</i>
+											<div class="key">@fact.Key</div>
+											<div class="value">@fact.Value</div>
+										</div>
 									}
 								</div>
 							</div>
@@ -125,11 +134,11 @@
 
 					@if ( app.Action == AppAction.Uninstall )
 					{
-						<div class="button" @onclick=@(() => ViewModel.UninstallApp( app.Id ))>Uninstall</div>
+						<div class="button" @onclick=@( () => ViewModel.UninstallApp( app.Id ) )>Uninstall</div>
 					}
 					else if ( app.Action == AppAction.Install )
 					{
-						<div class="button install" @onclick=@(() => ViewModel.InstallApp( app.Id ))>Install</div>
+						<div class="button install" @onclick=@( () => ViewModel.InstallApp( app.Id ) )>Install</div>
 					}
 				</div>
 			}
@@ -140,13 +149,14 @@
 	@* backdrop starts under the tabs row, so the tabs and this button stay clickable while the menu is up. *@
 	@if ( UiState.FilterOpen && !UiState.ShowStore )
 	{
-		<div class="filter-backdrop" @onmousedown=@(() => ViewModel.CloseFilterMenu())></div>
+		<div class="filter-backdrop" @onmousedown=@( () => ViewModel.CloseFilterMenu() )></div>
 
 		<div class="filter-menu">
 			@foreach ( var kind in UiState.Filters )
 			{
-				<div class="item @(kind.Selected ? "active" : "")" @onclick=@(() => ViewModel.ChooseFilter( kind.Key ))>
-					<i>@(kind.Selected ? "check" : "")</i>
+				<div class="item @( kind.Selected ? "active" : "" )"
+				     @onclick=@( () => ViewModel.ChooseFilter( kind.Key ) )>
+					<i>@( kind.Selected ? "check" : "" )</i>
 					<div class="label">@kind.Label</div>
 				</div>
 			}
@@ -161,7 +171,7 @@
 
 			@if ( UiState.HasMore )
 			{
-				<div class="button" @onclick=@(() => ViewModel.LoadMore())>More</div>
+				<div class="button" @onclick=@( () => ViewModel.LoadMore() )>More</div>
 			}
 		</div>
 	}
@@ -175,7 +185,7 @@
 	/// The app's logic and its state. Made on first use, because every call it makes to the computer is made with the
 	/// app's own panel, which is this.
 	/// </summary>
-	PackagesViewModel ViewModel => viewModel ??= new( this );
+	PackagesViewModel ViewModel => viewModel ??= new(this);
 
 	/// <summary>
 	/// What is drawn below. Read only: the view model replaces it, and its revision is what makes this panel redraw.

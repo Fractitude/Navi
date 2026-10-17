@@ -43,7 +43,8 @@ public sealed class PackagesViewModel
 	/// The kinds of app the Apps tab can show, in menu order. A property, not a field: a hot reload patches methods,
 	/// so a change to this list shows up in a running game, while a field's initializer only runs once per load.
 	/// </summary>
-	static (string Key, string Name)[] Kinds => [
+	static (string Key, string Name)[] Kinds =>
+	[
 		("installed", "Installed"),
 		("store", "Store"),
 		("core", "Core"),
@@ -64,15 +65,18 @@ public sealed class PackagesViewModel
 
 	/// <summary>The Store entries fetched so far, and how many match the current search in all.</summary>
 	(Package Package, bool Official)[] storePackages = [];
+
 	int storeTotal;
 
 	/// <summary>The computer's version when the lists were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
+
 	bool polling;
 	RealTimeSince sincePoll;
 
 	/// <summary>The guard for <see cref="FetchStoreAsync"/>; <see cref="PackagesUiState.Refreshing"/> is its reflection.</summary>
 	bool refreshing;
+
 	bool storeLoaded;
 
 	/// <summary>Idents of the Store entries showing their details.</summary>
@@ -83,7 +87,7 @@ public sealed class PackagesViewModel
 
 	public PackagesViewModel( Panel app )
 	{
-		this.app = app ?? throw new System.ArgumentNullException( nameof( app ) );
+		this.app = app ?? throw new System.ArgumentNullException( nameof(app) );
 
 		UiState = new PackagesUiState
 		{
@@ -213,7 +217,7 @@ public sealed class PackagesViewModel
 			knownVersion = version;
 
 			apps = await Navi.GetApps( app );
-			storeAppIds = ( await Navi.GetStoreApps( app ) ).ToHashSet();
+			storeAppIds = (await Navi.GetStoreApps( app )).ToHashSet();
 
 			var (installed, installing) = await Navi.GetStoreStatus( app );
 			installedPackages = installed.ToHashSet();
@@ -268,15 +272,12 @@ public sealed class PackagesViewModel
 		// a frame or two, and a refresh drawn only after it already finished looks like a click that did nothing.
 		var remaining = RefreshVisibleTime - elapsed;
 		if ( remaining > 0 )
-			await Task.Delay( (int)( remaining * 1000 ) );
+			await Task.Delay( (int)(remaining * 1000) );
 
 		refreshing = false;
 		Update( uiState => uiState with
 		{
-			Refreshing = false,
-			StoreStatus = status,
-			StoreRows = BuildStoreRows(),
-			StoreTotal = storeTotal,
+			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = storeTotal,
 		} );
 	}
 
@@ -372,7 +373,8 @@ public sealed class PackagesViewModel
 			.ToArray();
 	}
 
-	static AppRow BuildRow( (string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type) app )
+	static AppRow BuildRow(
+		(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type) app )
 	{
 		var shielded = app.Type is "core" or "system";
 
@@ -414,7 +416,7 @@ public sealed class PackagesViewModel
 	{
 		"store" => installed && fromStore,
 		"core" => type is "core",
-		"system" => installed && ( type is "core" or "system" ),
+		"system" => installed && (type is "core" or "system"),
 		"prepackaged" => !fromStore && type is not "core",
 		_ => installed && type is "app",
 	};
@@ -440,13 +442,14 @@ public sealed class PackagesViewModel
 		return "No description yet.";
 	}
 
-	static IReadOnlyList<PackageFact> Facts( Package package ) => [
-		new( "person", "Author", package.Org?.Title ?? "Unknown" ),
-		new( "thumb_up", "Rating", Rating( package ) ),
-		new( "group", "Players", package.Usage.Total.Users.ToString( "N0" ) ),
-		new( "update", "Updated", package.Updated.ToLocalTime().ToString( "d MMM yyyy" ) ),
-		new( "sell", "Version", package.Revision?.VersionId.ToString() ?? "..." ),
-		new( "save", "Size", Size( package ) ),
+	static IReadOnlyList<PackageFact> Facts( Package package ) =>
+	[
+		new("person", "Author", package.Org?.Title ?? "Unknown"),
+		new("thumb_up", "Rating", Rating( package )),
+		new("group", "Players", package.Usage.Total.Users.ToString( "N0" )),
+		new("update", "Updated", package.Updated.ToLocalTime().ToString( "d MMM yyyy" )),
+		new("sell", "Version", package.Revision?.VersionId.ToString() ?? "..."),
+		new("save", "Size", Size( package )),
 	];
 
 	static string Rating( Package package )
