@@ -1,0 +1,333 @@
+@using Sandbox.UI
+@inherits PanelComponent
+@namespace Sandbox
+
+<root>
+	<div class="screen">
+		<div class="title">COPLAND OS</div>
+
+		@foreach ( var process in Computer.Running )
+		{
+			var app = process.App;
+			var state = (process == Computer.Focused ? "focused " : "") + (process.IsMinimized ? "minimized " : "") + (process.IsMaximized ? "maximized" : "");
+
+			@* Position and size are set every frame in UpdateWindows, so dragging doesn't rebuild the tree. *@
+			<div @key=@app.Id class="window @state" style="z-index: @process.ZIndex;" @onmousedown=@(() => Computer.Focus( app.Id ))>
+				<div class="titlebar"
+					@onmousedown=@( ( PanelEvent e ) => StartMove( process, e ) )
+					@ondoubleclick=@( ( PanelEvent e ) => OnTitleDoubleClick( process, e ) )>
+					<i class="glyph">@app.Icon</i>
+					<div class="name">@app.Name</div>
+
+					@if ( app.CanMinimize )
+					{
+						<div class="button" @onclick=@(() => Computer.Minimize( app.Id ))><i>remove</i></div>
+					}
+
+					@if ( app.CanMaximize )
+					{
+						<div class="button" @onclick=@(() => Computer.ToggleMaximized( app.Id ))><i>@(process.IsMaximized ? "filter_none" : "crop_square")</i></div>
+					}
+
+					<div class="button close" @onclick=@(() => Computer.Close( app.Id ))><i>close</i></div>
+				</div>
+
+				<NaviAppHost class="body" Computer=@Computer Process=@process></NaviAppHost>
+
+				@if ( app.CanResize && !process.IsMaximized )
+				{
+					foreach ( var corner in Corners )
+					{
+						<div class="corner @corner.Name" @onmousedown=@( ( PanelEvent e ) => StartResize( process, corner.Direction, e ) )></div>
+					}
+				}
+			</div>
+		}
+	</div>
+
+	<div class="taskbar">
+		<div class="start" @onclick=@(() => Computer.Launch( "packages" ))>NAVI</div>
+
+		@foreach ( var app in Computer.Installed )
+		{
+			var process = Computer.GetProcess( app.Id );
+
+			<div class="app" @onclick=@(() => OnTaskbarClick( app ))>
+				<div class="tooltip">@app.Name</div>
+				<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+				@if ( process is not null )
+				{
+					<div class="marker @(process.IsMinimized ? "minimized" : "")"></div>
+				}
+			</div>
+		}
+	</div>
+</root>
+
+@code
+{
+	[RequireComponent] public NaviComputer Computer { get; set; }
+
+	/// <summary>
+	/// Minimum gap, in panel pixels, between a tooltip and the edge of the screen.
+	/// </summary>
+	[Property] public float TooltipEdgeMargin { get; set; } = 8f;
+
+	/// <summary>
+	/// Smallest size a window can be resized to, in panel pixels.
+	/// </summary>
+	[Property] public Vector2 MinWindowSize { get; set; } = new( 160f, 60f );
+
+	record Corner( string Name, Vector2 Direction );
+
+	static readonly Corner[] Corners =
+	{
+		new( "nw", new Vector2( -1, -1 ) ),
+		new( "ne", new Vector2( 1, -1 ) ),
+		new( "sw", new Vector2( -1, 1 ) ),
+		new( "se", new Vector2( 1, 1 ) ),
+	};
+
+	// The window being moved or resized. The drag lasts while the mouse button is held on dragHandle.
+	NaviProcess dragging;
+	Panel dragHandle;
+	Vector2 dragDirection; // Zero when moving, otherwise the corner being dragged.
+	Vector2 dragStartMouse;
+	Vector2 dragStartPosition;
+	Vector2 dragStartSize;
+
+	// Windows that were maximized last frame. Their measured size is still the maximized one, so they skip clamping for a frame.
+	readonly HashSet<NaviProcess> wasMaximized = new();
+
+	protected override void OnUpdate()
+	{
+		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
+		if ( screen is not null )
+			UpdateWindows( screen );
+
+		var taskbar = Panel?.Children.FirstOrDefault( x => x.HasClass( "taskbar" ) );
+		if ( taskbar is null )
+			return;
+
+		CapTaskbar( taskbar );
+		ClampTooltips( taskbar );
+	}
+
+	/// <summary>
+	/// Clicking the icon of the window in front minimizes it. Otherwise it opens, restores or focuses the app.
+	/// </summary>
+	void OnTaskbarClick( NaviAppInfo app )
+	{
+		var process = Computer.GetProcess( app.Id );
+		if ( process is not null && process == Computer.Focused && Computer.Minimize( app.Id ) )
+			return;
+
+		Computer.Launch( app.Id );
+	}
+
+	void OnTitleDoubleClick( NaviProcess process, PanelEvent e )
+	{
+		if ( !IsOnButton( e ) )
+			Computer.ToggleMaximized( process.App.Id );
+	}
+
+	/// <summary>
+	/// True if the event started on a title bar button rather than the title bar itself.
+	/// </summary>
+	static bool IsOnButton( PanelEvent e )
+	{
+		for ( var panel = e.Target; panel is not null && panel != e.This; panel = panel.Parent )
+		{
+			if ( panel.HasClass( "button" ) )
+				return true;
+		}
+
+		return false;
+	}
+
+	void StartMove( NaviProcess process, PanelEvent e )
+	{
+		if ( process.IsMaximized || IsOnButton( e ) )
+			return;
+
+		StartDrag( process, e.This, Vector2.Zero );
+	}
+
+	void StartResize( NaviProcess process, Vector2 corner, PanelEvent e )
+	{
+		if ( !process.App.CanResize || process.IsMaximized )
+			return;
+
+		StartDrag( process, e.This, corner );
+	}
+
+	void StartDrag( NaviProcess process, Panel handle, Vector2 direction )
+	{
+		var window = handle.Parent;
+		var screen = window?.Parent;
+		if ( screen is null )
+			return;
+
+		dragging = process;
+		dragHandle = handle;
+		dragDirection = direction;
+		dragStartMouse = MousePosition( screen );
+		dragStartPosition = process.Position;
+		dragStartSize = process.Size ?? window.Box.Rect.Size * window.ScaleFromScreen;
+	}
+
+	/// <summary>
+	/// Apply the current drag, keep every window inside the screen, and set the window positions and sizes.
+	/// </summary>
+	void UpdateWindows( Panel screen )
+	{
+		var bounds = screen.Box.Rect.Size * screen.ScaleFromScreen;
+
+		if ( dragging is not null )
+		{
+			if ( dragHandle is null || !dragHandle.IsValid || !dragHandle.HasActive || dragging.IsMaximized || !Computer.Running.Contains( dragging ) )
+			{
+				dragging = null;
+				dragHandle = null;
+			}
+			else
+			{
+				var delta = MousePosition( screen ) - dragStartMouse;
+
+				if ( dragDirection == Vector2.Zero )
+				{
+					dragging.Position = dragStartPosition + delta;
+				}
+				else
+				{
+					var (x, width) = ResizeAxis( dragDirection.x, delta.x, dragStartPosition.x, dragStartSize.x, MinWindowSize.x, bounds.x );
+					var (y, height) = ResizeAxis( dragDirection.y, delta.y, dragStartPosition.y, dragStartSize.y, MinWindowSize.y, bounds.y );
+					dragging.Position = new Vector2( x, y );
+					dragging.Size = new Vector2( width, height );
+				}
+			}
+		}
+
+		foreach ( var window in screen.Children.Where( x => x.HasClass( "window" ) ) )
+		{
+			var process = window.Children.OfType<NaviAppHost>().FirstOrDefault()?.Process;
+			if ( process is null )
+				continue;
+
+			if ( process.IsMaximized )
+			{
+				window.Style.Left = Length.Pixels( 0 );
+				window.Style.Top = Length.Pixels( 0 );
+				window.Style.Width = Length.Percent( 100 );
+				window.Style.Height = Length.Percent( 100 );
+				wasMaximized.Add( process );
+				continue;
+			}
+
+			var layoutIsCurrent = !wasMaximized.Remove( process );
+
+			if ( process.Size is { } size )
+			{
+				process.Size = new Vector2(
+					Clamp( size.x, MinWindowSize.x, bounds.x ),
+					Clamp( size.y, MinWindowSize.y, bounds.y ) );
+			}
+
+			// A window bigger than the screen is pinned to the top left.
+			if ( process.Size is not null || layoutIsCurrent )
+			{
+				var max = bounds - (process.Size ?? window.Box.Rect.Size * window.ScaleFromScreen);
+				process.Position = new Vector2(
+					Clamp( process.Position.x, 0f, max.x ),
+					Clamp( process.Position.y, 0f, max.y ) );
+			}
+
+			window.Style.Left = Length.Pixels( process.Position.x );
+			window.Style.Top = Length.Pixels( process.Position.y );
+			window.Style.Width = process.Size is { } w ? Length.Pixels( w.x ) : null;
+			window.Style.Height = process.Size is { } h ? Length.Pixels( h.y ) : null;
+		}
+	}
+
+	/// <summary>
+	/// Resize along one axis. <paramref name="direction"/> is 1 to move the far edge, -1 to move the near edge, 0 to leave both.
+	/// The moved edge stays inside 0..<paramref name="bound"/> and the size stays at least <paramref name="min"/>.
+	/// </summary>
+	static (float Position, float Size) ResizeAxis( float direction, float delta, float position, float size, float min, float bound )
+	{
+		if ( direction > 0 )
+			return (position, Clamp( size + delta, min, bound - position ));
+
+		if ( direction < 0 )
+		{
+			var far = position + size;
+			var near = Clamp( position + delta, 0f, far - min );
+			return (near, far - near);
+		}
+
+		return (position, size);
+	}
+
+	/// <summary>
+	/// Clamp that returns <paramref name="min"/> when the range is empty, instead of throwing.
+	/// </summary>
+	static float Clamp( float value, float min, float max ) => System.MathF.Max( min, System.MathF.Min( value, max ) );
+
+	/// <summary>
+	/// Mouse position relative to the panel's top left, in panel pixels.
+	/// </summary>
+	static Vector2 MousePosition( Panel panel ) => panel.MousePosition * panel.ScaleFromScreen;
+
+	/// <summary>
+	/// Hide the icons that don't fit between the start button and the taskbar's right edge.
+	/// Measured from the start button and the first icon, so hiding icons doesn't change the result.
+	/// </summary>
+	void CapTaskbar( Panel taskbar )
+	{
+		var start = taskbar.Children.FirstOrDefault( x => x.HasClass( "start" ) );
+		if ( start is null )
+			return;
+
+		var apps = taskbar.Children.Where( x => x.HasClass( "app" ) ).ToList();
+		if ( apps.Count == 0 )
+			return;
+
+		var first = apps[0].Box.Rect;
+		var slotWidth = first.Right - start.Box.Rect.Right;
+		var available = taskbar.Box.RectInner.Right - start.Box.Rect.Right;
+		var capacity = slotWidth > 0 ? System.Math.Max( 1, (int)(available / slotWidth) ) : apps.Count;
+
+		for ( var i = 0; i < apps.Count; i++ )
+		{
+			apps[i].Style.Display = i < capacity ? DisplayMode.Flex : DisplayMode.None;
+		}
+	}
+
+	/// <summary>
+	/// Centre each tooltip over its icon, then shift it sideways so it stays inside the screen.
+	/// </summary>
+	void ClampTooltips( Panel taskbar )
+	{
+		var bounds = Panel.Box.Rect;
+
+		foreach ( var app in taskbar.Children.Where( x => x.HasClass( "app" ) ) )
+		{
+			var tooltip = app.Children.FirstOrDefault( x => x.HasClass( "tooltip" ) );
+			if ( tooltip is null )
+				continue;
+
+			var appRect = app.Box.Rect;
+			var width = tooltip.Box.Rect.Width;
+			var margin = TooltipEdgeMargin * app.ScaleToScreen;
+
+			var x = appRect.Left + (appRect.Width - width) * 0.5f;
+			x = System.MathF.Min( x, bounds.Right - margin - width );
+			x = System.MathF.Max( x, bounds.Left + margin );
+
+			tooltip.Style.Left = Length.Pixels( (x - appRect.Left) * app.ScaleFromScreen );
+		}
+	}
+
+	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
+	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count );
+}

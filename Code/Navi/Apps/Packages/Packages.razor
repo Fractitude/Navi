@@ -1,0 +1,122 @@
+@using Sandbox.UI
+@using System.Threading.Tasks
+@inherits NaviApp
+@namespace Sandbox
+@attribute [NaviApp( "packages", "Packages", Description = "Install and uninstall apps.", Icon = "inventory_2", Color = "#9ab0c4", IsSystem = true )]
+
+<root>
+	<div class="tabs">
+		<div class="tab @(ShowStore ? "" : "active")" @onclick=@(() => ShowStore = false)>Apps</div>
+		<div class="tab @(ShowStore ? "active" : "")" @onclick=@OpenStore>Store</div>
+		<div class="spacer"></div>
+
+		@if ( ShowStore )
+		{
+			<div class="button" @onclick=@(() => _ = RefreshStoreAsync())><i>refresh</i></div>
+		}
+	</div>
+
+	<div class="list">
+		@if ( ShowStore )
+		{
+			@if ( StoreStatus is not null )
+			{
+				<div class="status">@StoreStatus</div>
+			}
+
+			@foreach ( var package in StorePackages )
+			{
+				var ident = package.FullIdent;
+
+				<div class="row">
+					<img class="thumb" src=@package.Thumb />
+					<div class="info">
+						<div class="name">@package.Title</div>
+						<div class="description">@package.Summary</div>
+					</div>
+
+					@if ( Computer.IsDownloading( ident ) )
+					{
+						<div class="button disabled">Installing...</div>
+					}
+					else if ( Computer.IsPackageInstalled( ident ) )
+					{
+						<div class="button disabled">Installed</div>
+					}
+					else
+					{
+						<div class="button install" @onclick=@(() => _ = Computer.InstallPackageAsync( ident ))>Install</div>
+					}
+				</div>
+			}
+		}
+		else
+		{
+			@foreach ( var app in NaviAppRegistry.All.Where( x => !x.IsSystem ) )
+			{
+				<div class="row">
+					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+					<div class="info">
+						<div class="name">@app.Name</div>
+						<div class="description">@app.Description</div>
+					</div>
+
+					@if ( Computer.IsInstalled( app ) )
+					{
+						<div class="button" @onclick=@(() => Computer.Uninstall( app.Id ))>Uninstall</div>
+					}
+					else
+					{
+						<div class="button install" @onclick=@(() => Computer.Install( app.Id ))>Install</div>
+					}
+				</div>
+			}
+		}
+	</div>
+</root>
+
+@code
+{
+	bool ShowStore;
+
+	List<Package> StorePackages = new();
+
+	/// <summary>
+	/// Message shown above the Store list, or null.
+	/// </summary>
+	string StoreStatus;
+
+	bool StoreLoaded;
+	int storeVersion;
+
+	void OpenStore()
+	{
+		ShowStore = true;
+
+		if ( !StoreLoaded )
+			_ = RefreshStoreAsync();
+	}
+
+	async Task RefreshStoreAsync()
+	{
+		StoreLoaded = true;
+		StoreStatus = "Connecting to the Wired...";
+		StorePackages = new();
+		storeVersion++;
+
+		try
+		{
+			StorePackages = await NaviStore.SearchAsync();
+			StoreStatus = StorePackages.Count == 0 ? "No apps have been published yet." : null;
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: Store search failed: {e.Message}" );
+			StoreStatus = "Couldn't reach the Store.";
+		}
+
+		storeVersion++;
+	}
+
+	protected override int BuildHash() => System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, ShowStore, storeVersion );
+}

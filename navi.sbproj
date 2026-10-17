@@ -1,0 +1,17 @@
+{
+  "Title": "Navi",
+  "Type": "library",
+  "Org": "fractitude",
+  "Ident": "navi",
+  "Schema": 1,
+  "IncludeSourceFiles": false,
+  "Resources": null,
+  "PackageReferences": [],
+  "EditorReferences": null,
+  "Mounts": null,
+  "IsStandaloneOnly": false,
+  "AI": {
+    "EnableMcpCommunication": true
+  },
+  "Metadata": {}
+}
