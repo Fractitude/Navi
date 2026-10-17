@@ -26,9 +26,9 @@
 
 		@if ( ShowStore )
 		{
-			@if ( StoreStatus is not null )
+			@if ( Refreshing || StoreStatus is not null )
 			{
-				<div class="status">@StoreStatus</div>
+				<div class="status">@( Refreshing ? "Connecting to the Wired..." : StoreStatus )</div>
 			}
 
 			@foreach ( var (package, official) in StorePackages )
@@ -201,7 +201,8 @@
 	}
 
 	/// <summary>
-	/// Message shown above the Store list, or null.
+	/// The result message shown above the Store list, or null. While a refresh runs the view shows its own message
+	/// instead, so this one can't cut it short.
 	/// </summary>
 	string StoreStatus;
 
@@ -216,9 +217,10 @@
 
 	/// <summary>
 	/// How long a refresh shows as running at least. A Store search usually answers within a frame or two, and a
-	/// refresh that finishes before it is drawn looks like a click that did nothing.
+	/// refresh that finishes before it is drawn looks like a click that did nothing, so the status and the disabled
+	/// button stay up this long even when the search is instant.
 	/// </summary>
-	const float RefreshVisibleTime = 0.35f;
+	const float RefreshVisibleTime = 0.5f;
 
 	/// <summary>
 	/// Idents of the Store entries showing their details.
@@ -302,7 +304,6 @@
 
 		Refreshing = true;
 		StoreLoaded = true;
-		StoreStatus = "Connecting to the Wired...";
 		storeVersion++;
 
 		RealTimeSince elapsed = 0;
@@ -319,8 +320,8 @@
 			StoreStatus = "Couldn't reach the Store.";
 		}
 
-		// Hold the running state for a moment and clear it in one go: the search often answers within a frame or
-		// two, and a refresh that is drawn only after it already finished looks like a click that did nothing.
+		// Hold the running state, and with it the "Connecting" status, for a moment: the search often answers within
+		// a frame or two, and a refresh drawn only after it already finished looks like a click that did nothing.
 		var remaining = RefreshVisibleTime - elapsed;
 		if ( remaining > 0 )
 			await Task.Delay( (int)( remaining * 1000 ) );
