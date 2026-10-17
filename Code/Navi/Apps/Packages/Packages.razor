@@ -39,8 +39,10 @@
 	@if ( UiState.ShowStore )
 	{
 		<div class="search">
-			<TextEntry Icon="search" Value:bind=@SearchText Placeholder="Search apps, then press Enter"
-			           HasClearButton=@true MaxLength=@( 80 ) onsubmit=@( () => ViewModel.SubmitSearch() )/>
+			<TextEntry Icon="search" Value=@( UiState.SearchText ) Placeholder="Search apps, then press Enter"
+			           HasClearButton=@true MaxLength=@( 80 )
+			           OnTextEdited=@SearchEdited
+			           onsubmit=@( () => ViewModel.SubmitSearch() )/>
 		</div>
 	}
 
@@ -207,16 +209,6 @@
 	/// </summary>
 	PackagesUiState UiState => ViewModel.UiState;
 
-	/// <summary>
-	/// The Store search field binds to this. Typing isn't a reason to redraw the list: Enter, or the refresh button,
-	/// is what searches for what it holds. It needs the setter: the binding assigns to it.
-	/// </summary>
-	string SearchText
-	{
-		get => ViewModel.SearchText;
-		set => ViewModel.SearchText = value;
-	}
-
 	public override void Tick()
 	{
 		base.Tick();
@@ -225,6 +217,11 @@
 
 		ViewModel.Tick();
 	}
+
+	/// <summary>
+	/// The Store search field reports every edit here. Typing doesn't redraw the list; Enter does.
+	/// </summary>
+	void SearchEdited( string text ) => ViewModel.SetSearchText( text );
 
 	/// <summary>
 	/// The engine draws the scrollbar over the list instead of taking room from it, and scrollbar-gutter keeps room

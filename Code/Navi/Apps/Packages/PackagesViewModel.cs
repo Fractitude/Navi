@@ -105,14 +105,11 @@ public sealed class PackagesViewModel
 	public int Revision => UiState.Revision;
 
 	/// <summary>
-	/// What the Store search field holds. Typing is no reason to redraw the list, so this replaces the state without
-	/// bumping its revision; Enter (<see cref="SubmitSearch"/>) is what searches.
+	/// What the Store search field holds, as the field reports it. Typing is no reason to redraw the list, so this
+	/// replaces the state without going through <see cref="Update"/>; Enter (<see cref="SubmitSearch"/>) is what
+	/// searches.
 	/// </summary>
-	public string SearchText
-	{
-		get => UiState.SearchText;
-		set => UiState = UiState with { SearchText = value ?? "" };
-	}
+	public void SetSearchText( string text ) => UiState = UiState with { SearchText = text ?? "" };
 
 	/// <summary>
 	/// Called every frame by the panel. Nothing here is a click: the lists are refetched when the computer's version
