@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 namespace Sandbox;
 
 /// <summary>
-/// Multiplayer. The host runs the computer and sends its state to every other client as
-/// <see cref="NetworkSnapshot"/>; they only draw it. What the player at the screen does goes to the host as an RPC
-/// (the <c>User…</c> methods), and only the player in the seat (<see cref="UserId"/>) is listened to.
+/// Multiplayer. The host runs the computer and sends its state to every other client as a snapshot
+/// (<see cref="NetworkWindows"/> and the other parts); they only draw it. What the player at the screen does goes to the
+/// host as an RPC (the <c>User…</c> methods), and only the player in the seat (<see cref="UserId"/>) is listened to.
 /// The computer's GameObject must be a network object: Network Mode: Object in the scene, or network-spawned by the game
 /// if it is made at runtime. Scene objects default to Snapshot, which is sent to clients only once, as they join.
 /// </summary>
@@ -33,10 +33,28 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	public bool IsAuthority => !Networking.IsActive || Networking.IsHost;
 
+	// The host's state (NaviComputerSnapshot), as JSON, in parts that change at different rates. Only the host writes them,
+	// and the network sends only the parts that changed: moving a window sends the windows, not the manifests.
+
 	/// <summary>
-	/// The host's state as JSON (<see cref="NaviComputerSnapshot"/>). Only the host writes it.
+	/// <see cref="NaviComputerSnapshot.Apps"/>. Changes when an app is installed or opened.
 	/// </summary>
-	[Sync( SyncFlags.FromHost )] public string NetworkSnapshot { get; set; }
+	[Sync( SyncFlags.FromHost )] public string NetworkApps { get; set; }
+
+	/// <summary>
+	/// <see cref="NaviComputerSnapshot.State"/>. Changes when an app is installed, a permission granted or a setting changed.
+	/// </summary>
+	[Sync( SyncFlags.FromHost )] public string NetworkState { get; set; }
+
+	/// <summary>
+	/// <see cref="NaviComputerSnapshot.Windows"/>. Changes whenever a window moves.
+	/// </summary>
+	[Sync( SyncFlags.FromHost )] public string NetworkWindows { get; set; }
+
+	/// <summary>
+	/// <see cref="NaviSessionSnapshot"/>: the user, permission requests and downloads.
+	/// </summary>
+	[Sync( SyncFlags.FromHost )] public string NetworkSession { get; set; }
 
 	/// <summary>
 	/// How often the host checks whether its state changed and sends it, in seconds.
@@ -44,7 +62,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	const float SnapshotInterval = 0.1f;
 
 	RealTimeSince sinceSnapshot;
-	string appliedSnapshot;
+	(string Apps, string State, string Windows, string Session) appliedSnapshot;
 
 	/// <summary>
 	/// Connection id of the player using this computer, or empty while nobody does. Only they can work it; everyone else
@@ -97,20 +115,47 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			{
 				sinceSnapshot = 0;
 
-				// Window moves don't bump Version, so compare what would be sent instead.
-				var json = Json.Serialize( CaptureSnapshot() );
-				if ( json != NetworkSnapshot )
-					NetworkSnapshot = json;
+				SendSnapshot();
 			}
 
 			return;
 		}
 
-		if ( NetworkSnapshot is { } snapshot && snapshot != appliedSnapshot )
+		var parts = (NetworkApps, NetworkState, NetworkWindows, NetworkSession);
+		if ( parts != appliedSnapshot && parts is ({ }, { }, { }, { }) )
 		{
-			appliedSnapshot = snapshot;
-			ApplySnapshot( snapshot );
+			appliedSnapshot = parts;
+			ApplySnapshot();
 		}
+	}
+
+	/// <summary>
+	/// On the host: set each part that changed. Window moves don't bump Version, so it compares what would be sent.
+	/// </summary>
+	void SendSnapshot()
+	{
+		var snapshot = CaptureSnapshot();
+
+		var apps = Json.Serialize( snapshot.Apps );
+		if ( apps != NetworkApps )
+			NetworkApps = apps;
+
+		var state = Json.Serialize( snapshot.State );
+		if ( state != NetworkState )
+			NetworkState = state;
+
+		var windows = Json.Serialize( snapshot.Windows );
+		if ( windows != NetworkWindows )
+			NetworkWindows = windows;
+
+		var session = Json.Serialize( new NaviSessionSnapshot
+		{
+			Requests = snapshot.Requests,
+			Downloading = snapshot.Downloading,
+			User = snapshot.User,
+		} );
+		if ( session != NetworkSession )
+			NetworkSession = session;
 	}
 
 	// Who it is sent to.
@@ -179,24 +224,31 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// <summary>
 	/// Take on the host's state. Windows and requests are kept as the same objects where they still exist, so the
 	/// desktop and the secure layer don't start over. Apps this client doesn't have yet are downloaded, and left out until
-	/// they are.
+	/// they are. Parts can arrive in different updates, e.g. a window before its app's manifest: the window is left out
+	/// until the manifest comes, and then everything is applied again.
 	/// </summary>
-	void ApplySnapshot( string json )
+	void ApplySnapshot()
 	{
 		NaviComputerSnapshot snapshot;
 
 		try
 		{
-			snapshot = Json.Deserialize<NaviComputerSnapshot>( json );
+			var session = Json.Deserialize<NaviSessionSnapshot>( NetworkSession ) ?? new();
+			snapshot = new NaviComputerSnapshot
+			{
+				Apps = Json.Deserialize<List<NaviAppSnapshot>>( NetworkApps ),
+				State = Json.Deserialize<NaviComputerSave>( NetworkState ),
+				Windows = Json.Deserialize<List<NaviWindowSnapshot>>( NetworkWindows ),
+				Requests = session.Requests,
+				Downloading = session.Downloading,
+				User = session.User,
+			};
 		}
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"NaviComputer: couldn't read the host's state: {e.Message}" );
 			return;
 		}
-
-		if ( snapshot is null )
-			return;
 
 		NaviAppRegistry.AddHostApps( snapshot.Apps );
 		ApplySave( snapshot.State ?? new() );
@@ -277,7 +329,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	async Task FetchAsync( string ident )
 	{
 		await NaviStore.DownloadAsync( ident );
-		appliedSnapshot = null;
+		appliedSnapshot = default;
 	}
 
 	// The seat.

@@ -1,8 +1,10 @@
 namespace Sandbox;
 
 /// <summary>
-/// Everything other clients need to draw a <see cref="NaviComputer"/> the way the host has it. The host sends it as JSON
-/// in <see cref="NaviComputer.NetworkSnapshot"/>; the others replace their state with it.
+/// Everything other clients need to draw a <see cref="NaviComputer"/> the way the host has it; the others replace their
+/// state with it. The host sends it as JSON in parts: <see cref="NaviComputer.NetworkApps"/>,
+/// <see cref="NaviComputer.NetworkState"/>, <see cref="NaviComputer.NetworkWindows"/> and
+/// <see cref="NaviComputer.NetworkSession"/> (<see cref="NaviSessionSnapshot"/>).
 /// </summary>
 public sealed class NaviComputerSnapshot
 {
@@ -32,6 +34,17 @@ public sealed class NaviComputerSnapshot
 	/// <summary>
 	/// Connection id of the player using the computer, or empty. See <see cref="NaviComputer.UserId"/>.
 	/// </summary>
+	public System.Guid User { get; set; }
+}
+
+/// <summary>
+/// The part of <see cref="NaviComputerSnapshot"/> sent in <see cref="NaviComputer.NetworkSession"/>. The user and the
+/// requests travel together: a new user dismisses open requests, and clients must never see one without the other.
+/// </summary>
+public sealed class NaviSessionSnapshot
+{
+	public List<NaviRequestSnapshot> Requests { get; set; } = new();
+	public List<string> Downloading { get; set; } = new();
 	public System.Guid User { get; set; }
 }
 
