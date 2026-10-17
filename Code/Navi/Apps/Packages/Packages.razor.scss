@@ -70,6 +70,88 @@ Packages
 	border: 1px solid #8a8472;
 }
 
+// A Store entry: the row, and its details when expanded.
+.entry
+{
+	flex-shrink: 0;
+	flex-direction: column;
+	background-color: #c9c3b0;
+	border: 1px solid #8a8472;
+
+	> .row
+	{
+		background-color: transparent;
+		border-width: 0;
+	}
+}
+
+.expand
+{
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+	justify-content: center;
+	align-items: center;
+	font-size: 16px;
+	color: #2a2840;
+	border: 1px solid #8a8472;
+	cursor: pointer;
+
+	&:hover
+	{
+		color: #f2eee2;
+		background-color: #2a2840;
+		border-color: #2a2840;
+	}
+}
+
+.details
+{
+	flex-direction: column;
+	gap: 6px;
+	margin: 0 4px 4px 4px;
+	padding: 6px 4px 2px 4px;
+	border-top: 1px solid #8a8472;
+}
+
+.about
+{
+	font-size: 10px;
+	white-space: normal;
+}
+
+.facts
+{
+	flex-direction: column;
+	gap: 2px;
+}
+
+.fact
+{
+	flex-direction: row;
+	align-items: center;
+	gap: 5px;
+	font-size: 10px;
+
+	i
+	{
+		font-size: 11px;
+		opacity: 0.7;
+	}
+
+	.key
+	{
+		width: 46px;
+		flex-shrink: 0;
+		opacity: 0.7;
+	}
+
+	.value
+	{
+		font-weight: 700;
+	}
+}
+
 .icon
 {
 	width: 28px;

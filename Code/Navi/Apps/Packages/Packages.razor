@@ -27,7 +27,9 @@
 			@foreach ( var package in StorePackages )
 			{
 				var ident = package.FullIdent;
+				var isExpanded = Expanded.Contains( ident );
 
+				<div class="entry">
 				<div class="row">
 					<img class="thumb" src=@package.Thumb />
 					<div class="info">
@@ -53,6 +55,29 @@
 					{
 						<div class="button install" @onclick=@(() => _ = Computer.InstallPackageAsync( ident ))>Install</div>
 					}
+
+					<div class="expand" tooltip=@(isExpanded ? "Less" : "More") @onclick=@(() => ToggleDetails( package ))>
+						<i>@(isExpanded ? "expand_less" : "expand_more")</i>
+					</div>
+				</div>
+
+				@if ( isExpanded )
+				{
+					var full = Details.GetValueOrDefault( ident ) ?? package;
+
+					<div class="details">
+						<div class="about">@About( full )</div>
+
+						<div class="facts">
+							<div class="fact"><i>person</i><div class="key">Author</div><div class="value">@(full.Org?.Title ?? "Unknown")</div></div>
+							<div class="fact"><i>thumb_up</i><div class="key">Rating</div><div class="value">@Rating( full )</div></div>
+							<div class="fact"><i>group</i><div class="key">Players</div><div class="value">@full.Usage.Total.Users.ToString( "N0" )</div></div>
+							<div class="fact"><i>update</i><div class="key">Updated</div><div class="value">@full.Updated.ToLocalTime().ToString( "d MMM yyyy" )</div></div>
+							<div class="fact"><i>sell</i><div class="key">Version</div><div class="value">@(full.Revision?.VersionId.ToString() ?? "...")</div></div>
+							<div class="fact"><i>save</i><div class="key">Size</div><div class="value">@Size( full )</div></div>
+						</div>
+					</div>
+				}
 				</div>
 			}
 		}
@@ -94,6 +119,72 @@
 
 	bool StoreLoaded;
 	int storeVersion;
+
+	/// <summary>
+	/// Idents of the Store entries showing their details.
+	/// </summary>
+	HashSet<string> Expanded = new();
+
+	/// <summary>
+	/// Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.
+	/// </summary>
+	Dictionary<string, Package> Details = new();
+
+	void ToggleDetails( Package package )
+	{
+		var ident = package.FullIdent;
+		storeVersion++;
+
+		if ( !Expanded.Add( ident ) )
+		{
+			Expanded.Remove( ident );
+			return;
+		}
+
+		if ( !Details.ContainsKey( ident ) )
+			_ = FetchDetailsAsync( ident );
+	}
+
+	async Task FetchDetailsAsync( string ident )
+	{
+		try
+		{
+			if ( await Package.FetchAsync( ident, false ) is { } full )
+				Details[ident] = full;
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Packages: couldn't fetch {ident}: {e.Message}" );
+		}
+
+		storeVersion++;
+	}
+
+	static string About( Package package )
+	{
+		if ( !string.IsNullOrWhiteSpace( package.Description ) ) return package.Description;
+		if ( !string.IsNullOrWhiteSpace( package.Summary ) ) return package.Summary;
+		return "No description yet.";
+	}
+
+	static string Rating( Package package )
+	{
+		if ( package.Reviews.Total > 0 )
+			return $"{package.Reviews.Score * 100:0}% positive ({package.Reviews.Total})";
+
+		if ( package.VotesUp + package.VotesDown > 0 )
+			return $"{package.VotesUp} up, {package.VotesDown} down";
+
+		return "No ratings yet";
+	}
+
+	static string Size( Package package )
+	{
+		if ( package.Revision is not { } revision )
+			return "...";
+
+		return $"{System.Math.Max( 1, revision.TotalSize / 1024 )} KB";
+	}
 
 	void OpenStore()
 	{
