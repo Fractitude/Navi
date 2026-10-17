@@ -60,37 +60,11 @@ The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 
 
 ### Keep the panel stateless
 
-A panel that also holds the app's logic becomes unreadable past a few hundred lines: every field can be a reason to redraw, every `@if` a place for a rule to hide, and nothing can be exercised without clicking it. So an app of any size is three parts:
+An app is three parts, and the panel is only the third:
 
-- **`<App>UiState.cs`** — a `record` of everything the panel draws, already filtered, already formatted: the rows of a list, which button a row offers, the text of a tooltip. It has a `Revision` that goes up on every change, computed properties for the flags the markup asks about (`HasMore`), and no logic. Nothing in it needs a panel, so the same state could be serialized or diffed.
-- **`<App>ViewModel.cs`** — all the logic: what a click does, the calls to the computer, the polling, the async guards, the filters and the words they produce. It is a plain class, not a panel. It is made with the app's panel (every call to the computer is made with one) and it replaces `UiState` — a new snapshot — through one private `Update` method, which is also what bumps the revision. Nothing in it reads the panel tree.
-- **`<App>.razor`** — the view. It holds no app state: its `@code` has a lazily made `ViewModel`, a `UiState => ViewModel.UiState` shortcut, and `BuildHash() => ViewModel.Revision`. Markup reads `ViewModel.UiState` and every control calls a `ViewModel` method, which updates the state and redraws.
-
-```csharp
-// The state: what is drawn, and nothing else.
-public sealed record NotesUiState
-{
-	public int Revision { get; init; }
-	public IReadOnlyList<NoteRow> Notes { get; init; } = [];
-	public bool AppListEmpty => Notes.Count == 0;
-}
-
-// The view model: what happens, and the state that comes out of it.
-public sealed class NotesViewModel
-{
-	readonly Panel app;
-
-	public NotesViewModel( Panel app ) => this.app = app;
-
-	public NotesUiState UiState { get; private set; } = new();
-	public int Revision => UiState.Revision;
-
-	public void Delete( string id ) { /* ... await Navi... then: */ }
-
-	void Update( System.Func<NotesUiState, NotesUiState> change ) =>
-		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
-}
-```
+- **`<App>UiState.cs`** — a record of everything the panel draws, already filtered, already formatted, with a `Revision` that goes up on every change. No logic, no engine objects.
+- **`<App>ViewModel.cs`** — the app: the calls to the computer, the polling, the async guards, the filters and the words they produce. It replaces `UiState` through one private `Update`, which is also what bumps the revision.
+- **`<App>.razor`** — markup. Its `@code` is a lazily made `ViewModel`, a `UiState` shortcut and `BuildHash`; every control calls a `ViewModel` method, and the markup prints values it is given.
 
 ```razor
 @code
@@ -104,14 +78,9 @@ public sealed class NotesViewModel
 }
 ```
 
-The rules the pattern is worth following for:
+One place changes the state, the panel never decides, not every change is worth a redraw, and what the panel must do to its own tree stays in the panel.
 
-- **One place changes the state.** `Update` is the only setter, so the revision can't be forgotten and a missed redraw can't happen.
-- **The panel never decides.** If markup needs an `if`, the view model puts a flag in the state; if it needs a number, the value is already formatted. A `@switch` over an enum the state carries is fine — enums like `PackageAction` exist so the markup has no strings to compare.
-- **Not every change is worth a redraw.** Text being typed into a field replaces the state without a revision bump; only Enter, which searches, asks for one.
-- **What the panel must do to its own tree stays in the panel.** The one exception in Packages is the scrollbar's gutter (`FitScrollbarGutter`): it adjusts a class from the rendered tree every frame. That is view plumbing, not app state, so it doesn't belong in the view model.
-
-`Packages` is the reference implementation: `Code/Navi/Apps/Packages/` holds `PackagesUiState.cs`, `PackagesViewModel.cs` and the panel. Store apps split the same way — a view model is plain C#, so it needs nothing from Navi.
+The full contract — where each kind of rule goes, async and threads, the optional `Changed` event, and a Kotlin-to-C# translation — is in [`docs/app-architecture.md`](docs/app-architecture.md). `Packages` is the reference implementation: `Code/Navi/Apps/Packages/`. Store apps split the same way; a view model is plain C#, so it needs nothing from Navi.
 
 ### The manifest (`.napp`)
 
