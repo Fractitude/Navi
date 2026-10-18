@@ -230,6 +230,15 @@ NaviDesktop
 		}
 	}
 
+	// Between the pinned apps and the ones that are only open.
+	.taskbar .divider
+	{
+		width: 2px;
+		height: 24px;
+		flex-shrink: 0;
+		background-color: $line-bc;
+	}
+
 	.app
 	{
 		position: relative;

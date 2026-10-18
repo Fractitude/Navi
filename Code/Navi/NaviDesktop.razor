@@ -85,9 +85,22 @@
 	<div class="taskbar">
 		<div class="start @(StartOpen ? "menu-open" : "")" @onclick=@(() => ToggleStart())>NAVI</div>
 
+		@{
+			var wasPinned = false;
+		}
+
 		@foreach ( var app in Computer.TaskbarApps )
 		{
 			var process = Computer.GetProcess( app.Id );
+			var isPinned = Computer.IsTaskbarPinned( app.Id );
+
+			// A divider between the pinned apps and the ones that are only open.
+			if ( wasPinned && !isPinned )
+			{
+				<div class="divider"></div>
+			}
+
+			wasPinned = isPinned;
 
 			<div class="app @(MenuApp == app.Id ? "menu-open" : "")"
 				@onmousedown=@( ( PanelEvent e ) => StartTaskbarDrag( e ) )
