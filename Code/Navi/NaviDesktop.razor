@@ -7,25 +7,26 @@
 		<div class="title">COPLAND OS</div>
 
 		@* Back to front: panels draw in child order, and s&box ignores z-index for that. *@
-		@foreach ( var process in Computer.Running.OrderBy( x => x.ZIndex ) )
+		@foreach ( var window in Computer.Windows.Where( x => !x.IsService ).OrderBy( x => x.ZIndex ) )
 		{
-			var app = process.App;
-			var state = (process == Computer.Focused ? "focused " : "") + (process.IsMinimized ? "minimized " : "") + (process.IsMaximized ? "maximized" : "");
+			var app = window.App;
+			var info = window.Info;
+			var state = (window == Computer.FocusedWindow ? "focused " : "") + (window.IsMinimized ? "minimized " : "") + (window.IsMaximized ? "maximized" : "");
 
 			@* Position and size are set every frame in UpdateWindows, so dragging doesn't rebuild the tree. *@
-			<div @key=@app.Id class="window @state" @onmousedown=@(() => Computer.UserFocus( app.Id ))>
+			<div @key=@window.Key class="window @state" @onmousedown=@(() => Computer.UserFocus( app.Id, window.Id ))>
 				@* The body comes before the title bar in markup, so the title bar draws after it and the shield's tooltip
 				@* lands over the app's content instead of under it. Its order pulls it in front in the column, so it still
 				@* sits on top on screen. *@
-				<NaviAppHost class="body" Computer=@Computer Process=@process></NaviAppHost>
+				<NaviAppHost class="body" Computer=@Computer Window=@window></NaviAppHost>
 
 				<div class="titlebar"
-					@onmousedown=@( ( PanelEvent e ) => StartMove( process, e ) )
-					@ondoubleclick=@( ( PanelEvent e ) => OnTitleDoubleClick( process, e ) )>
+					@onmousedown=@( ( PanelEvent e ) => StartMove( window, e ) )
+					@ondoubleclick=@( ( PanelEvent e ) => OnTitleDoubleClick( window, e ) )>
 					<i class="glyph">@app.Icon</i>
-					<div class="name">@app.Name</div>
+					<div class="name">@WindowTitle( window )</div>
 
-					@if ( process.IsRoot )
+					@if ( window.Process.IsRoot )
 					{
 						<div class="shield">
 							<i class="glyph">shield</i>
@@ -41,34 +42,34 @@
 						</div>
 					}
 
-					@if ( app.CanMinimize )
+					@if ( info.CanMinimize )
 					{
-						<div class="button" @onclick=@(() => Computer.UserMinimize( app.Id ))><i>remove</i></div>
+						<div class="button" @onclick=@(() => Computer.UserMinimize( app.Id, window.Id ))><i>remove</i></div>
 					}
 
-					@if ( app.CanMaximize )
+					@if ( info.CanMaximize )
 					{
-						<div class="button" @onclick=@(() => Computer.UserToggleMaximized( app.Id ))><i>@(process.IsMaximized ? "filter_none" : "crop_square")</i></div>
+						<div class="button" @onclick=@(() => Computer.UserToggleMaximized( app.Id, window.Id ))><i>@(window.IsMaximized ? "filter_none" : "crop_square")</i></div>
 					}
 
-					<div class="button close" @onclick=@(() => Computer.UserClose( app.Id ))><i>close</i></div>
+					<div class="button close" @onclick=@(() => Computer.UserCloseWindow( app.Id, window.Id ))><i>close</i></div>
 				</div>
 
-				@if ( app.CanResize && !process.IsMaximized )
+				@if ( info.CanResize && !window.IsMaximized )
 				{
 					foreach ( var corner in Corners )
 					{
-						<div class="corner @corner.Name" @onmousedown=@( ( PanelEvent e ) => StartResize( process, corner.Direction, e ) )></div>
+						<div class="corner @corner.Name" @onmousedown=@( ( PanelEvent e ) => StartResize( window, corner.Direction, e ) )></div>
 					}
 				}
 			</div>
 		}
 	</div>
 
-	@if ( MenuApp is not null )
+	@if ( MenuApp is not null || TrayMenuApp is not null )
 	{
 		@* Catches clicks outside the menu, to close it. *@
-		<div class="menu-backdrop" @onmousedown=@(() => MenuApp = null)></div>
+		<div class="menu-backdrop" @onmousedown=@(() => CloseMenus())></div>
 	}
 
 	<div class="taskbar">
@@ -89,7 +90,7 @@
 				@if ( MenuApp == app.Id )
 				{
 					<div class="menu">
-						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserLaunch( app.Id ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
+						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => OpenApp( app ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
 
 						@if ( app.Permissions.Count > 0 && !app.IsSystem )
 						{
@@ -105,6 +106,51 @@
 					</div>
 				}
 			</div>
+		}
+
+		@* The system tray: one icon for each app that has one. The desktop draws all of it, so an app can't change what a
+		   tooltip or the menu says besides its own words, and can't remove Quit. *@
+		<div class="tray">
+			@foreach ( var process in Computer.Running.Where( x => x.Tray is not null ) )
+			{
+				var tray = process.Tray;
+				var id = process.App.Id;
+
+				<div @key=@id class="tray-icon @(TrayMenuApp == id ? "menu-open" : "")"
+					@onclick=@(() => OnTrayClick( process, "" ))
+					@onrightclick=@(() => OpenTrayMenu( id ))>
+					<div class="tooltip">@(string.IsNullOrEmpty( tray.Tooltip ) ? process.App.Name : $"{process.App.Name}: {tray.Tooltip}")</div>
+					<i>@tray.Icon</i>
+
+					@if ( TrayMenuApp == id )
+					{
+						<div class="menu">
+							<div class="heading" @onclick=@(( PanelEvent e ) => e.StopPropagation())>@process.App.Name</div>
+
+							@foreach ( var item in tray.Items )
+							{
+								<div class="item" @onclick=@(( PanelEvent e ) => TrayMenuAction( e, process, item.Id ))>
+									@if ( !string.IsNullOrEmpty( item.Icon ) )
+									{
+										<i>@item.Icon</i>
+									}
+									@item.Label
+								</div>
+							}
+
+							<div class="item quit" @onclick=@(( PanelEvent e ) => TrayMenuAction( e, process, NaviComputer.QuitItem ))><i>power_settings_new</i>Quit</div>
+						</div>
+					}
+				</div>
+			}
+		</div>
+	</div>
+
+	@* Headless apps' services. Their panels run here, and nothing of them is drawn. *@
+	<div class="services">
+		@foreach ( var window in Computer.Windows.Where( x => x.IsService ) )
+		{
+			<NaviAppHost @key=@window.Key Computer=@Computer Window=@window></NaviAppHost>
 		}
 	</div>
 
@@ -144,7 +190,7 @@
 	};
 
 	// The window being moved or resized. The drag lasts while the mouse button is held on dragHandle.
-	NaviProcess dragging;
+	NaviWindow dragging;
 	Panel dragHandle;
 	Vector2 dragDirection; // Zero when moving, otherwise the corner being dragged.
 	Vector2 dragStartMouse;
@@ -152,12 +198,17 @@
 	Vector2 dragStartSize;
 
 	// Windows that were maximized last frame. Their measured size is still the maximized one, so they skip clamping for a frame.
-	readonly HashSet<NaviProcess> wasMaximized = new();
+	readonly HashSet<NaviWindow> wasMaximized = new();
 
 	/// <summary>
 	/// Id of the app whose taskbar menu is open, or null.
 	/// </summary>
 	string MenuApp;
+
+	/// <summary>
+	/// Id of the app whose tray menu is open, or null.
+	/// </summary>
+	string TrayMenuApp;
 
 	/// <summary>
 	/// How far in front of the screen the secure layer floats, in world units. Less than 1 and the screen can still draw
@@ -264,6 +315,9 @@
 		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
 			MenuApp = null;
 
+		if ( TrayMenuApp is not null && Computer.GetProcess( TrayMenuApp )?.Tray is null )
+			TrayMenuApp = null;
+
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
 		if ( screen is not null )
 			UpdateWindows( screen );
@@ -277,13 +331,75 @@
 	}
 
 	/// <summary>
-	/// Clicking the icon of the window in front minimizes it. Otherwise it opens, restores or focuses the app.
+	/// Clicking the icon of an app with a window in front minimizes its windows. Otherwise it opens, restores or focuses the
+	/// app. An app that is running without a window gets the click its tray icon would.
 	/// </summary>
 	void OnTaskbarClick( NaviAppInfo app )
 	{
-		MenuApp = null;
-		Computer.UserTaskbarClick( app.Id );
+		CloseMenus();
+
+		if ( Computer.GetProcess( app.Id ) is { } process && !process.DrawnWindows.Any() )
+			OnTrayClick( process, "" );
+		else
+			Computer.UserTaskbarClick( app.Id );
 	}
+
+	/// <summary>
+	/// Open an app, restore it, or give it the click of its tray icon if it is running without a window.
+	/// </summary>
+	void OpenApp( NaviAppInfo app )
+	{
+		if ( Computer.GetProcess( app.Id ) is { } process && !process.DrawnWindows.Any() )
+			OnTrayClick( process, "" );
+		else
+			Computer.UserLaunch( app.Id );
+	}
+
+	void CloseMenus()
+	{
+		MenuApp = null;
+		TrayMenuApp = null;
+	}
+
+	void OpenTrayMenu( string id )
+	{
+		MenuApp = null;
+		TrayMenuApp = id;
+	}
+
+	void TrayMenuAction( PanelEvent e, NaviProcess process, string item )
+	{
+		e.StopPropagation();
+		OnTrayClick( process, item );
+	}
+
+	/// <summary>
+	/// The player clicked a tray icon (<paramref name="item"/> empty) or one of its menu items, or Quit. A shared app hears it
+	/// on the host's copy. One that isn't shared runs on every client, so it hears it on this client's own copy.
+	/// </summary>
+	void OnTrayClick( NaviProcess process, string item )
+	{
+		CloseMenus();
+
+		if ( !Computer.CanUse )
+			return;
+
+		var id = process.App.Id;
+
+		if ( item == NaviComputer.QuitItem )
+			Computer.UserClose( id );
+		else if ( process.App.Shared )
+			Computer.UserTrayClick( id, item );
+		else
+			Computer.DeliverTrayClick( id, item );
+	}
+
+	/// <summary>
+	/// What the title bar says: the app's name, then the window's own title. The app's name is always first, so a window
+	/// can't pass for another app's.
+	/// </summary>
+	static string WindowTitle( NaviWindow window ) =>
+		string.IsNullOrEmpty( window.Info.Title ) ? window.App.Name : $"{window.App.Name} - {window.Info.Title}";
 
 	/// <summary>
 	/// Run a taskbar menu item and close the menu. The click doesn't reach the icon, so it doesn't also open the app.
@@ -295,10 +411,10 @@
 		action();
 	}
 
-	void OnTitleDoubleClick( NaviProcess process, PanelEvent e )
+	void OnTitleDoubleClick( NaviWindow window, PanelEvent e )
 	{
 		if ( !IsOnButton( e ) )
-			Computer.UserToggleMaximized( process.App.Id );
+			Computer.UserToggleMaximized( window.App.Id, window.Id );
 	}
 
 	/// <summary>
@@ -315,38 +431,38 @@
 		return false;
 	}
 
-	void StartMove( NaviProcess process, PanelEvent e )
+	void StartMove( NaviWindow window, PanelEvent e )
 	{
-		if ( process.IsMaximized || IsOnButton( e ) )
+		if ( window.IsMaximized || IsOnButton( e ) )
 			return;
 
-		StartDrag( process, e.This, Vector2.Zero );
+		StartDrag( window, e.This, Vector2.Zero );
 	}
 
-	void StartResize( NaviProcess process, Vector2 corner, PanelEvent e )
+	void StartResize( NaviWindow window, Vector2 corner, PanelEvent e )
 	{
-		if ( !process.App.CanResize || process.IsMaximized )
+		if ( !window.Info.CanResize || window.IsMaximized )
 			return;
 
-		StartDrag( process, e.This, corner );
+		StartDrag( window, e.This, corner );
 	}
 
-	void StartDrag( NaviProcess process, Panel handle, Vector2 direction )
+	void StartDrag( NaviWindow window, Panel handle, Vector2 direction )
 	{
 		if ( !Computer.CanUse )
 			return;
 
-		var window = handle.Parent;
-		var screen = window?.Parent;
+		var panel = handle.Parent;
+		var screen = panel?.Parent;
 		if ( screen is null )
 			return;
 
-		dragging = process;
+		dragging = window;
 		dragHandle = handle;
 		dragDirection = direction;
 		dragStartMouse = MousePosition( screen );
-		dragStartPosition = process.Position;
-		dragStartSize = process.Size ?? window.Box.Rect.Size * window.ScaleFromScreen;
+		dragStartPosition = window.Position;
+		dragStartSize = window.Size ?? panel.Box.Rect.Size * panel.ScaleFromScreen;
 	}
 
 	/// <summary>
@@ -358,7 +474,7 @@
 
 		if ( dragging is not null )
 		{
-			if ( dragHandle is null || !dragHandle.IsValid || !dragHandle.HasActive || dragging.IsMaximized || !Computer.Running.Contains( dragging ) )
+			if ( dragHandle is null || !dragHandle.IsValid || !dragHandle.HasActive || dragging.IsMaximized || !Computer.Windows.Contains( dragging ) )
 			{
 				SendDrag();
 				dragging = null;
@@ -382,44 +498,44 @@
 			}
 		}
 
-		foreach ( var window in screen.Children.Where( x => x.HasClass( "window" ) ) )
+		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ) )
 		{
-			var process = window.Children.OfType<NaviAppHost>().FirstOrDefault()?.Process;
-			if ( process is null )
+			var window = panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Window;
+			if ( window is null )
 				continue;
 
-			if ( process.IsMaximized )
+			if ( window.IsMaximized )
 			{
-				window.Style.Left = Length.Pixels( 0 );
-				window.Style.Top = Length.Pixels( 0 );
-				window.Style.Width = Length.Percent( 100 );
-				window.Style.Height = Length.Percent( 100 );
-				wasMaximized.Add( process );
+				panel.Style.Left = Length.Pixels( 0 );
+				panel.Style.Top = Length.Pixels( 0 );
+				panel.Style.Width = Length.Percent( 100 );
+				panel.Style.Height = Length.Percent( 100 );
+				wasMaximized.Add( window );
 				continue;
 			}
 
-			var layoutIsCurrent = !wasMaximized.Remove( process );
+			var layoutIsCurrent = !wasMaximized.Remove( window );
 
-			if ( process.Size is { } size )
+			if ( window.Size is { } size )
 			{
-				process.Size = new Vector2(
+				window.Size = new Vector2(
 					Clamp( size.x, MinWindowSize.x, bounds.x ),
 					Clamp( size.y, MinWindowSize.y, bounds.y ) );
 			}
 
 			// A window bigger than the screen is pinned to the top left.
-			if ( process.Size is not null || layoutIsCurrent )
+			if ( window.Size is not null || layoutIsCurrent )
 			{
-				var max = bounds - (process.Size ?? window.Box.Rect.Size * window.ScaleFromScreen);
-				process.Position = new Vector2(
-					Clamp( process.Position.x, 0f, max.x ),
-					Clamp( process.Position.y, 0f, max.y ) );
+				var max = bounds - (window.Size ?? panel.Box.Rect.Size * panel.ScaleFromScreen);
+				window.Position = new Vector2(
+					Clamp( window.Position.x, 0f, max.x ),
+					Clamp( window.Position.y, 0f, max.y ) );
 			}
 
-			window.Style.Left = Length.Pixels( process.Position.x );
-			window.Style.Top = Length.Pixels( process.Position.y );
-			window.Style.Width = process.Size is { } w ? Length.Pixels( w.x ) : null;
-			window.Style.Height = process.Size is { } h ? Length.Pixels( h.y ) : null;
+			panel.Style.Left = Length.Pixels( window.Position.x );
+			panel.Style.Top = Length.Pixels( window.Position.y );
+			panel.Style.Width = window.Size is { } w ? Length.Pixels( w.x ) : null;
+			panel.Style.Height = window.Size is { } h ? Length.Pixels( h.y ) : null;
 		}
 
 		StackWindows( screen );
@@ -446,7 +562,7 @@
 		if ( dragging is null || Computer.IsAuthority )
 			return;
 
-		Computer.UserMoveWindow( dragging.App.Id, dragging.Position, dragging.Size ?? default, dragging.Size is not null );
+		Computer.UserMoveWindow( dragging.App.Id, dragging.Id, dragging.Position, dragging.Size ?? default, dragging.Size is not null );
 	}
 
 	/// <summary>
@@ -477,7 +593,7 @@
 	/// </summary>
 	static void StackWindows( Panel screen )
 	{
-		static int Order( Panel panel ) => panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Process?.ZIndex ?? int.MinValue;
+		static int Order( Panel panel ) => panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Window?.ZIndex ?? int.MinValue;
 
 		var last = int.MinValue;
 		foreach ( var child in screen.Children )
@@ -538,7 +654,11 @@
 
 		var first = apps[0].Box.Rect;
 		var slotWidth = first.Right - start.Box.Rect.Right;
-		var available = taskbar.Box.RectInner.Right - start.Box.Rect.Right;
+
+		// The tray takes the right end, and a gap before it like the one between icons.
+		var tray = taskbar.Children.FirstOrDefault( x => x.HasClass( "tray" ) );
+		var right = tray is not null && tray.Children.Any() ? tray.Box.Rect.Left - (slotWidth - first.Width) : taskbar.Box.RectInner.Right;
+		var available = right - start.Box.Rect.Right;
 		var capacity = slotWidth > 0 ? System.Math.Max( 1, (int)(available / slotWidth) ) : apps.Count;
 
 		for ( var i = 0; i < apps.Count; i++ )
@@ -574,5 +694,5 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, Computer?.CanUse, Computer?.UserId );
+		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, TrayMenuApp, Computer?.CanUse, Computer?.UserId );
 }

@@ -4,9 +4,9 @@ namespace Sandbox;
 
 /// <summary>
 /// The calls apps make to the computer, through the <c>Navi</c> client (<c>Code/Navi/Client/Navi.cs</c>).
-/// A call is a <c>navi.call</c> panel event that bubbles up from the app to its window, with a value of
+/// A call is a <c>navi.call</c> panel event that bubbles up from the app's panel to its window, with a value of
 /// <c>(string Method, object[] Args, TaskCompletionSource&lt;object&gt; Reply)</c>. Everything in it is a .NET or engine type,
-/// so apps don't need Navi types and Store apps work in every game. The call runs as the app's window: a call it lacks
+/// so apps don't need Navi types and Store apps work in every game. The call runs as the app, from the window the panel is in: a call it lacks
 /// the permission for fails with <see cref="System.UnauthorizedAccessException"/> (<see cref="NaviPermissions.Missing"/>).
 /// Keep method names, arguments and results stable: published apps depend on them.
 /// </summary>
@@ -15,13 +15,14 @@ public static class NaviSystemCalls
 	public const string EventName = "navi.call";
 
 	/// <summary>
-	/// Run a call for <paramref name="process"/> and answer it on <paramref name="reply"/>.
+	/// Run a call for <paramref name="window"/>'s app and answer it on <paramref name="reply"/>. The window is where the
+	/// panel that made the call lives, which is what the calls about "this window" mean.
 	/// </summary>
-	public static async Task RunAsync( NaviComputer computer, NaviProcess process, string method, object[] args, TaskCompletionSource<object> reply )
+	public static async Task RunAsync( NaviComputer computer, NaviWindow window, string method, object[] args, TaskCompletionSource<object> reply )
 	{
 		try
 		{
-			reply.TrySetResult( await CallAsync( computer, process, method, args ?? [] ) );
+			reply.TrySetResult( await CallAsync( computer, window, method, args ?? [] ) );
 		}
 		catch ( System.Exception e )
 		{
@@ -29,9 +30,11 @@ public static class NaviSystemCalls
 		}
 	}
 
-	static async Task<object> CallAsync( NaviComputer computer, NaviProcess process, string method, object[] args )
+	static async Task<object> CallAsync( NaviComputer computer, NaviWindow window, string method, object[] args )
 	{
+		var process = window.Process;
 		var self = process.App.Id;
+		var windowId = window.Id;
 
 		// On a client that isn't the host, a copy of an app that isn't shared runs here alone. It can read the computer
 		// as the host has it, and work its own window as the local player would. Everything else that changes the
@@ -41,31 +44,50 @@ public static class NaviSystemCalls
 			switch ( method )
 			{
 				case "window.close":
-					computer.UserClose( self );
+					computer.UserCloseWindow( self, windowId );
 					return null;
 
 				case "window.minimize":
-					computer.UserMinimize( self );
-					return process.App.CanMinimize;
+					computer.UserMinimize( self, windowId );
+					return window.Info.CanMinimize && !window.IsService;
 
 				case "window.maximize":
-					computer.UserToggleMaximized( self );
-					return process.App.CanMaximize;
+					computer.UserToggleMaximized( self, windowId );
+					return window.Info.CanMaximize && !window.IsService;
+
+				case "window.open":
+					computer.UserOpenWindow( self, Arg<string>( args, 0, method ) );
+					return process.App.FindWindow( Arg<string>( args, 0, method ) ) is { Id: not "" };
+
+				case "window.close-other":
+					computer.UserCloseWindow( self, Arg<string>( args, 0, method ) );
+					return null;
 			}
 		}
 
 		switch ( method )
 		{
-			// The app's own window.
+			// The window the panel is in.
 			case "window.close":
-				computer.Close( self );
+				computer.CloseWindow( self, windowId );
 				return null;
 
 			case "window.minimize":
-				return computer.Minimize( self );
+				return computer.Minimize( self, windowId );
 
 			case "window.maximize":
-				return computer.ToggleMaximized( self );
+				return computer.ToggleMaximized( self, windowId );
+
+			// The app's other windows, which only its manifest can define.
+			case "window.open":
+				return computer.OpenWindow( self, Arg<string>( args, 0, method ) );
+
+			case "window.close-other":
+				return computer.CloseWindow( self, Arg<string>( args, 0, method ) );
+
+			// The system tray. The app has its own icon, and only its own.
+			case "tray.set":
+				return computer.SetTray( self, Opt( args, 0, "" ), Opt( args, 1, "" ), Opt<(string, string, string)[]>( args, 2, [] ) );
 
 			// Permissions.
 			case "permissions.get":

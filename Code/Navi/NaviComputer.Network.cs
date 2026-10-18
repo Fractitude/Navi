@@ -159,7 +159,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		if ( state != NetworkState )
 			NetworkState = state;
 
-		var windows = Json.Serialize( snapshot.Windows );
+		var windows = Json.Serialize( snapshot.Layout );
 		if ( windows != NetworkWindows )
 			NetworkWindows = windows;
 
@@ -255,17 +255,26 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			.DistinctBy( x => x.Id )
 			.Select( x => x.ToSnapshot() )
 			.ToList(),
-		Windows = running.Select( x => new NaviWindowSnapshot
+		Layout = new NaviLayoutSnapshot
 		{
-			AppId = x.App.Id,
-			Position = x.Position,
-			Size = x.Size,
-			IsMinimized = x.IsMinimized,
-			IsMaximized = x.IsMaximized,
-			ZIndex = x.ZIndex,
-			IsRoot = x.IsRoot,
-			Permissions = x.Permissions.ToList(),
-		} ).ToList(),
+			Processes = running.Select( x => new NaviProcessSnapshot
+			{
+				AppId = x.App.Id,
+				IsRoot = x.IsRoot,
+				Permissions = x.Permissions.ToList(),
+				Tray = x.Tray?.ToSnapshot(),
+			} ).ToList(),
+			Windows = Windows.Select( x => new NaviWindowSnapshot
+			{
+				AppId = x.App.Id,
+				WindowId = x.Id,
+				Position = x.Position,
+				Size = x.Size,
+				IsMinimized = x.IsMinimized,
+				IsMaximized = x.IsMaximized,
+				ZIndex = x.ZIndex,
+			} ).ToList(),
+		},
 		Requests = permissionRequests.Select( x => new NaviRequestSnapshot
 		{
 			Id = x.Id,
@@ -297,7 +306,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			{
 				Apps = Json.Deserialize<List<NaviAppSnapshot>>( NetworkApps ),
 				State = Json.Deserialize<NaviComputerSave>( NetworkState ),
-				Windows = Json.Deserialize<List<NaviWindowSnapshot>>( NetworkWindows ),
+				Layout = Json.Deserialize<NaviLayoutSnapshot>( NetworkWindows ) ?? new(),
 				Requests = session.Requests,
 				Downloading = session.Downloading,
 				User = session.User,
@@ -320,27 +329,47 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		UserId = snapshot.User;
 
 		var processes = new List<NaviProcess>();
-		foreach ( var window in snapshot.Windows ?? [] )
+		foreach ( var entry in snapshot.Layout?.Processes ?? [] )
 		{
-			if ( FindOrFetch( window.AppId ) is not { } app )
+			if ( FindOrFetch( entry.AppId ) is not { } app || processes.Any( x => x.App.Id == app.Id ) )
 				continue;
 
-			var process = running.FirstOrDefault( x => x.App.Id == app.Id && x.IsRoot == window.IsRoot )
-				?? new NaviProcess { App = app, IsRoot = window.IsRoot };
+			var process = running.FirstOrDefault( x => x.App.Id == app.Id && x.IsRoot == entry.IsRoot )
+				?? new NaviProcess { App = app, IsRoot = entry.IsRoot };
 
-			process.Position = window.Position;
-			process.Size = window.Size;
-			process.IsMinimized = window.IsMinimized;
-			process.IsMaximized = window.IsMaximized;
-			process.ZIndex = window.ZIndex;
 			process.Permissions.Clear();
-			process.Permissions.UnionWith( window.Permissions ?? [] );
+			process.Permissions.UnionWith( entry.Permissions ?? [] );
+			process.Tray = NaviTray.FromSnapshot( entry.Tray );
 			processes.Add( process );
+		}
+
+		// Windows are kept as the same objects where they still exist, so their panels don't start over.
+		var windows = processes.ToDictionary( x => x, x => new List<NaviWindow>() );
+		foreach ( var entry in snapshot.Layout?.Windows ?? [] )
+		{
+			var process = processes.FirstOrDefault( x => x.App.Id == entry.AppId );
+			if ( process is null || process.App.FindWindow( entry.WindowId ) is not { } info
+				|| windows[process].Any( x => x.Id == info.Id ) )
+				continue;
+
+			var window = process.GetWindow( info.Id ) ?? new NaviWindow { Process = process, Info = info };
+			window.Position = entry.Position;
+			window.Size = entry.Size;
+			window.IsMinimized = entry.IsMinimized;
+			window.IsMaximized = entry.IsMaximized;
+			window.ZIndex = entry.ZIndex;
+			windows[process].Add( window );
+		}
+
+		foreach ( var process in processes )
+		{
+			process.WindowList.Clear();
+			process.WindowList.AddRange( windows[process] );
 		}
 
 		running.Clear();
 		running.AddRange( processes );
-		topZIndex = running.Count > 0 ? running.Max( x => x.ZIndex ) : 0;
+		topZIndex = Windows.Any() ? Windows.Max( x => x.ZIndex ) : 0;
 
 		var requests = new List<NaviPermissionRequest>();
 		foreach ( var request in snapshot.Requests ?? [] )
@@ -476,6 +505,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Launch( id );
 	}
 
+	/// <summary>
+	/// Close an app and all its windows.
+	/// </summary>
 	[Rpc.Host]
 	public void UserClose( string id )
 	{
@@ -483,25 +515,63 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Close( id );
 	}
 
+	/// <summary>
+	/// Open one of an app's windows, or bring it to the front. See <see cref="OpenWindow"/>. The app has to list the window in
+	/// its manifest, whatever the caller sends.
+	/// </summary>
 	[Rpc.Host]
-	public void UserFocus( string id )
+	public void UserOpenWindow( string id, string windowId )
 	{
 		if ( Authorize() )
-			Focus( id );
+			OpenWindow( id, windowId );
+	}
+
+	/// <summary>
+	/// Close a window. See <see cref="CloseWindow"/>.
+	/// </summary>
+	[Rpc.Host]
+	public void UserCloseWindow( string id, string windowId )
+	{
+		if ( Authorize() )
+			CloseWindow( id, windowId );
 	}
 
 	[Rpc.Host]
-	public void UserMinimize( string id )
+	public void UserFocus( string id, string windowId )
 	{
 		if ( Authorize() )
-			Minimize( id );
+			Focus( id, windowId );
 	}
 
 	[Rpc.Host]
-	public void UserToggleMaximized( string id )
+	public void UserMinimize( string id, string windowId )
 	{
 		if ( Authorize() )
-			ToggleMaximized( id );
+			Minimize( id, windowId );
+	}
+
+	[Rpc.Host]
+	public void UserToggleMaximized( string id, string windowId )
+	{
+		if ( Authorize() )
+			ToggleMaximized( id, windowId );
+	}
+
+	/// <summary>
+	/// The user clicked a shared app's tray icon (<paramref name="item"/> empty) or one of its menu items. Quit closes the
+	/// app. The click only reaches the host's copy of the app. An app that isn't shared hears it on the user's own client,
+	/// from the desktop. An item the app's tray doesn't have gets nothing.
+	/// </summary>
+	[Rpc.Host]
+	public void UserTrayClick( string id, string item )
+	{
+		if ( !Authorize() || GetProcess( id ) is not { } process )
+			return;
+
+		if ( item == QuitItem )
+			Close( id );
+		else if ( string.IsNullOrEmpty( item ) || (process.App.Shared && process.Tray?.Items.Any( x => x.Id == item ) == true) )
+			DeliverTrayClick( id, item );
 	}
 
 	[Rpc.Host]
@@ -520,8 +590,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		if ( !Authorize() )
 			return;
 
-		var process = GetProcess( id );
-		if ( process is not null && process == Focused && Minimize( id ) )
+		if ( GetProcess( id ) is { } process && FocusedWindow?.Process == process && MinimizeApp( id ) )
 			return;
 
 		Launch( id );
@@ -532,17 +601,17 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// window that fits its app. The desktop keeps it inside the screen.
 	/// </summary>
 	[Rpc.Host]
-	public void UserMoveWindow( string id, Vector2 position, Vector2 size, bool sized )
+	public void UserMoveWindow( string id, string windowId, Vector2 position, Vector2 size, bool sized )
 	{
-		if ( !Authorize() || GetProcess( id ) is not { } process || process.IsMaximized )
+		if ( !Authorize() || GetWindow( id, windowId ) is not { IsService: false } window || window.IsMaximized )
 			return;
 
-		if ( !IsPlausible( position ) || (sized && (!process.App.CanResize || !IsPlausible( size ))) )
+		if ( !IsPlausible( position ) || (sized && (!window.Info.CanResize || !IsPlausible( size ))) )
 			return;
 
-		process.Position = position;
+		window.Position = position;
 		if ( sized )
-			process.Size = size;
+			window.Size = size;
 	}
 
 	/// <summary>
@@ -583,7 +652,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	// Shared apps (NaviAppInfo.Shared). The host's copy of each runs the app and publishes its state; the others draw it.
 
 	/// <summary>
-	/// The state each shared app's host copy published, as JSON, by app id. Only the host writes it.
+	/// The state each shared app's host copy published, as JSON, by window key (<see cref="NaviWindow.Key"/>). Only the host
+	/// writes it.
 	/// </summary>
 	[Sync( SyncFlags.FromHost )] public NetDictionary<string, string> AppStates { get; set; } = new();
 
@@ -593,45 +663,47 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	public const int MaxAppState = 32 * 1024;
 
 	/// <summary>
-	/// On the host: what the host copy of a running shared app published. Ignored for an app that isn't running or isn't
-	/// shared.
+	/// On the host: what the host copy of a window of a running shared app published. Ignored for a window that isn't open
+	/// or isn't shared.
 	/// </summary>
-	internal void SetAppState( string id, string json )
+	internal void SetAppState( string key, string json )
 	{
-		if ( !IsAuthority || GetProcess( id ) is not { App.Shared: true } )
+		if ( !IsAuthority || FindWindow( key ) is not { App.Shared: true } )
 			return;
 
 		if ( json is not null && json.Length > MaxAppState )
 		{
-			Log.Warning( $"NaviComputer: {id} published {json.Length} characters of state, more than {MaxAppState}; not sent" );
+			Log.Warning( $"NaviComputer: {key} published {json.Length} characters of state, more than {MaxAppState}; not sent" );
 			return;
 		}
 
-		if ( AppStates.TryGetValue( id, out var current ) && current == json )
+		if ( AppStates.TryGetValue( key, out var current ) && current == json )
 			return;
 
-		AppStates[id] = json;
+		AppStates[key] = json;
 	}
 
 	/// <summary>
-	/// What the host copy of a shared app published last, or null.
+	/// What the host copy of a shared app's window published last, or null.
 	/// </summary>
-	public string GetAppState( string id ) => AppStates.TryGetValue( id, out var json ) ? json : null;
+	public string GetAppState( string key ) => AppStates.TryGetValue( key, out var json ) ? json : null;
 
 	/// <summary>
-	/// Forget the state of apps that closed, so a new window starts from nothing.
+	/// Forget the state of windows that closed, so a new window starts from nothing.
 	/// </summary>
 	void PruneAppStates()
 	{
-		foreach ( var id in AppStates.Keys.Where( x => !IsRunning( x ) ).ToArray() )
-			AppStates.Remove( id );
+		var open = Windows.Select( x => x.Key ).ToHashSet();
 
-		foreach ( var id in AppScrolls.Keys.Where( x => !IsRunning( x ) ).ToArray() )
-			AppScrolls.Remove( id );
+		foreach ( var key in AppStates.Keys.Where( x => !open.Contains( x ) ).ToArray() )
+			AppStates.Remove( key );
+
+		foreach ( var key in AppScrolls.Keys.Where( x => !open.Contains( x ) ).ToArray() )
+			AppScrolls.Remove( key );
 	}
 
 	/// <summary>
-	/// Where the user scrolled each shared app's lists, by app id, as <see cref="NaviAppHost"/> encodes it. Only the host
+	/// Where the user scrolled each shared app's lists, by window key, as <see cref="NaviAppHost"/> encodes it. Only the host
 	/// writes it. Scrolling is the panel's own, not the app's state, so Navi passes it on for every shared app.
 	/// </summary>
 	[Sync( SyncFlags.FromHost )] public NetDictionary<string, string> AppScrolls { get; set; } = new();
@@ -641,31 +713,31 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	const int MaxAppScroll = 2048;
 
-	public string GetAppScroll( string id ) => AppScrolls.TryGetValue( id, out var scroll ) ? scroll : null;
+	public string GetAppScroll( string key ) => AppScrolls.TryGetValue( key, out var scroll ) ? scroll : null;
 
 	/// <summary>
 	/// The user scrolled in a shared app.
 	/// </summary>
 	[Rpc.Host]
-	public void UserScroll( string id, string scroll )
+	public void UserScroll( string id, string windowId, string scroll )
 	{
-		if ( !Authorize() || GetProcess( id ) is not { App.Shared: true } || scroll is null || scroll.Length > MaxAppScroll )
+		if ( !Authorize() || GetWindow( id, windowId ) is not { App.Shared: true } window || scroll is null || scroll.Length > MaxAppScroll )
 			return;
 
-		AppScrolls[id] = scroll;
+		AppScrolls[window.Key] = scroll;
 	}
 
 	/// <summary>
-	/// The host's copy of each open app's window body, which actions are delivered to.
+	/// The host's copy of each open window's body, by window key, which actions and tray clicks are delivered to.
 	/// </summary>
 	readonly Dictionary<string, NaviAppHost> appHosts = new();
 
-	internal void RegisterAppHost( string id, NaviAppHost host ) => appHosts[id] = host;
+	internal void RegisterAppHost( string key, NaviAppHost host ) => appHosts[key] = host;
 
-	internal void UnregisterAppHost( string id, NaviAppHost host )
+	internal void UnregisterAppHost( string key, NaviAppHost host )
 	{
-		if ( id is not null && appHosts.TryGetValue( id, out var current ) && current == host )
-			appHosts.Remove( id );
+		if ( key is not null && appHosts.TryGetValue( key, out var current ) && current == host )
+			appHosts.Remove( key );
 	}
 
 	/// <summary>
@@ -673,9 +745,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// they had clicked it there.
 	/// </summary>
 	[Rpc.Host]
-	public void UserAct( string id, string action, string[] args )
+	public void UserAct( string id, string windowId, string action, string[] args )
 	{
-		if ( !Authorize() || GetProcess( id ) is not { App.Shared: true } || !appHosts.TryGetValue( id, out var host ) )
+		if ( !Authorize() || GetWindow( id, windowId ) is not { App.Shared: true } window || !appHosts.TryGetValue( window.Key, out var host ) )
 			return;
 
 		args ??= [];

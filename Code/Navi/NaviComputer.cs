@@ -3,11 +3,94 @@ using System.Threading.Tasks;
 namespace Sandbox;
 
 /// <summary>
-/// An app that is open in a window.
+/// An app that is running. It has the permissions it was granted, any windows it has open (<see cref="Windows"/>), and
+/// maybe an icon in the system tray (<see cref="Tray"/>). A normal app has its main window; a headless one
+/// (<see cref="NaviAppInfo.Headless"/>) starts with none.
 /// </summary>
 public sealed class NaviProcess
 {
 	public NaviAppInfo App { get; init; }
+
+	/// <summary>
+	/// The permissions the app has (<see cref="NaviPermissions"/>): what the player granted it, which the computer
+	/// remembers per app (<see cref="NaviComputer.GrantedPermissions"/>), or all it declares for a system app.
+	/// </summary>
+	public HashSet<string> Permissions { get; } = new();
+
+	/// <summary>
+	/// Full system access: every permission. Only system apps the player accepted, or that are part of the OS.
+	/// </summary>
+	public bool IsRoot { get; init; }
+
+	public bool HasPermission( string permission ) => IsRoot || Permissions.Contains( permission );
+
+	readonly List<NaviWindow> windows = new();
+
+	/// <summary>
+	/// The app's windows, in the order they were opened. For a headless app that includes its service, which isn't drawn.
+	/// </summary>
+	public IReadOnlyList<NaviWindow> Windows => windows;
+
+	internal List<NaviWindow> WindowList => windows;
+
+	/// <summary>
+	/// The windows the player can see: all but the service of a headless app.
+	/// </summary>
+	public IEnumerable<NaviWindow> DrawnWindows => windows.Where( x => !x.IsService );
+
+	/// <summary>
+	/// The window with this id (empty for the main one), or null.
+	/// </summary>
+	public NaviWindow GetWindow( string id ) => windows.FirstOrDefault( x => x.Id == (id ?? "") );
+
+	/// <summary>
+	/// Every window the player can see is minimized.
+	/// </summary>
+	public bool IsMinimized => DrawnWindows.Any() && DrawnWindows.All( x => x.IsMinimized );
+
+	/// <summary>
+	/// The app's icon in the system tray, or null. A headless app always has one, so the player can reach it.
+	/// </summary>
+	public NaviTray Tray { get; set; }
+}
+
+/// <summary>
+/// One window of a running app. Position and size are in panel pixels.
+/// </summary>
+public sealed class NaviWindow
+{
+	/// <summary>
+	/// Separates the app's id from the window's in <see cref="Key"/>. No app id contains it (<see cref="NaviAppRegistry.IdOf"/>).
+	/// </summary>
+	public const char KeySeparator = '#';
+
+	/// <summary>
+	/// The longest a window's title can be, in characters.
+	/// </summary>
+	public const int MaxTitle = 32;
+
+	/// <summary>
+	/// Names a window across the computer: the app's id for its main window, otherwise the app's id, '#', and the window's id.
+	/// </summary>
+	public static string KeyOf( string appId, string windowId ) =>
+		string.IsNullOrEmpty( windowId ) ? appId : appId + KeySeparator + windowId;
+
+	public NaviProcess Process { get; init; }
+	public NaviWindowInfo Info { get; init; }
+
+	public NaviAppInfo App => Process.App;
+
+	/// <summary>
+	/// Empty for the app's main window.
+	/// </summary>
+	public string Id => Info.Id;
+
+	public string Key => KeyOf( Process.App.Id, Id );
+
+	/// <summary>
+	/// The panel of a headless app that runs it. It has no window: it is never drawn, minimized or focused.
+	/// </summary>
+	public bool IsService => Info.Id == "" && Process.App.Headless;
 
 	/// <summary>
 	/// Window position on the screen, in panel pixels.
@@ -33,19 +116,69 @@ public sealed class NaviProcess
 	/// Stacking order. The highest is in front.
 	/// </summary>
 	public int ZIndex { get; set; }
+}
+
+/// <summary>
+/// An app's icon in the system tray, which the app sets (<c>Navi.SetTray</c>). The desktop draws it and its menu: the
+/// app's items, then Quit, which the app can't change.
+/// </summary>
+public sealed class NaviTray
+{
+	public const int MaxIcon = 32, MaxTooltip = 64, MaxLabel = 48, MaxId = 32, MaxItems = 12;
 
 	/// <summary>
-	/// The permissions the app has (<see cref="NaviPermissions"/>): what the player granted it, which the computer
-	/// remembers per app (<see cref="NaviComputer.GrantedPermissions"/>), or all it declares for a system app.
+	/// Material icon name.
 	/// </summary>
-	public HashSet<string> Permissions { get; } = new();
+	public string Icon { get; set; } = "";
 
 	/// <summary>
-	/// Full system access: every permission. Only system apps the player accepted, or that are part of the OS.
+	/// Shown after the app's name when the pointer rests on the icon.
 	/// </summary>
-	public bool IsRoot { get; init; }
+	public string Tooltip { get; set; } = "";
 
-	public bool HasPermission( string permission ) => IsRoot || Permissions.Contains( permission );
+	public IReadOnlyList<NaviTrayItem> Items { get; set; } = [];
+
+	internal bool SameAs( NaviTray other ) =>
+		Icon == other.Icon && Tooltip == other.Tooltip && Items.Count == other.Items.Count
+		&& Items.Zip( other.Items ).All( x => x.First.Id == x.Second.Id && x.First.Label == x.Second.Label && x.First.Icon == x.Second.Icon );
+
+	internal NaviTraySnapshot ToSnapshot() => new() { Icon = Icon, Tooltip = Tooltip, Items = Items.ToList() };
+
+	internal static NaviTray FromSnapshot( NaviTraySnapshot tray ) =>
+		tray is null ? null : Make( tray.Icon, tray.Tooltip, tray.Items?.Select( x => (x?.Id, x?.Label, x?.Icon) ) );
+
+	/// <summary>
+	/// A tray from what an app asked for, cut to size. Items without an id or label, or with an id that repeats, are dropped.
+	/// </summary>
+	internal static NaviTray Make( string icon, string tooltip, IEnumerable<(string Id, string Label, string Icon)> items )
+	{
+		var made = new List<NaviTrayItem>();
+
+		foreach ( var (id, label, itemIcon) in items ?? [] )
+		{
+			if ( string.IsNullOrWhiteSpace( id ) || string.IsNullOrWhiteSpace( label ) || id.Length > MaxId
+				|| made.Count >= MaxItems || made.Any( x => x.Id == id ) )
+				continue;
+
+			made.Add( new NaviTrayItem { Id = id, Label = NaviAppInfo.Cap( label, MaxLabel ), Icon = NaviAppInfo.Cap( itemIcon, MaxIcon ) } );
+		}
+
+		return new NaviTray { Icon = NaviAppInfo.Cap( icon, MaxIcon ), Tooltip = NaviAppInfo.Cap( tooltip, MaxTooltip ), Items = made };
+	}
+}
+
+/// <summary>
+/// An entry in a tray icon's menu. Choosing it gives the app's main panel its <see cref="Id"/> (<c>Navi.IsTrayClick</c>).
+/// </summary>
+public sealed class NaviTrayItem
+{
+	public string Id { get; set; }
+	public string Label { get; set; }
+
+	/// <summary>
+	/// Material icon name, or empty.
+	/// </summary>
+	public string Icon { get; set; } = "";
 }
 
 /// <summary>
@@ -466,15 +599,20 @@ public sealed partial class NaviComputer : Component
 	public IReadOnlyList<NaviPermissionRequest> PermissionRequests => permissionRequests;
 
 	/// <summary>
-	/// The visible app in front, or null.
+	/// Every window of every running app.
 	/// </summary>
-	public NaviProcess Focused => running.Where( x => !x.IsMinimized ).OrderByDescending( x => x.ZIndex ).FirstOrDefault();
+	public IEnumerable<NaviWindow> Windows => running.SelectMany( x => x.Windows );
+
+	/// <summary>
+	/// The visible window in front, or null.
+	/// </summary>
+	public NaviWindow FocusedWindow => Windows.Where( x => !x.IsService && !x.IsMinimized ).OrderByDescending( x => x.ZIndex ).FirstOrDefault();
 
 	/// <summary>
 	/// The window that has the player's input: the window in front, while someone sits at the computer. Otherwise null.
 	/// See <see cref="NaviInputCapture"/>.
 	/// </summary>
-	public NaviProcess InputCapture => HasUser ? Focused : null;
+	public NaviWindow InputCapture => HasUser ? FocusedWindow : null;
 
 	/// <summary>
 	/// Installed apps, sorted by name.
@@ -493,9 +631,19 @@ public sealed partial class NaviComputer : Component
 	public bool IsRunning( string id ) => running.Any( x => x.App.Id == id );
 
 	/// <summary>
-	/// The open window of an app, or null.
+	/// The running app, or null.
 	/// </summary>
 	public NaviProcess GetProcess( string id ) => running.FirstOrDefault( x => x.App.Id == id );
+
+	/// <summary>
+	/// A window of a running app (the main one when <paramref name="windowId"/> is empty), or null.
+	/// </summary>
+	public NaviWindow GetWindow( string id, string windowId = "" ) => GetProcess( id )?.GetWindow( windowId );
+
+	/// <summary>
+	/// The window with this key (<see cref="NaviWindow.Key"/>), or null.
+	/// </summary>
+	public NaviWindow FindWindow( string key ) => key is null ? null : Windows.FirstOrDefault( x => x.Key == key );
 
 	public bool IsPackageInstalled( string packageIdent ) => InstalledPackages?.Contains( packageIdent ) ?? false;
 
@@ -630,7 +778,10 @@ public sealed partial class NaviComputer : Component
 
 		if ( GetProcess( id ) is not null )
 		{
-			Focus( id );
+			// An app with no window to show gets the click its tray icon would.
+			if ( !FocusApp( id ) )
+				DeliverTrayClick( id, "" );
+
 			return true;
 		}
 
@@ -657,21 +808,41 @@ public sealed partial class NaviComputer : Component
 
 	void Open( NaviAppInfo app )
 	{
-		// Cascade new windows so they don't cover each other exactly.
-		var offset = (running.Count % 6) * 16f;
 		var process = new NaviProcess
 		{
 			App = app,
-			Position = new Vector2( 16f + offset, 8f + offset ),
-			ZIndex = ++topZIndex,
 			IsRoot = HasRoot( app ),
 		};
 
 		process.Permissions.UnionWith( GetPermissions( app ) );
+
+		// The main panel is the app's window, or its service if the app is headless. A headless app also gets a tray icon, so
+		// the player can find it and quit it.
+		process.WindowList.Add( NewWindow( process, app.MainWindow ) );
+		if ( app.Headless )
+			process.Tray = new NaviTray { Icon = app.Icon };
+
 		running.Add( process );
 		Version++;
 	}
 
+	NaviWindow NewWindow( NaviProcess process, NaviWindowInfo info )
+	{
+		// Cascade new windows so they don't cover each other exactly.
+		var offset = (Windows.Count() % 6) * 16f;
+
+		return new NaviWindow
+		{
+			Process = process,
+			Info = info,
+			Position = new Vector2( 16f + offset, 8f + offset ),
+			ZIndex = ++topZIndex,
+		};
+	}
+
+	/// <summary>
+	/// Close an app, and with it every window it has open.
+	/// </summary>
 	public void Close( string id )
 	{
 		if ( !IsAuthority || running.RemoveAll( x => x.App.Id == id ) == 0 )
@@ -682,6 +853,89 @@ public sealed partial class NaviComputer : Component
 			DismissPermissionRequest( request );
 
 		Version++;
+	}
+
+	/// <summary>
+	/// Open one of the windows the app's manifest lists, or bring it to the front if it is already open. An app has one of
+	/// each. Returns false if the app isn't running, has no such window, or <paramref name="windowId"/> is empty: the main
+	/// window opens with the app.
+	/// </summary>
+	public bool OpenWindow( string id, string windowId )
+	{
+		if ( !IsAuthority || string.IsNullOrEmpty( windowId ) || GetProcess( id ) is not { } process
+			|| process.App.FindWindow( windowId ) is not { } info )
+			return false;
+
+		if ( process.GetWindow( windowId ) is not null )
+		{
+			Focus( id, windowId );
+			return true;
+		}
+
+		process.WindowList.Add( NewWindow( process, info ) );
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Close a window. Closing an app's main window, or its service, closes the app (<see cref="Close"/>). Returns false if
+	/// the window isn't open.
+	/// </summary>
+	public bool CloseWindow( string id, string windowId = "" )
+	{
+		if ( !IsAuthority || GetWindow( id, windowId ) is not { } window )
+			return false;
+
+		if ( window.Id == "" )
+		{
+			Close( id );
+			return true;
+		}
+
+		window.Process.WindowList.Remove( window );
+		Version++;
+		return true;
+	}
+
+	// The system tray.
+
+	/// <summary>
+	/// The id the desktop gives the Quit item it adds to every tray menu. The app can't remove it or use the id for its own
+	/// items.
+	/// </summary>
+	public const string QuitItem = "navi.quit";
+
+	/// <summary>
+	/// Set the icon and menu of an app's tray icon. Everything is cut to size (<see cref="NaviTray"/>). Returns false if the
+	/// app isn't running.
+	/// </summary>
+	public bool SetTray( string id, string icon, string tooltip, IEnumerable<(string Id, string Label, string Icon)> items )
+	{
+		if ( !IsAuthority || GetProcess( id ) is not { } process )
+			return false;
+
+		var tray = NaviTray.Make( icon, tooltip, items?.Where( x => x.Id != QuitItem ) );
+		if ( string.IsNullOrWhiteSpace( tray.Icon ) )
+			tray.Icon = process.App.Icon;
+
+		// An app may set it every frame; only a change redraws the desktop.
+		if ( process.Tray is { } current && current.SameAs( tray ) )
+			return true;
+
+		process.Tray = tray;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Give an app's main panel the click on its tray icon (<paramref name="item"/> empty), or on one of its menu items. It
+	/// goes to this client's copy of the panel, so on a client that isn't the host an app that isn't shared hears the
+	/// click on its own copy.
+	/// </summary>
+	internal void DeliverTrayClick( string id, string item )
+	{
+		if ( appHosts.TryGetValue( NaviWindow.KeyOf( id, "" ), out var host ) )
+			host.DeliverTray( item );
 	}
 
 	/// <summary>
@@ -856,52 +1110,91 @@ public sealed partial class NaviComputer : Component
 	}
 
 	/// <summary>
-	/// Bring an app's window to the front, restoring it if it is minimized.
+	/// Bring a window to the front, restoring it if it is minimized.
 	/// </summary>
-	public void Focus( string id )
+	public void Focus( string id, string windowId = "" )
 	{
-		var process = GetProcess( id );
-		if ( !IsAuthority || process is null || process == Focused )
+		var window = GetWindow( id, windowId );
+		if ( !IsAuthority || window is null || window.IsService || window == FocusedWindow )
 			return;
 
-		process.IsMinimized = false;
-		process.ZIndex = ++topZIndex;
+		window.IsMinimized = false;
+		window.ZIndex = ++topZIndex;
 		Version++;
 	}
 
 	/// <summary>
-	/// Hide an app's window. Returns false if the app doesn't allow it.
+	/// Bring all of an app's windows to the front, restoring the minimized ones, in the order they were stacked. Returns
+	/// false if the app has no window to show.
 	/// </summary>
-	public bool Minimize( string id )
+	public bool FocusApp( string id )
 	{
-		var process = GetProcess( id );
-		if ( !IsAuthority || process is null || process.IsMinimized || !process.App.CanMinimize )
+		if ( !IsAuthority || GetProcess( id ) is not { } process )
 			return false;
 
-		process.IsMinimized = true;
+		var windows = process.DrawnWindows.OrderBy( x => x.ZIndex ).ToList();
+		if ( windows.Count == 0 )
+			return false;
+
+		foreach ( var window in windows )
+		{
+			window.IsMinimized = false;
+			window.ZIndex = ++topZIndex;
+		}
+
 		Version++;
 		return true;
 	}
 
 	/// <summary>
-	/// Maximize or restore an app's window. Returns false if the app doesn't allow it.
+	/// Hide a window. Returns false if the app doesn't allow it.
 	/// </summary>
-	public bool SetMaximized( string id, bool maximized )
+	public bool Minimize( string id, string windowId = "" )
 	{
-		var process = GetProcess( id );
-		if ( !IsAuthority || process is null || !process.App.CanMaximize )
+		var window = GetWindow( id, windowId );
+		if ( !IsAuthority || window is null || window.IsService || window.IsMinimized || !window.Info.CanMinimize )
 			return false;
 
-		Focus( id );
+		window.IsMinimized = true;
+		Version++;
+		return true;
+	}
 
-		if ( process.IsMaximized != maximized )
+	/// <summary>
+	/// Hide all of an app's windows that allow it. Returns false if none did.
+	/// </summary>
+	public bool MinimizeApp( string id )
+	{
+		if ( !IsAuthority || GetProcess( id ) is not { } process )
+			return false;
+
+		var any = false;
+		foreach ( var window in process.DrawnWindows.ToList() )
+			any |= Minimize( id, window.Id );
+
+		return any;
+	}
+
+	/// <summary>
+	/// Maximize or restore a window. Returns false if the app doesn't allow it.
+	/// </summary>
+	public bool SetMaximized( string id, bool maximized, string windowId = "" )
+	{
+		var window = GetWindow( id, windowId );
+		if ( !IsAuthority || window is null || window.IsService || !window.Info.CanMaximize )
+			return false;
+
+		Focus( id, windowId );
+
+		if ( window.IsMaximized != maximized )
 		{
-			process.IsMaximized = maximized;
+			window.IsMaximized = maximized;
 			Version++;
 		}
 
 		return true;
 	}
 
-	public bool ToggleMaximized( string id ) => GetProcess( id ) is { } process && SetMaximized( id, !process.IsMaximized );
+	public bool ToggleMaximized( string id, string windowId = "" ) =>
+		GetWindow( id, windowId ) is { } window && SetMaximized( id, !window.IsMaximized, windowId );
 }

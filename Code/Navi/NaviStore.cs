@@ -93,7 +93,7 @@ public static class NaviStore
 	public static bool IsDownloaded( NaviAppResource resource ) => PackageOf( resource ) is not null;
 
 	/// <summary>
-	/// The ident of the Store package this app was downloaded from, e.g. "fractitude.napp_counter", or null if it
+	/// The ident of the Store package this app was downloaded from, e.g. "fractitude.napp_pacman", or null if it
 	/// wasn't.
 	/// </summary>
 	public static string PackageOf( NaviAppResource resource ) =>

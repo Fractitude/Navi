@@ -10,7 +10,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Parts
 
-- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector), the open windows and the permissions granted to apps. Gameplay code can call `Install`, `Uninstall`, `Launch` and `Close` with an app id (see "App ids").
+- `NaviComputer` (component) is the OS. It holds the installed apps (`InstalledApps`, editable in the inspector), the running apps with their windows and tray icons, and the permissions granted to apps. Gameplay code can call `Install`, `Uninstall`, `Launch` and `Close` with an app id (see "App ids").
 - `NaviDesktop` (panel component) draws the desktop, windows, taskbar and permission dialogs. It adds a `NaviComputer` to its GameObject if there is none.
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
@@ -25,6 +25,9 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - Minimize hides the window and keeps the app running. Click the taskbar icon to bring it back. Clicking the icon of the window in front minimizes it.
 - Right-click a taskbar icon for its menu: Open, Permissions..., Close.
 - A shield in a window's title bar means the app has full system access (root). Nothing else shows it.
+- An app can have more than one window, and a headless app has none at first, only an icon in the system tray. See "Headless apps and more windows".
+- A title bar always starts with the app's name; a window's own title (if the manifest gives one) comes after it.
+- Clicking the taskbar icon of an app with several windows minimizes or restores all of them. Closing an app's main window closes the app and its other windows.
 
 ## Make an app
 
@@ -91,6 +94,8 @@ The full contract — where each kind of rule goes, async and threads, the optio
 | `Icon` | Material icon name, e.g. `calculate`. |
 | `Color` | Icon background, as a CSS color. |
 | `PanelType` | Full name of the app's panel class. |
+| `Headless` | The app starts with no window, in the system tray. `PanelType` is then its service: a panel that runs while the app does and is never drawn. See "Headless apps and more windows". Default `false`. |
+| `Windows` | More windows the app can open, each with an `Id`, an optional `Title`, a `PanelType` and its own `CanMinimize` / `CanMaximize` / `CanResize`. |
 | `CanMinimize` | Has a minimize button. Default `true`. |
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
@@ -102,10 +107,68 @@ The full contract — where each kind of rule goes, async and threads, the optio
 
 The manifest doesn't choose its app's id. Navi derives it (`NaviAppRegistry.IdOf`):
 
-- **A Store app's id is its package ident**, e.g. `fractitude.napp_counter`. sbox.game keeps idents unique, and only the package's org can publish under one.
+- **A Store app's id is its package ident**, e.g. `fractitude.napp_pacman`. sbox.game keeps idents unique, and only the package's org can publish under one.
 - **Any other app's id is its manifest's resource path**, e.g. `navi/apps/packages.napp` (`NaviAppRegistry.PackagesApp`). This includes an addon's app while you test it in the editor.
 
 Ids are saved in `InstalledApps` and the other lists of granted rights, so don't move or rename a manifest once it is used. A path with spaces isn't an id, and its app isn't listed. Idents have no `/` and paths always do, so a Store app can never get the id of another app.
+
+## Headless apps and more windows
+
+An app is not the same thing as a window. A running app (`NaviProcess`) has any number of windows (`NaviWindow`) and may have an icon in the system tray (`NaviTray`).
+
+**More windows.** List them in the manifest under `Windows`, each with a panel class from the app's own code, and open them from the app with `Navi.OpenWindow( this, "settings" )`. An app has at most one window of each id, so opening one that is open brings it to the front. The panels are separate instances: they share state through the app's own code (a static class or service), not through Navi. An app can only open windows its manifest lists, and it needs no permission to.
+
+**Headless.** With `Headless` in the manifest the app's `PanelType` is a service. It is created when the app starts and kept in a hidden layer of the desktop where it keeps ticking, and no window is made for it. It sets its tray icon and menu, and opens windows when asked:
+
+```razor
+@using Sandbox.UI
+@inherits Panel
+@namespace SyncApp
+
+<root></root>
+
+@code
+{
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !started )
+		{
+			started = true;
+			_ = Navi.SetTray( this, "cloud_sync", "Up to date",
+				new Navi.TrayItem( "settings", "Settings...", "settings" ),
+				new Navi.TrayItem( "sync", "Sync now", "sync" ) );
+		}
+	}
+
+	bool started;
+
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsTrayClick( e, out var item ) )
+		{
+			if ( item is "settings" or Navi.TrayPrimary )
+				_ = Navi.OpenWindow( this, "settings" );
+			else if ( item == "sync" )
+				StartSync();
+
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+}
+```
+
+- **The tray is drawn by the desktop**, at the right end of the taskbar. Right-click opens the menu: the app's items (up to 12), then **Quit**, which the app can't remove or rename. Quit closes the app with all its windows. The tooltip and the menu heading start with the app's name, so an app can't pass for another one. Texts are cut to size (`NaviTray`).
+- **Left-click** gives the app `Navi.TrayPrimary`. Opening an app from the taskbar when it is already running without a window gives it the same click.
+- **A headless app has a tray icon from the start** (its manifest icon), so the player can always see and quit it. A normal app may set one too.
+- **Where a click goes.** A tray click reaches the app's main panel only (the service, for a headless app). In multiplayer a `Shared` app hears it on the host's copy; one that isn't shared hears it on the clicking player's own copy, like every other click in it.
+- **Closing.** `Navi.Close( this )` from the service quits the app. Closing a secondary window only closes it.
+- **Shared apps** publish per window: each window's panel calls `Navi.Publish` and draws `Navi.GetState` for itself, and `Navi.Act` reaches the host's copy of the same window. State, scrolling and actions are kept by window key (`NaviWindow.Key`: the app's id, then `#` and the window id for the others). App ids can't contain `#`.
+- **Not a security boundary.** Window panel classes, like the main one, come from the app's code, and the host can name any panel class in a client's code (see "Multiplayer", last bullet).
 
 ## Talking to the computer
 
@@ -113,7 +176,10 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 
 | Call | Does | Needs |
 |---|---|---|
-| `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The app's own window | |
+| `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The window the panel is in. Closing the main window closes the app | |
+| `Navi.OpenWindow( this, id )`, `CloseWindow` | Open or close one of the windows the manifest lists | |
+| `Navi.SetTray( this, icon, tooltip, items )` | Set the app's tray icon and menu | |
+| `Navi.IsTrayClick( e, out id )` | In `OnEvent`: the player clicked the tray icon (`Navi.TrayPrimary`) or a menu item | |
 | `Navi.HasInput( this )` | True while the app has the player's controls (not async) | |
 | `Navi.GetApps( this )` | Every app, with installed and system flags | |
 | `Navi.GetStoreApps( this )` | Ids of the apps that came from the Store | |
@@ -131,7 +197,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 
 ## Saving
 
-Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, and settings such as the display scale. Open windows aren't saved. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, and settings such as the display scale. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
 
 - **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.
 - **One file per computer.** `SaveId` names the file. Left empty, it is the GameObject's id, which stays the same for an object saved in a scene. Set it on computers that are spawned at runtime.
@@ -193,7 +259,7 @@ Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for 
 
 ## Publish an app to the Store (players)
 
-Players make apps in their own addon project and publish them to sbox.game. Other players install them from the Store tab in Packages, in any game that has the Navi library. In the Omnipresence repo, `Addons/navi_counter/` is an example: a counter with - and + buttons.
+Players make apps in their own addon project and publish them to sbox.game. Other players install them from the Store tab in Packages, in any game that has the Navi library. In the Omnipresence repo, `Addons/navi_pacman/` is an example: a Pac-Man game.
 
 **Don't install the Navi library in an app addon.** When an addon asset is published with code, s&box bundles every library in the addon project, and a bundled Navi would replace the host game's Navi when the app is installed. That's why apps use no Navi types: copy `Code/Navi/Client/Navi.cs` into the addon's `Code/` and change only its namespace line. The `.napp` asset type comes from the target game, which already has Navi.
 
@@ -201,7 +267,7 @@ Players make apps in their own addon project and publish them to sbox.game. Othe
 2. In Project Settings, set Target Game to a game that has the Navi library, e.g. `fractitude.omnipresence`. Restart the editor.
 3. Copy the `Navi` client in, if the app calls the computer. Write the app as in "Make an app".
 4. Press Play to test. Code changes hot-reload. Friends who join your editor session get the changes too.
-5. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_counter`.
+5. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_pacman`.
 
 How the Store works:
 

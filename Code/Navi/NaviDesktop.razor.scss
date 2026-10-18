@@ -309,6 +309,125 @@ NaviDesktop
 	}
 }
 
+// The system tray, at the right end of the taskbar.
+.tray
+{
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+	flex-shrink: 0;
+}
+
+.tray-icon
+{
+	position: relative;
+	width: 26px;
+	height: 26px;
+	justify-content: center;
+	align-items: center;
+	font-size: 16px;
+	color: #2a2840;
+	background-color: #dcd6c4;
+	border: 2px solid #8a8472;
+	pointer-events: all;
+	cursor: pointer;
+
+	&:hover
+	{
+		border-color: #f2eee2;
+
+		.tooltip
+		{
+			opacity: 1;
+		}
+	}
+
+	&.menu-open .tooltip
+	{
+		display: none;
+	}
+
+	.tooltip
+	{
+		position: absolute;
+		bottom: 38px;
+		right: 0;
+		opacity: 0;
+		pointer-events: none;
+		padding: 3px 6px;
+		font-size: 12px;
+		color: #f2eee2;
+		background-color: #2a2840;
+		border: 1px solid #f2eee2;
+		white-space: nowrap;
+	}
+
+	// Right-click menu, above the icon. The heading is the app's name, which the desktop writes.
+	.menu
+	{
+		position: absolute;
+		bottom: 38px;
+		right: 0;
+		flex-direction: column;
+		padding: 2px;
+		color: #2a2840;
+		background-color: #dcd6c4;
+		border: 2px solid #2a2840;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+		z-index: 100;
+
+		.heading
+		{
+			padding: 3px 8px;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 1px;
+			color: #dcd6c4;
+			background-color: #6e6a5c;
+			white-space: nowrap;
+		}
+
+		.item
+		{
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+			padding: 4px 8px;
+			font-size: 12px;
+			font-weight: 700;
+			white-space: nowrap;
+			cursor: pointer;
+
+			i
+			{
+				font-size: 14px;
+			}
+
+			&:hover
+			{
+				color: #f2eee2;
+				background-color: #2a2840;
+			}
+
+			&.quit:hover
+			{
+				background-color: #a0403a;
+			}
+		}
+	}
+}
+
+// Where headless apps' panels run. No size and nothing drawn, but still in the tree, so they tick.
+.services
+{
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
 // Under an open taskbar menu, to close it on a click anywhere else.
 .menu-backdrop
 {

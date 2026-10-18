@@ -3,6 +3,49 @@ using Sandbox.UI;
 namespace Sandbox;
 
 /// <summary>
+/// A window an app can have: its main one (<see cref="Id"/> empty), or one of the others its manifest lists.
+/// </summary>
+public sealed class NaviWindowInfo
+{
+	/// <summary>
+	/// Empty for the app's main window, otherwise the id its manifest gave.
+	/// </summary>
+	public string Id { get; init; } = "";
+
+	/// <summary>
+	/// Shown after the app's name in the title bar, or empty.
+	/// </summary>
+	public string Title { get; init; } = "";
+
+	public bool CanMinimize { get; init; }
+	public bool CanMaximize { get; init; }
+	public bool CanResize { get; init; }
+
+	public TypeDescription PanelType { get; init; }
+
+	/// <summary>
+	/// Create a new instance of the window's panel.
+	/// </summary>
+	public Panel Create() => PanelType.Create<Panel>();
+
+	/// <summary>
+	/// 1 to 32 lowercase letters, digits, '-' or '_'. Keeps a window's key (<see cref="NaviWindow.KeyOf"/>) unambiguous.
+	/// </summary>
+	public static bool IsValidId( string id ) =>
+		id is { Length: >= 1 and <= 32 } && id.All( x => x is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_' );
+
+	internal NaviWindowDefinitionSnapshot ToSnapshot() => new()
+	{
+		Id = Id,
+		Title = Title,
+		CanMinimize = CanMinimize,
+		CanMaximize = CanMaximize,
+		CanResize = CanResize,
+		PanelType = PanelType.FullName,
+	};
+}
+
+/// <summary>
 /// An app that exists in the game and can be installed, from a loaded <see cref="NaviAppResource"/>.
 /// </summary>
 public sealed class NaviAppInfo
@@ -15,6 +58,16 @@ public sealed class NaviAppInfo
 	public bool CanMinimize { get; init; }
 	public bool CanMaximize { get; init; }
 	public bool CanResize { get; init; }
+
+	/// <summary>
+	/// Starts without a window, in the system tray. See <see cref="NaviAppResource.Headless"/>.
+	/// </summary>
+	public bool Headless { get; init; }
+
+	/// <summary>
+	/// The windows the app can open besides its main one. Empty for most apps.
+	/// </summary>
+	public IReadOnlyList<NaviWindowInfo> Windows { get; init; } = [];
 
 	/// <summary>
 	/// Runs on the host, and other clients draw what it publishes. See <see cref="NaviAppResource.Shared"/>.
@@ -48,12 +101,32 @@ public sealed class NaviAppInfo
 	public TypeDescription PanelType { get; init; }
 
 	/// <summary>
+	/// The app's main window: the one <see cref="PanelType"/> draws. For a headless app it is never drawn, and its panel is
+	/// the app's service.
+	/// </summary>
+	public NaviWindowInfo MainWindow => mainWindow ??= new()
+	{
+		CanMinimize = CanMinimize,
+		CanMaximize = CanMaximize,
+		CanResize = CanResize,
+		PanelType = PanelType,
+	};
+
+	NaviWindowInfo mainWindow;
+
+	/// <summary>
+	/// The window with this id (empty for the main one), or null if the app has no such window.
+	/// </summary>
+	public NaviWindowInfo FindWindow( string id ) =>
+		string.IsNullOrEmpty( id ) ? MainWindow : Windows.FirstOrDefault( x => x.Id == id );
+
+	/// <summary>
 	/// The resource that defines this app.
 	/// </summary>
 	public NaviAppResource Resource { get; init; }
 
 	/// <summary>
-	/// Create a new instance of the app's panel.
+	/// Create a new instance of the app's main panel.
 	/// </summary>
 	public Panel Create() => PanelType.Create<Panel>();
 
@@ -71,6 +144,8 @@ public sealed class NaviAppInfo
 			CanMinimize = resource.CanMinimize,
 			CanMaximize = resource.CanMaximize,
 			CanResize = resource.CanResize,
+			Headless = resource.Headless,
+			Windows = ReadWindows( resource.Windows?.Select( x => (x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true) ) ),
 			Shared = resource.Shared,
 			IsPrepackaged = prepackaged,
 			IsSystem = resource.IsSystem,
@@ -79,6 +154,35 @@ public sealed class NaviAppInfo
 			Resource = resource,
 		};
 	}
+
+	/// <summary>
+	/// The windows a manifest lists. One with a bad or repeated id, or a panel class that isn't loaded, is left out.
+	/// </summary>
+	static NaviWindowInfo[] ReadWindows( IEnumerable<(string Id, string Title, string PanelType, bool CanMinimize, bool CanMaximize, bool CanResize)> windows )
+	{
+		var found = new List<NaviWindowInfo>();
+
+		foreach ( var window in windows ?? [] )
+		{
+			if ( !NaviWindowInfo.IsValidId( window.Id ) || found.Any( x => x.Id == window.Id ) || NaviAppResource.FindPanelType( window.PanelType ) is not { } panel )
+				continue;
+
+			found.Add( new NaviWindowInfo
+			{
+				Id = window.Id,
+				Title = Cap( window.Title, NaviWindow.MaxTitle ),
+				CanMinimize = window.CanMinimize,
+				CanMaximize = window.CanMaximize,
+				CanResize = window.CanResize,
+				PanelType = panel,
+			} );
+		}
+
+		return found.ToArray();
+	}
+
+	internal static string Cap( string text, int length ) =>
+		text is null ? "" : text.Length > length ? text[..length] : text;
 
 	internal NaviAppSnapshot ToSnapshot() => new()
 	{
@@ -90,6 +194,8 @@ public sealed class NaviAppInfo
 		CanMinimize = CanMinimize,
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
+		Headless = Headless,
+		Windows = Windows.Select( x => x.ToSnapshot() ).ToList(),
 		Shared = Shared,
 		IsPrepackaged = IsPrepackaged,
 		IsSystem = IsSystem,
@@ -103,7 +209,7 @@ public sealed class NaviAppInfo
 	/// </summary>
 	internal static NaviAppInfo FromSnapshot( NaviAppSnapshot app )
 	{
-		if ( string.IsNullOrEmpty( app?.Id ) || app.Id.Any( char.IsWhiteSpace ) || NaviStore.NormalizeIdent( app.Id ) is not null )
+		if ( string.IsNullOrEmpty( app?.Id ) || app.Id.Any( x => char.IsWhiteSpace( x ) || x == NaviWindow.KeySeparator ) || NaviStore.NormalizeIdent( app.Id ) is not null )
 			return null;
 
 		var panelType = TypeLibrary.GetTypes<Panel>().FirstOrDefault( x => !x.IsAbstract && x.FullName == app.PanelType );
@@ -120,6 +226,8 @@ public sealed class NaviAppInfo
 			CanMinimize = app.CanMinimize,
 			CanMaximize = app.CanMaximize,
 			CanResize = app.CanResize,
+			Headless = app.Headless,
+			Windows = ReadWindows( app.Windows?.Select( x => (x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true) ) ),
 			Shared = app.Shared,
 			IsPrepackaged = app.IsPrepackaged,
 			IsSystem = app.IsSystem,
@@ -193,7 +301,8 @@ public static class NaviAppRegistry
 	/// from, e.g. "fractitude.napp_counter": unique on sbox.game, and only the package's org can publish under it. Any
 	/// other app's is its resource path, e.g. "navi/apps/packages.napp", so moving or renaming the manifest changes
 	/// it. Idents have no '/' and paths do, so the two can't meet. Null for a path with whitespace, which can't be an
-	/// id because <see cref="NaviComputer.GrantedPermissions"/> separates the id from the permission with a space.
+	/// id because <see cref="NaviComputer.GrantedPermissions"/> separates the id from the permission with a space, nor
+	/// for one with a '#', which <see cref="NaviWindow.KeyOf"/> separates the id from a window's id with.
 	/// </summary>
 	public static string IdOf( NaviAppResource resource )
 	{
@@ -201,7 +310,7 @@ public static class NaviAppRegistry
 			return ident;
 
 		var path = resource?.ResourcePath?.Replace( '\\', '/' ).TrimStart( '/' ).ToLowerInvariant();
-		if ( string.IsNullOrEmpty( path ) || path.Any( char.IsWhiteSpace ) )
+		if ( string.IsNullOrEmpty( path ) || path.Any( x => char.IsWhiteSpace( x ) || x == NaviWindow.KeySeparator ) )
 			return null;
 
 		return path;

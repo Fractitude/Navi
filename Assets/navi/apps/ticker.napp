@@ -1,0 +1,26 @@
+{
+  "Title": "Ticker",
+  "Description": "Demo of a headless app: counts seconds from the system tray, shared by all players.",
+  "Icon": "timer",
+  "Color": "#7aa0c4",
+  "PanelType": "NaviApps.TickerService",
+  "Headless": true,
+  "Windows": [
+    {
+      "Id": "log",
+      "Title": "Count",
+      "PanelType": "NaviApps.TickerWindow",
+      "CanMinimize": true,
+      "CanMaximize": false,
+      "CanResize": false
+    }
+  ],
+  "CanMinimize": true,
+  "CanMaximize": false,
+  "CanResize": false,
+  "Shared": true,
+  "Permissions": [],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

@@ -1,0 +1,15 @@
+{
+  "Title": "Counter",
+  "Description": "Count up and down.",
+  "Icon": "exposure",
+  "Color": "#c0d890",
+  "PanelType": "NaviApps.Counter",
+  "CanMinimize": true,
+  "CanMaximize": false,
+  "CanResize": false,
+  "Shared": true,
+  "Permissions": [],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

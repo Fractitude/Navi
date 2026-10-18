@@ -1,0 +1,49 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* The Ticker demo's extra window ("log" in its .napp). The app is shared: the host's copy publishes the count, and *@
+@* everyone's copy draws it. Reset is an action the host's copy runs. *@
+
+<root>
+	<div class="count">@UiState.Seconds s</div>
+	<div class="button" @onclick=@( () => Navi.Act( this, ResetAction ) )>Reset</div>
+</root>
+
+@code
+{
+	const string ResetAction = "reset";
+
+	TickerUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<TickerUiState>( this ) ?? TickerUiState.Empty : hostState;
+
+	TickerUiState hostState = TickerUiState.Empty;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( Navi.IsViewer( this ) )
+			return;
+
+		if ( hostState.Seconds != TickerState.Seconds )
+			hostState = new TickerUiState { Seconds = TickerState.Seconds };
+
+		Navi.Publish( this, hostState );
+	}
+
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsAction( e, out var action, out _ ) )
+		{
+			if ( action == ResetAction )
+				TickerState.Seconds = 0;
+
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+
+	protected override int BuildHash() => UiState.Seconds;
+}

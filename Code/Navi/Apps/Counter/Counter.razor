@@ -1,0 +1,48 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* A built-in Navi app, like any other: a plain panel, described by Assets/navi/apps/counter.napp. It talks to the computer *@
+@* through the Navi client. *@
+@* It is shared: in multiplayer the host's copy counts, and every player sees its count. *@
+
+<root>
+	<div class="count">@UiState.Count</div>
+
+	<div class="buttons">
+		<div class="button" @onclick=@( () => Navi.Act( this, CounterViewModel.DecrementAction ) )>−</div>
+		<div class="button" @onclick=@( () => Navi.Act( this, CounterViewModel.IncrementAction ) )>+</div>
+	</div>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state, in the host's copy only.
+	/// </summary>
+	CounterViewModel ViewModel => field ??= new();
+
+	CounterUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<CounterUiState>( this ) ?? CounterUiState.Empty : ViewModel.UiState;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !Navi.IsViewer( this ) )
+			Navi.Publish( this, ViewModel.UiState );
+	}
+
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsAction( e, out var action, out var args ) )
+		{
+			ViewModel.Act( action, args );
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+
+	protected override int BuildHash() => UiState.Revision;
+}

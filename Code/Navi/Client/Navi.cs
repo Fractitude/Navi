@@ -56,8 +56,12 @@ public static class Navi
 
 	static async Task<T> Call<T>( Panel app, string method, params object[] args ) => (T)await Call( app, method, args );
 
-	// The app's own window.
+	// The window the panel is in.
 
+	/// <summary>
+	/// Close the window this panel is in. Closing an app's main window closes the app and all its windows. Called from a
+	/// headless app's service panel it quits the app.
+	/// </summary>
 	public static Task Close( Panel app ) => Call( app, "window.close" );
 
 	public static Task<bool> Minimize( Panel app ) => Call<bool>( app, "window.minimize" );
@@ -66,6 +70,58 @@ public static class Navi
 	/// Maximize the window, or restore it if it is maximized. False if the app doesn't allow maximizing.
 	/// </summary>
 	public static Task<bool> ToggleMaximize( Panel app ) => Call<bool>( app, "window.maximize" );
+
+	// More windows, and the system tray. An app can open the windows its .napp lists under Windows, one of each, and a
+	// headless app (Headless in the .napp) starts with none: its main panel is a service that is never drawn and runs until
+	// the player quits it from its tray menu. Call these from the main panel, or the service.
+
+	/// <summary>
+	/// Open one of the windows the .napp lists, by its id, or bring it to the front if it is open. False if the app has no
+	/// such window. Needs no permission: an app can only open what its manifest says.
+	/// </summary>
+	public static Task<bool> OpenWindow( Panel app, string windowId ) => Call<bool>( app, "window.open", windowId );
+
+	/// <summary>
+	/// Close one of the app's other windows, by its id.
+	/// </summary>
+	public static Task CloseWindow( Panel app, string windowId ) => Call( app, "window.close-other", windowId );
+
+	/// <summary>
+	/// An entry in the tray menu: <paramref name="Id"/> comes back with <see cref="IsTrayClick"/>, <paramref name="Label"/> is
+	/// what the player reads, <paramref name="Icon"/> is a Material icon name or empty. Ids are up to 32 characters, labels
+	/// up to 48, and a menu holds 12.
+	/// </summary>
+	public readonly record struct TrayItem( string Id, string Label, string Icon = "" );
+
+	/// <summary>
+	/// Set this app's icon in the system tray: a Material icon name (empty uses the app's own), a tooltip, and the menu items
+	/// shown on a right-click. The desktop puts the app's name before the tooltip and adds Quit after the items, so an app can
+	/// neither pass for another nor stay when the player wants it gone. A headless app has an icon from the start.
+	/// </summary>
+	public static Task SetTray( Panel app, string icon, string tooltip, params TrayItem[] items ) =>
+		Call( app, "tray.set", icon, tooltip, items.Select( x => (x.Id, x.Label, x.Icon ?? "") ).ToArray() );
+
+	/// <summary>
+	/// The id of the tray item the player chose, or <see cref="TrayPrimary"/> when they clicked the icon itself. Call it from
+	/// the main panel's OnEvent.
+	/// </summary>
+	public static bool IsTrayClick( PanelEvent e, out string id )
+	{
+		if ( e.Name == "navi.tray" && e.Value is string item )
+		{
+			id = item;
+			return true;
+		}
+
+		id = null;
+		return false;
+	}
+
+	/// <summary>
+	/// The id <see cref="IsTrayClick"/> gives for a click on the tray icon itself. Opening a headless app that is already
+	/// running from the taskbar gives it too.
+	/// </summary>
+	public const string TrayPrimary = "";
 
 	/// <summary>
 	/// True while the app's window has the player's controls (it is in front while the player sits at the computer). Pause when it doesn't.

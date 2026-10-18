@@ -310,6 +310,29 @@ protected override void OnEvent( PanelEvent e )
 An action is what the player could have clicked, not data to trust: the host checks only that it came from the
 computer's user. Whatever the action does still goes through the computer's permissions, as the click always did.
 
+## Several windows, and headless apps
+
+Each window is a separate panel, so a window has its own `ViewModel` and `UiState` like any app. An app with more than one window (`Windows` in its manifest) or a service (`Headless`) has to decide where the state that the windows have in common lives. Two rules:
+
+- **One owner for state they share.** Put it in a plain class the app's code owns (a static or a singleton held by the service panel's view model), and let each window's view model read it. Don't pass it through Navi, and don't have one window reach into another's panel: the panels are separate instances and a viewer's copy has nothing of the host's.
+- **The service is the app, the windows are views.** For a headless app, the service panel's view model does the work (timers, downloads, the tray menu) and the window panels only draw its state and call its methods. A window can then be closed and reopened without losing anything, which is the point of headless.
+
+The service's view model is made like any other: `new( this )` on first use. It makes the tray menu with `Navi.SetTray` and reacts to the player's tray clicks, which arrive in the panel's `OnEvent` as `Navi.IsTrayClick`, as a method call on the view model, one case per menu item, in the same way a shared app turns an action into a call.
+
+```csharp
+public void TrayClicked( string item )
+{
+	switch ( item )
+	{
+		case Navi.TrayPrimary:
+		case "settings": _ = Navi.OpenWindow( app, "settings" ); break;
+		case "sync": StartSync(); break;
+	}
+}
+```
+
+Tray items change what the app shows, so keep them like any other state: build the list from `UiState` and call `Navi.SetTray` when it changes, not every tick.
+
 ## If you come from Kotlin
 
 - `record` ≈ `data class`: `equals`/`hashCode`/`toString` by value, `with` ≈ `copy( x = … )`. A

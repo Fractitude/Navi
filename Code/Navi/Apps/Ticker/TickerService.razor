@@ -1,0 +1,54 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* Demo of a headless, shared app (Assets/navi/apps/ticker.napp): this panel is its service. It is never drawn. On the *@
+@* host it counts seconds, keeps the tray tooltip up to date, and opens the "log" window from the tray. Other players' *@
+@* copies are viewers and do nothing; the window shows them the host's count. *@
+
+<root></root>
+
+@code
+{
+	RealTimeSince sinceSecond;
+	int shownSeconds = -1;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( Navi.IsViewer( this ) )
+			return;
+
+		if ( sinceSecond >= 1f )
+		{
+			sinceSecond = 0;
+			TickerState.Seconds++;
+		}
+
+		// SetTray only redraws the desktop when something changed, but there is no need to ask every frame.
+		if ( shownSeconds != TickerState.Seconds )
+		{
+			shownSeconds = TickerState.Seconds;
+			_ = Navi.SetTray( this, "timer", $"{shownSeconds} s",
+				new Navi.TrayItem( "open", "Show count", "visibility" ),
+				new Navi.TrayItem( "reset", "Reset", "restart_alt" ) );
+		}
+	}
+
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsTrayClick( e, out var item ) )
+		{
+			if ( item == "reset" )
+				TickerState.Seconds = 0;
+			else
+				_ = Navi.OpenWindow( this, "log" );
+
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+}

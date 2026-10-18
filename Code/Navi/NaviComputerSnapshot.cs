@@ -19,7 +19,10 @@ public sealed class NaviComputerSnapshot
 	/// </summary>
 	public List<NaviAppSnapshot> Apps { get; set; } = new();
 
-	public List<NaviWindowSnapshot> Windows { get; set; } = new();
+	/// <summary>
+	/// The running apps, and their windows.
+	/// </summary>
+	public NaviLayoutSnapshot Layout { get; set; } = new();
 
 	/// <summary>
 	/// Open permission requests, oldest first.
@@ -61,6 +64,8 @@ public sealed class NaviAppSnapshot
 	public bool CanMinimize { get; set; }
 	public bool CanMaximize { get; set; }
 	public bool CanResize { get; set; }
+	public bool Headless { get; set; }
+	public List<NaviWindowDefinitionSnapshot> Windows { get; set; } = new();
 	public bool Shared { get; set; }
 	public bool IsPrepackaged { get; set; }
 	public bool IsSystem { get; set; }
@@ -69,18 +74,66 @@ public sealed class NaviAppSnapshot
 }
 
 /// <summary>
-/// An open window, as in <see cref="NaviProcess"/>.
+/// A window an app can open, as in <see cref="NaviWindowInfo"/>, with its panel class by name.
+/// </summary>
+public sealed class NaviWindowDefinitionSnapshot
+{
+	public string Id { get; set; }
+	public string Title { get; set; }
+	public bool CanMinimize { get; set; }
+	public bool CanMaximize { get; set; }
+	public bool CanResize { get; set; }
+	public string PanelType { get; set; }
+}
+
+/// <summary>
+/// The part of <see cref="NaviComputerSnapshot"/> sent in <see cref="NaviComputer.NetworkWindows"/>: what is running, and
+/// where its windows are. It changes whenever a window moves.
+/// </summary>
+public sealed class NaviLayoutSnapshot
+{
+	public List<NaviProcessSnapshot> Processes { get; set; } = new();
+	public List<NaviWindowSnapshot> Windows { get; set; } = new();
+}
+
+/// <summary>
+/// A running app, as in <see cref="NaviProcess"/>.
+/// </summary>
+public sealed class NaviProcessSnapshot
+{
+	public string AppId { get; set; }
+	public bool IsRoot { get; set; }
+	public List<string> Permissions { get; set; } = new();
+	public NaviTraySnapshot Tray { get; set; }
+}
+
+/// <summary>
+/// An app's tray icon, as in <see cref="NaviTray"/>.
+/// </summary>
+public sealed class NaviTraySnapshot
+{
+	public string Icon { get; set; }
+	public string Tooltip { get; set; }
+	public List<NaviTrayItem> Items { get; set; } = new();
+}
+
+/// <summary>
+/// An open window, as in <see cref="NaviWindow"/>.
 /// </summary>
 public sealed class NaviWindowSnapshot
 {
 	public string AppId { get; set; }
+
+	/// <summary>
+	/// Empty for the app's main window.
+	/// </summary>
+	public string WindowId { get; set; } = "";
+
 	public Vector2 Position { get; set; }
 	public Vector2? Size { get; set; }
 	public bool IsMinimized { get; set; }
 	public bool IsMaximized { get; set; }
 	public int ZIndex { get; set; }
-	public bool IsRoot { get; set; }
-	public List<string> Permissions { get; set; } = new();
 }
 
 /// <summary>

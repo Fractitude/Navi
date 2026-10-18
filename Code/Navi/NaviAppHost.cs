@@ -37,19 +37,30 @@ public static class NaviEvents
 	/// An action for the host's copy of a shared app, raised on the app's panel. See <c>Navi.IsAction</c>.
 	/// </summary>
 	public const string Action = "navi.action";
+
+	/// <summary>
+	/// The player clicked the app's tray icon or one of its menu items, raised on the app's main panel. See
+	/// <c>Navi.IsTrayClick</c>.
+	/// </summary>
+	public const string Tray = "navi.tray";
 }
 
 /// <summary>
-/// Window body. Creates the panel of the app in <see cref="Process"/> and keeps it as its only child, and answers the
-/// calls the app makes to the computer. Razor can't create a panel whose type is only known at runtime, so this does it in code.
+/// Window body. Creates the panel of <see cref="Window"/> and keeps it as its only child, and answers the calls the app makes
+/// to the computer. Razor can't create a panel whose type is only known at runtime, so this does it in code. A headless
+/// app's service has one too, in the desktop's hidden layer instead of a window.
 /// </summary>
 public sealed class NaviAppHost : Panel
 {
 	public NaviComputer Computer { get; set; }
-	public NaviProcess Process { get; set; }
+	public NaviWindow Window { get; set; }
 
 	Panel app;
-	string appId;
+
+	/// <summary>
+	/// <see cref="NaviWindow.Key"/> of the window the panel was made for.
+	/// </summary>
+	string windowKey;
 
 	/// <summary>
 	/// The app is shared and this client isn't the host, so its copy only draws (<c>Navi.IsViewer</c>).
@@ -60,7 +71,7 @@ public sealed class NaviAppHost : Panel
 	string lastPublished;
 	string lastState;
 
-	bool IsShared => Process?.App.Shared ?? false;
+	bool IsShared => Window?.App.Shared ?? false;
 
 	public override void Tick()
 	{
@@ -69,22 +80,22 @@ public sealed class NaviAppHost : Panel
 		var wantViewer = IsShared && Computer is { IsAuthority: false };
 
 		// The host left and this client took over (or the other way round): the copy starts over in its new role.
-		if ( app is null || !app.IsValid || appId != Process?.App.Id || viewer != wantViewer )
+		if ( app is null || !app.IsValid || windowKey != Window?.Key || viewer != wantViewer )
 		{
 			app?.Delete();
-			Computer?.UnregisterAppHost( appId, this );
+			Computer?.UnregisterAppHost( windowKey, this );
 			app = null;
-			appId = null;
+			windowKey = null;
 			lastPublished = null;
 			lastState = null;
 			knownScroll = "";
 			lastRemoteScroll = null;
 
-			if ( Process is null )
+			if ( Window is null )
 				return;
 
-			app = Process.App.Create();
-			appId = Process.App.Id;
+			app = Window.Info.Create();
+			windowKey = Window.Key;
 			viewer = wantViewer;
 
 			// Before the app's first tick, so it never runs as the host's copy here.
@@ -93,8 +104,12 @@ public sealed class NaviAppHost : Panel
 		}
 
 		// A shared app's copy on the host runs for whoever is using the computer.
-		var capture = Computer?.InputCapture == Process;
+		var capture = Computer?.InputCapture == Window;
 		app.SetClass( NaviEvents.HasInputClass, capture && (Computer.IsSeated || IsShared) );
+
+		// Where tray clicks and a shared app's actions are delivered to. A viewer's copy gets neither.
+		if ( Computer is not null && !viewer )
+			Computer.RegisterAppHost( windowKey, this );
 
 		if ( IsShared && Computer is not null )
 		{
@@ -103,7 +118,7 @@ public sealed class NaviAppHost : Panel
 		}
 
 		// A window with a set size decides the app's size. Otherwise the window fits the app.
-		var fill = Process.Size is not null || Process.IsMaximized;
+		var fill = Window.Size is not null || Window.IsMaximized;
 		app.Style.Width = fill ? Length.Percent( 100 ) : null;
 		app.Style.Height = fill ? Length.Percent( 100 ) : null;
 	}
@@ -116,7 +131,7 @@ public sealed class NaviAppHost : Panel
 	{
 		if ( viewer )
 		{
-			var state = Computer.GetAppState( appId ) ?? "";
+			var state = Computer.GetAppState( windowKey ) ?? "";
 			if ( state != lastState )
 			{
 				lastState = state;
@@ -126,13 +141,11 @@ public sealed class NaviAppHost : Panel
 			return;
 		}
 
-		Computer.RegisterAppHost( appId, this );
-
 		var published = app.GetAttribute( "navi-published", null );
 		if ( published is not null && published != lastPublished )
 		{
 			lastPublished = published;
-			Computer.SetAppState( appId, published );
+			Computer.SetAppState( windowKey, published );
 		}
 
 		var (down, pressed) = Computer.UserInput;
@@ -161,7 +174,7 @@ public sealed class NaviAppHost : Panel
 
 	void TickScroll()
 	{
-		var remote = Computer.GetAppScroll( appId );
+		var remote = Computer.GetAppScroll( windowKey );
 		if ( remote != lastRemoteScroll )
 		{
 			lastRemoteScroll = remote;
@@ -197,7 +210,7 @@ public sealed class NaviAppHost : Panel
 			return;
 
 		knownScroll = scroll;
-		Computer.UserScroll( appId, scroll );
+		Computer.UserScroll( Window.App.Id, Window.Id, scroll );
 	}
 
 	/// <summary>
@@ -268,10 +281,19 @@ public sealed class NaviAppHost : Panel
 			app.CreateEvent( new PanelEvent( NaviEvents.Action, app ) { Value = (action, args) } );
 	}
 
+	/// <summary>
+	/// On this client: give the app's panel the click on its tray icon, or on a menu item.
+	/// </summary>
+	internal void DeliverTray( string item )
+	{
+		if ( app is not null && app.IsValid && !viewer )
+			app.CreateEvent( new PanelEvent( NaviEvents.Tray, app ) { Value = item ?? "" } );
+	}
+
 	public override void OnDeleted()
 	{
 		base.OnDeleted();
-		Computer?.UnregisterAppHost( appId, this );
+		Computer?.UnregisterAppHost( windowKey, this );
 	}
 
 	/// <summary>
@@ -279,7 +301,8 @@ public sealed class NaviAppHost : Panel
 	/// </summary>
 	protected override void OnEvent( PanelEvent e )
 	{
-		var id = Process?.App.Id;
+		var id = Window?.App.Id;
+		var windowId = Window?.Id;
 
 		if ( Computer is not null && id is not null )
 		{
@@ -293,7 +316,7 @@ public sealed class NaviAppHost : Panel
 					return;
 
 				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call:
-					_ = NaviSystemCalls.RunAsync( Computer, Process, call.Item1, call.Item2, call.Item3 );
+					_ = NaviSystemCalls.RunAsync( Computer, Window, call.Item1, call.Item2, call.Item3 );
 					e.StopPropagation();
 					return;
 
@@ -301,7 +324,7 @@ public sealed class NaviAppHost : Panel
 				// gets it.
 				case NaviEvents.Act when e.Value is System.ValueTuple<string, string[]> act:
 					if ( IsShared )
-						Computer.UserAct( id, act.Item1, act.Item2 );
+						Computer.UserAct( id, windowId, act.Item1, act.Item2 );
 					else
 						DeliverAction( act.Item1, act.Item2 );
 
@@ -310,17 +333,17 @@ public sealed class NaviAppHost : Panel
 
 				// The app's copy on this client asks, so it counts as the local player's request.
 				case NaviEvents.Close:
-					Computer.UserClose( id );
+					Computer.UserCloseWindow( id, windowId );
 					e.StopPropagation();
 					return;
 
 				case NaviEvents.Minimize:
-					Computer.UserMinimize( id );
+					Computer.UserMinimize( id, windowId );
 					e.StopPropagation();
 					return;
 
 				case NaviEvents.ToggleMaximize:
-					Computer.UserToggleMaximized( id );
+					Computer.UserToggleMaximized( id, windowId );
 					e.StopPropagation();
 					return;
 			}
