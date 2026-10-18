@@ -272,6 +272,12 @@ public sealed partial class NaviComputer : Component
 	[Property] public List<string> RootApps { get; set; } = new();
 
 	/// <summary>
+	/// Ids of apps in the order the player put their taskbar icons in. Installed apps that aren't listed come after them,
+	/// in the registry's order. See <see cref="TaskbarApps"/>.
+	/// </summary>
+	[Property] public List<string> TaskbarOrder { get; set; } = new();
+
+	/// <summary>
 	/// Asset folders of this game whose app manifests ship with it, so their system apps are part of the OS: always installed,
 	/// root without asking. Manifests anywhere else (except the library's own <see cref="NaviAppRegistry.BuiltInFolder"/>)
 	/// are normal apps, and a system one asks the player for root. Folders are trusted from when the computer is enabled.
@@ -558,6 +564,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions = GrantedPermissions?.ToList() ?? new(),
 		ReviewedApps = ReviewedApps?.ToList() ?? new(),
 		RootApps = RootApps?.ToList() ?? new(),
+		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		DisplayScale = DisplayScale,
 	};
 
@@ -578,6 +585,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions = save.GrantedPermissions?.Where( x => NaviPermissions.IsKnown( x.Split( ' ' ).Last() ) ).Distinct().ToList() ?? new();
 		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();
 		RootApps = save.RootApps?.Distinct().ToList() ?? new();
+		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 
 		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
 
@@ -631,7 +639,40 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public IEnumerable<NaviAppInfo> Installed => NaviAppRegistry.All.Where( IsInstalled );
 
-	public bool IsInstalled( string id ) => NaviAppRegistry.Find( id ) is { } app && IsInstalled( app );
+	/// <summary>
+	/// Installed apps in taskbar order: those in <see cref="TaskbarOrder"/> first, as listed, then the rest.
+	/// </summary>
+	public IEnumerable<NaviAppInfo> TaskbarApps
+	{
+		get
+		{
+			var order = TaskbarOrder ?? [];
+			return Installed.OrderBy( x => order.IndexOf( x.Id ) is var i and >= 0 ? i : int.MaxValue );
+		}
+	}
+
+	/// <summary>
+	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Returns false if the app isn't
+	/// installed, the index is out of range, or the icon is already there.
+	/// </summary>
+	public bool MoveTaskbarApp( string id, int index )
+	{
+		if ( !IsAuthority )
+			return false;
+
+		var apps = TaskbarApps.Select( x => x.Id ).ToList();
+		var from = apps.IndexOf( id );
+		if ( from < 0 || index < 0 || index >= apps.Count || index == from )
+			return false;
+
+		apps.RemoveAt( from );
+		apps.Insert( index, id );
+		TaskbarOrder = apps;
+		Version++;
+		return true;
+	}
+
+	public bool IsInstalled( string id ) =>NaviAppRegistry.Find( id ) is { } app && IsInstalled( app );
 
 	public bool IsInstalled( NaviAppInfo app ) => app.IsCore || (InstalledApps?.Contains( app.Id ) ?? false);
 
@@ -775,6 +816,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions?.RemoveAll( x => x.StartsWith( id + " " ) );
 		ReviewedApps?.Remove( id );
 		RootApps?.Remove( id );
+		TaskbarOrder?.Remove( id );
 		Version++;
 		return true;
 	}

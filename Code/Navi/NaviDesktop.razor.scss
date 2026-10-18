@@ -318,6 +318,22 @@ NaviDesktop
 	}
 }
 
+// An icon being dragged to a new place on the taskbar (NaviDesktop moves it). No tooltips pop up as icons pass under
+// the mouse.
+.taskbar.reordering .app
+{
+	.tooltip
+	{
+		opacity: 0;
+	}
+
+	&.dragging .icon
+	{
+		border-color: #f2eee2;
+		opacity: 0.85;
+	}
+}
+
 // The system tray, at the right end of the taskbar.
 .tray
 {

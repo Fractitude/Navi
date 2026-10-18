@@ -75,11 +75,14 @@
 	<div class="taskbar">
 		<div class="start" @onclick=@(() => Computer.UserLaunch( NaviAppRegistry.PackagesApp ))>NAVI</div>
 
-		@foreach ( var app in Computer.Installed )
+		@foreach ( var app in Computer.TaskbarApps )
 		{
 			var process = Computer.GetProcess( app.Id );
 
-			<div class="app @(MenuApp == app.Id ? "menu-open" : "")" @onclick=@(() => OnTaskbarClick( app )) @onrightclick=@(() => MenuApp = app.Id)>
+			<div class="app @(MenuApp == app.Id ? "menu-open" : "")"
+				@onmousedown=@( ( PanelEvent e ) => StartTaskbarDrag( e ) )
+				@onclick=@(() => OnTaskbarClick( app ))
+				@onrightclick=@(() => MenuApp = app.Id)>
 				<div class="tooltip">@app.Name</div>
 				<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 				@if ( process is not null )
@@ -327,7 +330,12 @@
 		if ( taskbar is null )
 			return;
 
-		CapTaskbar( taskbar );
+		UpdateTaskbarDrag( taskbar );
+
+		// Icons are offset while one is dragged, which would throw the measurements off. Nothing to fit changes meanwhile.
+		if ( !taskbarDragMoved )
+			CapTaskbar( taskbar );
+
 		ClampTooltips( taskbar );
 	}
 
@@ -337,6 +345,10 @@
 	/// </summary>
 	void OnTaskbarClick( NaviAppInfo app )
 	{
+		// Letting go of a dragged icon isn't a click on it.
+		if ( taskbarDragMoved || sinceTaskbarDrag < TaskbarDropClickTime )
+			return;
+
 		CloseMenus();
 
 		if ( Computer.GetProcess( app.Id ) is { } process && !process.DrawnWindows.Any() )
@@ -421,15 +433,155 @@
 	/// <summary>
 	/// True if the event started on a title bar button rather than the title bar itself.
 	/// </summary>
-	static bool IsOnButton( PanelEvent e )
+	static bool IsOnButton( PanelEvent e ) => IsOn( e, "button" );
+
+	/// <summary>
+	/// True if the event started on a panel with this class inside the one handling it, rather than that panel itself.
+	/// </summary>
+	static bool IsOn( PanelEvent e, string className )
 	{
 		for ( var panel = e.Target; panel is not null && panel != e.This; panel = panel.Parent )
 		{
-			if ( panel.HasClass( "button" ) )
+			if ( panel.HasClass( className ) )
 				return true;
 		}
 
 		return false;
+	}
+
+	// The taskbar icon being dragged to a new place. The drag lasts while the mouse button is held on taskbarDragHandle.
+	// It only becomes a drag once the mouse has moved TaskbarDragThreshold; until then it may still be a click.
+	Panel taskbarDragHandle;
+	List<string> taskbarDragApps; // The apps of the shown icons, in order, when the button went down.
+	int taskbarDragFrom;
+	float taskbarDragSlot; // From one icon's left edge to the next's, in panel pixels.
+	float taskbarDragStartMouse;
+	bool taskbarDragMoved;
+	RealTimeSince sinceTaskbarDrag = TaskbarDropClickTime;
+
+	/// <summary>
+	/// How far the mouse moves, in panel pixels, before pressing an icon becomes dragging it.
+	/// </summary>
+	const float TaskbarDragThreshold = 6f;
+
+	/// <summary>
+	/// For how long after an icon is dropped a click on the taskbar is ignored, in seconds. The release that drops it may
+	/// arrive as a click after the drag has ended.
+	/// </summary>
+	const float TaskbarDropClickTime = 0.2f;
+
+	static List<Panel> ShownTaskbarIcons( Panel taskbar ) =>
+		taskbar.Children.Where( x => x.HasClass( "app" ) && x.Style.Display != DisplayMode.None ).ToList();
+
+	/// <summary>
+	/// The mouse went down on a taskbar icon. Moving it far enough drags the icon; see <see cref="UpdateTaskbarDrag"/>.
+	/// </summary>
+	void StartTaskbarDrag( PanelEvent e )
+	{
+		if ( !Computer.CanUse || e is not MousePanelEvent { MouseButton: MouseButtons.Left } || IsOn( e, "menu" ) )
+			return;
+
+		var taskbar = e.This.Parent;
+		var icons = ShownTaskbarIcons( taskbar );
+		var from = icons.IndexOf( e.This );
+		if ( from < 0 || icons.Count < 2 )
+			return;
+
+		taskbarDragHandle = e.This;
+		taskbarDragApps = Computer.TaskbarApps.Take( icons.Count ).Select( x => x.Id ).ToList();
+		taskbarDragFrom = from;
+		taskbarDragSlot = (icons[1].Box.Rect.Left - icons[0].Box.Rect.Left) * taskbar.ScaleFromScreen;
+		taskbarDragStartMouse = MousePosition( taskbar ).x;
+		taskbarDragMoved = false;
+	}
+
+	/// <summary>
+	/// Move the dragged icon with the mouse, along the taskbar, and the icons it passes out of its way. Letting go drops it
+	/// there and tells the host. The drag is called off if the taskbar changes under it.
+	/// </summary>
+	void UpdateTaskbarDrag( Panel taskbar )
+	{
+		if ( taskbarDragHandle is null )
+			return;
+
+		var icons = ShownTaskbarIcons( taskbar );
+		var from = taskbarDragFrom;
+
+		var unchanged = taskbarDragHandle.IsValid && Computer.CanUse
+			&& icons.Count == taskbarDragApps.Count && icons[from] == taskbarDragHandle
+			&& Computer.TaskbarApps.Take( icons.Count ).Select( x => x.Id ).SequenceEqual( taskbarDragApps );
+
+		if ( !unchanged )
+		{
+			EndTaskbarDrag( icons, from );
+			return;
+		}
+
+		var delta = MousePosition( taskbar ).x - taskbarDragStartMouse;
+		var released = !taskbarDragHandle.HasActive;
+
+		if ( !taskbarDragMoved )
+		{
+			if ( released )
+			{
+				EndTaskbarDrag( icons, from );
+				return;
+			}
+
+			if ( System.MathF.Abs( delta ) < TaskbarDragThreshold )
+				return;
+
+			taskbarDragMoved = true;
+			CloseMenus();
+		}
+
+		var slot = taskbarDragSlot;
+		var offset = Clamp( delta, -from * slot, (icons.Count - 1 - from) * slot );
+		var to = slot > 0f ? from + (int)System.MathF.Round( offset / slot ) : from;
+
+		if ( released )
+		{
+			EndTaskbarDrag( icons, to );
+			return;
+		}
+
+		taskbar.SetClass( "reordering", true );
+
+		for ( var i = 0; i < icons.Count; i++ )
+		{
+			var shift = i == from ? offset
+				: i > from && i <= to ? -slot
+				: i < from && i >= to ? slot
+				: 0f;
+
+			icons[i].Style.Left = Length.Pixels( shift );
+			icons[i].SetClass( "dragging", i == from );
+		}
+	}
+
+	/// <summary>
+	/// Put the icons back in their places and, if the dragged one was dropped somewhere new, ask the host to move it there.
+	/// The taskbar is rebuilt in the new order once the host's state comes back.
+	/// </summary>
+	void EndTaskbarDrag( List<Panel> icons, int to )
+	{
+		foreach ( var icon in icons )
+		{
+			icon.Style.Left = null;
+			icon.SetClass( "dragging", false );
+		}
+
+		taskbarDragHandle?.Parent?.SetClass( "reordering", false );
+
+		if ( taskbarDragMoved )
+			sinceTaskbarDrag = 0;
+
+		if ( taskbarDragMoved && to != taskbarDragFrom )
+			Computer.UserMoveTaskbarApp( taskbarDragApps[taskbarDragFrom], to );
+
+		taskbarDragHandle = null;
+		taskbarDragApps = null;
+		taskbarDragMoved = false;
 	}
 
 	void StartMove( NaviWindow window, PanelEvent e )

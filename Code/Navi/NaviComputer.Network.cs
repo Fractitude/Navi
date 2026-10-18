@@ -599,6 +599,16 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// The user dragged an app's taskbar icon to a new place. See <see cref="MoveTaskbarApp"/>.
+	/// </summary>
+	[Rpc.Host]
+	public void UserMoveTaskbarApp( string id, int index )
+	{
+		if ( Authorize() )
+			MoveTaskbarApp( id, index );
+	}
+
+	/// <summary>
 	/// The user moved or resized a window. <paramref name="size"/> is ignored unless <paramref name="sized"/>, for a
 	/// window that fits its app. The desktop keeps it inside the screen.
 	/// </summary>

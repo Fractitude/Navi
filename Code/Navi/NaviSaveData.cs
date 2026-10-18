@@ -11,6 +11,7 @@ public sealed class NaviComputerSave
 	public List<string> GrantedPermissions { get; set; } = new();
 	public List<string> ReviewedApps { get; set; } = new();
 	public List<string> RootApps { get; set; } = new();
+	public List<string> TaskbarOrder { get; set; } = new();
 	public float DisplayScale { get; set; } = 1f;
 }
 
