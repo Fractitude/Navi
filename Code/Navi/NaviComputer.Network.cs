@@ -66,8 +66,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	/// <summary>
 	/// Connection id of the player using this computer, or empty while nobody does. Only they can work it; everyone else
-	/// watches. The first player to click a free computer takes the seat, and it frees itself when they leave the game or
-	/// stop using it for <see cref="SeatTimeout"/>. Offline it stays empty and the local player can always use it.
+	/// watches. The first player to click a free computer and let go takes the seat (<see cref="UserSit"/>), and it frees
+	/// itself when they leave the game or stop using it for <see cref="SeatTimeout"/>. Offline it stays empty, and the
+	/// local player sits the same way.
 	/// </summary>
 	public System.Guid UserId { get; private set; }
 
@@ -83,8 +84,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	/// <summary>
 	/// The local player has taken the seat: <see cref="NaviInputCapture"/> pulls the camera to the screen and gives them the
-	/// mouse. Online it is the seat itself. Offline there is no one to share with, so the first thing they do on the screen
-	/// sits them down. <see cref="UserLeave"/> stands them up.
+	/// mouse. Online it is the seat itself. Offline there is no one to share with, but they still sit down with a click
+	/// (<see cref="UserSit"/>) before they can use the screen. <see cref="UserLeave"/> stands them up.
 	/// </summary>
 	public bool IsSeated => Networking.IsActive ? UserId != default && UserId == Connection.Local?.Id : seatedOffline;
 
@@ -462,19 +463,19 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
-	/// On the host, in an RPC: may the caller work the computer? The user may, and so may anyone while the seat is free,
-	/// which gives it to them when <paramref name="take"/> is set. Never trusts what the caller says about itself: the
-	/// connection is the network's.
+	/// On the host, in an RPC: may the caller work the computer? Only the user may. With <paramref name="sit"/>, anyone may
+	/// while the seat is free, which gives it to them. Never trusts what the caller says about itself: the connection is
+	/// the network's.
 	/// </summary>
-	bool Authorize( bool take = true )
+	bool Authorize( bool sit = false )
 	{
 		if ( !IsAuthority )
 			return false;
 
 		if ( !Networking.IsActive )
 		{
-			seatedOffline |= take;
-			return true;
+			seatedOffline |= sit;
+			return seatedOffline;
 		}
 
 		var caller = Rpc.Caller ?? Connection.Local;
@@ -487,7 +488,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return true;
 		}
 
-		if ( !take || UserId != default )
+		if ( !sit || UserId != default )
 			return false;
 
 		SetUser( caller.Id );
@@ -633,12 +634,22 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		float.IsFinite( value.x ) && float.IsFinite( value.y ) && System.MathF.Abs( value.x ) < 100000f && System.MathF.Abs( value.y ) < 100000f;
 
 	/// <summary>
+	/// The player sits down at the computer, if the seat is free. Nothing else takes it: until they sit, their clicks on the
+	/// screen do nothing.
+	/// </summary>
+	[Rpc.Host]
+	public void UserSit()
+	{
+		Authorize( sit: true );
+	}
+
+	/// <summary>
 	/// The user is still at the computer, so the seat stays theirs.
 	/// </summary>
 	[Rpc.Host( NetFlags.Unreliable )]
 	public void UserKeepSeat()
 	{
-		Authorize( take: false );
+		Authorize();
 	}
 
 	/// <summary>
@@ -647,7 +658,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserLeave()
 	{
-		if ( !Authorize( take: false ) )
+		if ( !Authorize() )
 			return;
 
 		if ( Networking.IsActive )
@@ -804,7 +815,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserHoldInput( string[] actions )
 	{
-		if ( !Authorize( take: false ) || InputCapture is null )
+		if ( !Authorize() || InputCapture is null )
 			return;
 
 		userInput.Clear();
@@ -818,14 +829,14 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserAnswerPermissionRequest( int requestId, string[] ticked )
 	{
-		if ( Authorize( take: false ) && permissionRequests.FirstOrDefault( x => x.Id == requestId ) is { } request )
+		if ( Authorize() && permissionRequests.FirstOrDefault( x => x.Id == requestId ) is { } request )
 			AnswerPermissionRequest( request, ticked );
 	}
 
 	[Rpc.Host]
 	public void UserDismissPermissionRequest( int requestId )
 	{
-		if ( Authorize( take: false ) && permissionRequests.FirstOrDefault( x => x.Id == requestId ) is { } request )
+		if ( Authorize() && permissionRequests.FirstOrDefault( x => x.Id == requestId ) is { } request )
 			DismissPermissionRequest( request );
 	}
 }

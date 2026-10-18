@@ -164,6 +164,12 @@
 			<div class="badge"><i>person</i>In use by @( Computer.User?.DisplayName ?? "another player" )</div>
 		</div>
 	}
+	else if ( !Computer.IsSeated )
+	{
+		@* The seat is free. Catches every click, so nothing on the screen is used before the player sits. A click sits them
+		   down once the button is released, so the press can't land on the screen while the camera flies in. *@
+		<div class="sit" @onmousedown=@(( PanelEvent e ) => PressSit( e )) @onclick=@(( PanelEvent e ) => ReleaseSit( e ))></div>
+	}
 
 </root>
 
@@ -737,6 +743,26 @@
 	}
 
 	/// <summary>
+	/// A real left mouse press started on the sit overlay. Apps can raise panel events, but can't fake the hardware state
+	/// behind <see cref="Input.Keyboard"/>, so they can't sit the player down.
+	/// </summary>
+	bool sitPressed;
+
+	void PressSit( PanelEvent e )
+	{
+		sitPressed = e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" );
+	}
+
+	void ReleaseSit( PanelEvent e )
+	{
+		var real = sitPressed && e.This.HasHovered;
+		sitPressed = false;
+
+		if ( real )
+			Computer.UserSit();
+	}
+
+	/// <summary>
 	/// How often the user's client tells the host they're still at the screen, in seconds.
 	/// </summary>
 	const float KeepSeatInterval = 1f;
@@ -914,5 +940,6 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, TrayMenuApp, Computer?.CanUse, Computer?.UserId );
+		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, TrayMenuApp, Computer?.CanUse, Computer?.UserId,
+			Computer?.IsSeated );
 }

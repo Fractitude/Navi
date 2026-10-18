@@ -8,7 +8,9 @@
 @* in it only reacts to a real mouse press made after the prompt has been up for a moment. See the Security section *@
 @* of AGENTS.md for what this does and doesn't protect against. *@
 
-<root class="@(Request is null ? "" : "active")">
+<root class="@(Request is null ? "" : "active")"
+	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
+	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
 	@if ( Request is { } request )
 	{
 		var heading = request.IsRoot
@@ -56,9 +58,13 @@
 				</div>
 			}
 
-			@if ( !Computer.IsUser )
+			@if ( !Computer.CanUse )
 			{
 				<div class="dialog-text">Only @( Computer.User?.DisplayName ?? "the player using this computer" ) can answer this.</div>
+			}
+			else if ( !Computer.IsSeated )
+			{
+				<div class="dialog-text">Click to sit down at the computer, then answer this.</div>
 			}
 
 			<div class="dialog-buttons">
@@ -92,13 +98,17 @@
 	NaviPermissionRequest Request => Computer.IsValid() ? Computer.PermissionRequests.FirstOrDefault() : null;
 
 	/// <summary>
-	/// The controls react: the prompt has been up for <see cref="ArmTime"/>, and the local player is the computer's user.
+	/// The controls react: the prompt has been up for <see cref="ArmTime"/> since the local player sat at the computer.
 	/// Everyone else at the screen sees the prompt but can't answer it.
 	/// </summary>
-	bool Armed => sinceShown > ArmTime && Computer.IsValid() && Computer.IsUser;
+	bool Armed => sinceShown > ArmTime && Computer.IsValid() && Computer.IsSeated;
 
 	NaviPermissionRequest shownRequest;
+	bool shownSeated;
 	RealTimeSince sinceShown;
+
+	// A real press started on the layer while the player wasn't seated. Letting go sits them down.
+	bool sitPressed;
 
 	// Permissions unticked in the prompt. Reset for each new request, from what it starts with ticked.
 	readonly HashSet<string> Unticked = new();
@@ -109,6 +119,16 @@
 	protected override void OnUpdate()
 	{
 		var request = Request;
+		var seated = Computer.IsValid() && Computer.IsSeated;
+
+		// Sitting down arms the prompt afresh, so the click that sat the player can't answer it.
+		if ( seated != shownSeated )
+		{
+			shownSeated = seated;
+			sinceShown = 0;
+			pressed = null;
+		}
+
 		if ( request == shownRequest )
 			return;
 
@@ -143,6 +163,27 @@
 			action();
 	}
 
+	/// <summary>
+	/// A press anywhere on the open prompt, before the player sits. Only a real left press counts, as in <see cref="Press"/>.
+	/// </summary>
+	void PressSit( PanelEvent e )
+	{
+		sitPressed = Request is not null && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
+			&& e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" );
+	}
+
+	/// <summary>
+	/// Letting go sits the player down, as a click on the desktop would. It doesn't answer the prompt.
+	/// </summary>
+	void ReleaseSit( PanelEvent e )
+	{
+		var real = sitPressed && Computer.IsValid() && !Computer.IsSeated && e.This.HasHovered;
+		sitPressed = false;
+
+		if ( real )
+			Computer.UserSit();
+	}
+
 	void TogglePermission( string permission )
 	{
 		if ( !Unticked.Remove( permission ) )
@@ -150,5 +191,5 @@
 	}
 
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Request, Armed, Computer?.IsUser, Unticked.Count, string.Join( ",", Unticked ) );
+		System.HashCode.Combine( Request, Armed, Computer?.CanUse, Computer?.IsSeated, Unticked.Count, string.Join( ",", Unticked ) );
 }
