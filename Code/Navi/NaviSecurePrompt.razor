@@ -244,6 +244,8 @@
 	SetupStep setup;
 	NaviLockKind newKind;
 	string currentProof = "";
+	string verifiedProof;
+	bool verifying;
 	string newSecret;
 	string pendingSalt;
 	int pendingKind;
@@ -285,6 +287,8 @@
 	void ClearSetup()
 	{
 		currentProof = "";
+		verifiedProof = null;
+		verifying = false;
 		newSecret = null;
 		pendingSalt = null;
 		SetupMessage = null;
@@ -314,17 +318,22 @@
 	}
 
 	/// <summary>
-	/// The current password or pattern, before changing the lock. The host is the one that finds out if it is right, when it
-	/// is sent along with the new one.
+	/// The current password or pattern, before changing the lock. Only the host can tell if it is right, so it is checked by
+	/// asking it to set the same lock again under a fresh salt: that counts a wrong try like any other, and a changed salt
+	/// is how this client sees that it was right.
 	/// </summary>
 	void SubmitCurrent( string secret )
 	{
-		if ( !Armed || !NaviLockCrypto.IsAcceptable( Computer.LockKind, secret ) )
+		if ( !Armed || !Computer.HasLockCredential || !NaviLockCrypto.IsAcceptable( Computer.LockKind, secret ) )
 			return;
 
-		currentProof = NaviLockCrypto.Proof( Computer.LockKind, secret, Computer.LockSalt );
-		SetupMessage = null;
-		setup = SetupStep.Choose;
+		var kind = Computer.LockKind;
+		var proof = NaviLockCrypto.Proof( kind, secret, Computer.LockSalt );
+		var salt = NaviLockCrypto.NewSalt();
+
+		verifying = true;
+		verifiedProof = NaviLockCrypto.Proof( kind, secret, salt );
+		SendLock( (int)kind, salt, verifiedProof, "Checking...", proof );
 	}
 
 	void ChooseKind( NaviLockKind kind )
@@ -358,15 +367,15 @@
 		}
 
 		var salt = NaviLockCrypto.NewSalt();
-		SendLock( (int)newKind, salt, NaviLockCrypto.Proof( newKind, secret, salt ), "Saving the lock..." );
+		SendLock( (int)newKind, salt, NaviLockCrypto.Proof( newKind, secret, salt ), "Saving the lock...", currentProof );
 	}
 
 	void RemoveLock()
 	{
-		SendLock( (int)NaviLockKind.None, "", "", "Removing the lock..." );
+		SendLock( (int)NaviLockKind.None, "", "", "Removing the lock...", currentProof );
 	}
 
-	void SendLock( int kind, string salt, string proof, string status )
+	void SendLock( int kind, string salt, string proof, string status, string current )
 	{
 		pendingKind = kind;
 		pendingSalt = salt;
@@ -376,7 +385,7 @@
 		sinceSent = 0;
 		setup = SetupStep.Saving;
 
-		Computer.UserSetLock( currentProof, kind, salt, proof );
+		Computer.UserSetLock( current, kind, salt, proof );
 		newSecret = null;
 	}
 
@@ -419,7 +428,26 @@
 			}
 		}
 
-		if ( setup == SetupStep.Saving && !saveDone )
+		if ( setup == SetupStep.Saving && verifying )
+		{
+			if ( Computer.LockSalt == pendingSalt )
+			{
+				// Right: the lock now uses the fresh salt, so that is the proof the next change must send.
+				verifying = false;
+				currentProof = verifiedProof;
+				SetupMessage = null;
+				setup = SetupStep.Choose;
+			}
+			else if ( Computer.FailedAttempts > failedBefore || sinceSent > 3f )
+			{
+				verifying = false;
+				SetupMessage = Computer.FailedAttempts > failedBefore
+					? $"That wasn't the current {KindName( Computer.LockKind )}."
+					: Computer.IsLockedOut ? $"Too many tries. Wait {WaitSeconds}s." : "The computer didn't answer.";
+				setup = SetupStep.Current;
+			}
+		}
+		else if ( setup == SetupStep.Saving && !saveDone )
 		{
 			if ( pendingKind == (int)NaviLockKind.None ? !Computer.HasLockCredential : Computer.LockSalt == pendingSalt )
 			{
