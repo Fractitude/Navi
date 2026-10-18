@@ -29,7 +29,7 @@ public static class NaviEvents
 	public const string ViewerClass = "navi-viewer";
 
 	/// <summary>
-	/// The app asks for the lock screen's setup dialog (<c>Navi.OpenLockSetup</c>). Only core apps are listened to.
+	/// The app asks for the lock screen's setup dialog (<c>Navi.Settings.OpenLockSetup</c>). Only core apps are listened to.
 	/// </summary>
 	public const string LockSetup = "navi.lock-setup";
 
@@ -39,13 +39,13 @@ public static class NaviEvents
 	public const string Act = "navi.act";
 
 	/// <summary>
-	/// An action for the host's copy of a shared app, raised on the app's panel. See <c>Navi.IsAction</c>.
+	/// An action for the host's copy of a shared app, raised on the app's panel. See <c>NaviApp.OnAction</c>.
 	/// </summary>
 	public const string Action = "navi.action";
 
 	/// <summary>
 	/// The player clicked the app's tray icon or one of its menu items, raised on the app's main panel. See
-	/// <c>Navi.IsTrayClick</c>.
+	/// <c>NaviApp.OnTrayClick</c>.
 	/// </summary>
 	public const string Tray = "navi.tray";
 }

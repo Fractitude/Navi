@@ -16,11 +16,11 @@ public sealed class WebBrowserViewModel
 	/// <summary>Where an address field entry that isn't an address is searched.</summary>
 	const string SearchUrl = "https://duckduckgo.com/?q=";
 
-	/// <summary>The most a window title shows (see <c>Navi.SetTitle</c>).</summary>
+	/// <summary>The most a window title shows (see <c>Navi.Window.SetTitleAsync</c>).</summary>
 	const int MaxTitle = 32;
 
-	/// <summary>The app's panel, which every call to the computer is made with.</summary>
-	readonly Panel app;
+	/// <summary>The computer, as this app. Every call is made through it.</summary>
+	readonly Navi navi;
 
 	/// <summary>The pages the player has been to, oldest first, and which one is open.</summary>
 	readonly List<string> history = [Home];
@@ -38,9 +38,9 @@ public sealed class WebBrowserViewModel
 
 	string reportedTitle;
 
-	public WebBrowserViewModel( Panel app )
+	public WebBrowserViewModel( Navi navi )
 	{
-		this.app = app;
+		this.navi = navi;
 		UiState = new WebBrowserUiState { Url = Home, LoadId = 1, AddressText = Home };
 	}
 
@@ -183,7 +183,7 @@ public sealed class WebBrowserViewModel
 			return;
 
 		reportedTitle = title;
-		_ = Navi.SetTitle( app, title.Length > MaxTitle ? title[..MaxTitle] : title );
+		_ = navi.Window.SetTitleAsync( title.Length > MaxTitle ? title[..MaxTitle] : title );
 	}
 
 	/// <summary>

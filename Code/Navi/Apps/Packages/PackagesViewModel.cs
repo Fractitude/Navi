@@ -17,9 +17,9 @@ namespace NaviApps;
 public sealed class PackagesViewModel
 {
 	/// <summary>
-	/// The app's panel. Every call to the computer is made with it, and it is the window the computer answers as.
+	/// The computer, as this app. Every call is made through it, and the computer answers as the window the app is in.
 	/// </summary>
-	readonly Panel app;
+	readonly Navi navi;
 
 	/// <summary>The kind the Apps tab starts on.</summary>
 	const string StartFilter = "installed";
@@ -54,8 +54,8 @@ public sealed class PackagesViewModel
 
 	// What the computer said, kept apart from what is drawn from it: drawing formats and filters, this is the data.
 
-	/// <summary>Every app on the computer, installed or not. See <see cref="Navi.GetApps"/>.</summary>
-	(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type)[] apps = [];
+	/// <summary>Every app on the computer, installed or not. See <see cref="Navi.AppCalls.ListAsync"/>.</summary>
+	IReadOnlyList<Navi.AppInfo> apps = [];
 
 	/// <summary>Ids of the apps that came from the Store. The app list doesn't say where an app came from, so it's a second call.</summary>
 	HashSet<string> storeAppIds = new();
@@ -67,7 +67,7 @@ public sealed class PackagesViewModel
 	HashSet<string> blacklistedPackages = new( System.StringComparer.OrdinalIgnoreCase );
 
 	/// <summary>The Store entries fetched so far. The backend pages them, so the list grows with "More".</summary>
-	(Package Package, bool Official)[] storePackages = [];
+	IReadOnlyList<Navi.StoreListing> storePackages = [];
 
 	/// <summary>The computer's version when the lists were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -89,9 +89,9 @@ public sealed class PackagesViewModel
 	/// <summary>Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.</summary>
 	readonly Dictionary<string, Package> details = new();
 
-	public PackagesViewModel( Panel app )
+	public PackagesViewModel( Navi navi )
 	{
-		this.app = app ?? throw new System.ArgumentNullException( nameof(app) );
+		this.navi = navi ?? throw new System.ArgumentNullException( nameof(navi) );
 
 		UiState = new PackagesUiState
 		{
@@ -194,13 +194,13 @@ public sealed class PackagesViewModel
 	}
 
 	/// <summary>Download and install a Store app.</summary>
-	public void InstallPackage( string ident ) => Run( "install this app", () => Navi.InstallPackage( app, ident ) );
+	public void InstallPackage( string ident ) => Run( "install this app", () => navi.Store.InstallAsync( ident ) );
 
 	/// <summary>Install an app that ships with the game or a library.</summary>
-	public void InstallApp( string id ) => Run( "install apps", () => Navi.Install( app, id ) );
+	public void InstallApp( string id ) => Run( "install apps", () => navi.Apps.InstallAsync( id ) );
 
 	/// <summary>Uninstall an app.</summary>
-	public void UninstallApp( string id ) => Run( "uninstall apps", () => Navi.Uninstall( app, id ) );
+	public void UninstallApp( string id ) => Run( "uninstall apps", () => navi.Apps.UninstallAsync( id ) );
 
 	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
 
@@ -253,19 +253,19 @@ public sealed class PackagesViewModel
 
 		try
 		{
-			var version = await Navi.GetVersion( app );
+			var version = await navi.GetVersionAsync();
 			if ( version == knownVersion )
 				return;
 
 			knownVersion = version;
 
-			apps = await Navi.GetApps( app );
-			storeAppIds = (await Navi.GetStoreApps( app )).ToHashSet();
+			apps = await navi.Apps.ListAsync();
+			storeAppIds = (await navi.Apps.ListFromStoreAsync()).ToHashSet();
 
-			var (installed, installing) = await Navi.GetStoreStatus( app );
+			var (installed, installing) = await navi.Store.GetStatusAsync();
 			installedPackages = installed.ToHashSet();
 			installingPackages = installing.ToHashSet();
-			blacklistedPackages = (await Navi.GetStoreBlacklist( app )).ToHashSet( System.StringComparer.OrdinalIgnoreCase );
+			blacklistedPackages = (await navi.Store.GetBlacklistAsync()).ToHashSet( System.StringComparer.OrdinalIgnoreCase );
 
 			Update( uiState => uiState with { AppRows = BuildAppRows(), StoreRows = BuildStoreRows() } );
 		}
@@ -296,7 +296,7 @@ public sealed class PackagesViewModel
 		RealTimeSince elapsed = 0;
 
 		var text = UiState.SearchText.Trim();
-		var skip = append ? storePackages.Length : 0;
+		var skip = append ? storePackages.Count : 0;
 
 		// A failed search leaves the page that is already listed, so the total it came with stays too.
 		var total = UiState.StoreTotal;
@@ -305,7 +305,7 @@ public sealed class PackagesViewModel
 		try
 		{
 			// The old entries stay on screen while the page loads: the status above says it's a refresh.
-			var (packages, found) = await Navi.SearchStore( app, text, skip, StorePageSize );
+			var (packages, found) = await navi.Store.SearchAsync( text, skip, StorePageSize );
 
 			storePackages = append ? storePackages.Concat( packages ).ToArray() : packages;
 			total = found;
@@ -375,7 +375,7 @@ public sealed class PackagesViewModel
 
 		try
 		{
-			await Navi.WithPermission( app, call );
+			await navi.WithPermissionAsync( call );
 		}
 		catch ( System.UnauthorizedAccessException )
 		{
@@ -432,15 +432,14 @@ public sealed class PackagesViewModel
 
 		return apps
 			.Select( x => (App: x, FromStore: storeAppIds.Contains( x.Id )) )
-			.Where( x => Matches( kind, x.App.Installed, x.App.Type, x.FromStore ) )
+			.Where( x => Matches( kind, x.App.Installed, x.App.Kind, x.FromStore ) )
 			.Select( x => BuildAppRow( x.App ) )
 			.ToArray();
 	}
 
-	static AppRow BuildAppRow(
-		(string Id, string Name, string Description, string Icon, string Color, bool Installed, string Type) app )
+	static AppRow BuildAppRow( Navi.AppInfo app )
 	{
-		var shielded = app.Type is "core" or "system";
+		var shielded = app.Kind is Navi.AppKind.Core or Navi.AppKind.System;
 
 		return new AppRow
 		{
@@ -450,8 +449,8 @@ public sealed class PackagesViewModel
 			Icon = app.Icon,
 			Color = app.Color,
 			Shield = shielded,
-			ShieldTooltip = app.Type == "core" ? "Core app: part of the OS" : "System app: asks for full system access",
-			Action = app.Type == "core" ? AppAction.None
+			ShieldTooltip = app.Kind == Navi.AppKind.Core ? "Core app: part of the OS" : "System app: asks for full system access",
+			Action = app.Kind == Navi.AppKind.Core ? AppAction.None
 				: app.Installed ? AppAction.Uninstall
 				: AppAction.Install,
 		};
@@ -476,13 +475,13 @@ public sealed class PackagesViewModel
 	/// system apps ask for full system access, whether they ship with the game or with a Store package, so an app can
 	/// match more than one of these.
 	/// </summary>
-	static bool Matches( string filter, bool installed, string type, bool fromStore ) => filter switch
+	static bool Matches( string filter, bool installed, Navi.AppKind kind, bool fromStore ) => filter switch
 	{
 		"store" => installed && fromStore,
-		"core" => type is "core",
-		"system" => installed && (type is "core" or "system"),
-		"prepackaged" => !fromStore && type is not "core",
-		_ => installed && type is "app",
+		"core" => kind is Navi.AppKind.Core,
+		"system" => installed && kind is Navi.AppKind.Core or Navi.AppKind.System,
+		"prepackaged" => !fromStore && kind is not Navi.AppKind.Core,
+		_ => installed && kind is Navi.AppKind.App,
 	};
 
 	/// <summary>

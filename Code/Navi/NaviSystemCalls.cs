@@ -7,7 +7,8 @@ namespace Sandbox;
 /// A call is a <c>navi.call</c> panel event that bubbles up from the app's panel to its window, with a value of
 /// <c>(string Method, object[] Args, TaskCompletionSource&lt;object&gt; Reply)</c>. Everything in it is a .NET or engine type,
 /// so apps don't need Navi types and Store apps work in every game. The call runs as the app, from the window the panel is in: a call it lacks
-/// the permission for fails with <see cref="System.UnauthorizedAccessException"/> (<see cref="NaviPermissions.Missing"/>).
+/// the permission for fails with <see cref="System.UnauthorizedAccessException"/> (<see cref="NaviPermissions.Missing"/>), which the client
+/// turns into <see cref="Navi.MissingPermissionException"/>.
 /// Keep method names, arguments and results stable: published apps depend on them.
 /// </summary>
 public static class NaviSystemCalls

@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. It makes no calls to *@
@@ -44,7 +44,7 @@
 	/// The app's logic and its state. Made on first use: its calls to the computer are made with the app's own panel, which
 	/// is this.
 	/// </summary>
-	WebBrowserViewModel ViewModel => field ??= new(this);
+	WebBrowserViewModel ViewModel => field ??= new(Navi);
 
 	/// <summary>
 	/// What is drawn above. Read only: the view model replaces it, and its revision is what makes this panel redraw.

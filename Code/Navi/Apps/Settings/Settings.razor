@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* The computer's settings: a sidebar of pages, and the page that is open. A core app (Assets/navi/apps/settings.napp), *@
@@ -11,7 +11,7 @@
 		@foreach ( var category in UiState.Categories )
 		{
 			<div class="category @( category.Selected ? "active" : "" )"
-			     @onclick=@( () => Navi.Act( this, SettingsViewModel.OpenCategoryAction, category.Key.ToString() ) )>
+			     @onclick=@( () => Navi.Act( SettingsViewModel.OpenCategoryAction, category.Key.ToString() ) )>
 				<i>@category.Icon</i>
 				<div class="label">@category.Label</div>
 			</div>
@@ -21,7 +21,7 @@
 	<div class="page">
 		@if ( UiState.Notice is not null )
 		{
-			<div class="notice" @onclick=@( () => Navi.Act( this, SettingsViewModel.DismissNoticeAction ) )>
+			<div class="notice" @onclick=@( () => Navi.Act( SettingsViewModel.DismissNoticeAction ) )>
 				@UiState.Notice
 			</div>
 		}
@@ -39,7 +39,7 @@
 						@foreach ( var option in UiState.ScaleOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseScaleAction, option.Scale.ToString( System.Globalization.CultureInfo.InvariantCulture ) ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseScaleAction, option.Scale.ToString( System.Globalization.CultureInfo.InvariantCulture ) ) )>
 								@option.Label
 							</div>
 						}
@@ -57,7 +57,7 @@
 						@foreach ( var option in UiState.SnapScreenOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapScreenAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseSnapScreenAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -71,7 +71,7 @@
 						@foreach ( var option in UiState.SnapWindowsOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapWindowsAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseSnapWindowsAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -85,7 +85,7 @@
 						@foreach ( var option in UiState.SnapDistanceOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapDistanceAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseSnapDistanceAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -96,7 +96,7 @@
 			case SettingsCategory.Security:
 				<div class="heading">Security</div>
 
-				<div class="big-item" @onclick=@( () => Navi.OpenLockSetup( this ) )>
+				<div class="big-item" @onclick=@( () => Navi.Settings.OpenLockSetup() )>
 					<i>password</i>
 					<div class="text">
 						<div class="name">Lock-screen password</div>
@@ -116,7 +116,7 @@
 						@foreach ( var option in UiState.WallpaperOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseWallpaperAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseWallpaperAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -130,7 +130,7 @@
 						@foreach ( var option in UiState.ThemeOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseThemeAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseThemeAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -144,7 +144,7 @@
 						@foreach ( var option in UiState.SchemeOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSchemeAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseSchemeAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -158,7 +158,7 @@
 						@foreach ( var option in UiState.BlurOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseBlurAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseBlurAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -172,7 +172,7 @@
 						@foreach ( var option in UiState.TransparencyOptions )
 						{
 							<div class="option @( option.Selected ? "active" : "" )"
-							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseTransparencyAction, option.Value.ToString() ) )>
+							     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseTransparencyAction, option.Value.ToString() ) )>
 								@option.Label
 							</div>
 						}
@@ -188,35 +188,25 @@
 	/// <summary>
 	/// The app's logic and its state, in the host's copy only. Made on first use: calls need the panel, which is this.
 	/// </summary>
-	SettingsViewModel ViewModel => field ??= new(this);
+	SettingsViewModel ViewModel => field ??= new(Navi);
 
 	/// <summary>
 	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	SettingsUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<SettingsUiState>( this ) ?? SettingsUiState.Empty : ViewModel.UiState;
+	SettingsUiState UiState => Navi.IsViewer ? Navi.GetState<SettingsUiState>() ?? SettingsUiState.Empty : ViewModel.UiState;
 
 	public override void Tick()
 	{
 		base.Tick();
 
-		if ( Navi.IsViewer( this ) )
+		if ( Navi.IsViewer )
 			return;
 
 		ViewModel.Tick();
-		Navi.Publish( this, ViewModel.UiState );
+		Navi.Publish( ViewModel.UiState );
 	}
 
-	protected override void OnEvent( PanelEvent e )
-	{
-		if ( Navi.IsAction( e, out var action, out var args ) )
-		{
-			ViewModel.Act( action, args );
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
-	}
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
 
 	protected override int BuildHash() => UiState.Revision;
 }

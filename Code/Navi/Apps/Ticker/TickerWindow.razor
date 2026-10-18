@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* The Ticker demo's extra window ("log" in its .napp). The app is shared: the host's copy publishes the count, and *@
@@ -7,7 +7,7 @@
 
 <root>
 	<div class="count">@UiState.Seconds s</div>
-	<div class="button" @onclick=@( () => Navi.Act( this, ResetAction ) )>Reset</div>
+	<div class="button" @onclick=@( () => Navi.Act( ResetAction ) )>Reset</div>
 	<div class="button @( UiState.AllOpen ? "disabled" : "" )" @onclick=@OnNewWindow>New window</div>
 </root>
 
@@ -16,7 +16,7 @@
 	const string ResetAction = "reset";
 	const string NewWindowAction = "new-window";
 
-	TickerUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<TickerUiState>( this ) ?? TickerUiState.Empty : hostState;
+	TickerUiState UiState => Navi.IsViewer ? Navi.GetState<TickerUiState>() ?? TickerUiState.Empty : hostState;
 
 	TickerUiState hostState = TickerUiState.Empty;
 
@@ -31,7 +31,7 @@
 	{
 		base.Tick();
 
-		if ( Navi.IsViewer( this ) )
+		if ( Navi.IsViewer )
 			return;
 
 		if ( !askedId )
@@ -46,38 +46,30 @@
 			TickerState.Windows.Add( this );
 
 		var number = TickerState.Windows.IndexOf( this ) + 1;
-		_ = Navi.SetTitle( this, TickerState.Windows.Count > 1 ? $"#{number}" : "" );
+		_ = Navi.Window.SetTitleAsync( TickerState.Windows.Count > 1 ? $"#{number}" : "" );
 
 		var allOpen = TickerState.Windows.Count >= TickerState.WindowIds.Length;
 		if ( hostState.Seconds != TickerState.Seconds || hostState.AllOpen != allOpen )
 			hostState = new TickerUiState { Seconds = TickerState.Seconds, AllOpen = allOpen };
 
-		Navi.Publish( this, hostState );
+		Navi.Publish( hostState );
 	}
 
-	protected override void OnEvent( PanelEvent e )
+	protected override void OnAction( string action, string[] args )
 	{
-		if ( Navi.IsAction( e, out var action, out _ ) )
-		{
-			if ( action == ResetAction )
-				TickerState.Seconds = 0;
-			else if ( action == NewWindowAction )
-				_ = Navi.OpenWindow( this, FreeWindowId() );
-
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
+		if ( action == ResetAction )
+			TickerState.Seconds = 0;
+		else if ( action == NewWindowAction )
+			_ = Navi.Window.OpenAsync( FreeWindowId() );
 	}
 
 	void OnNewWindow()
 	{
 		if ( !UiState.AllOpen )
-			Navi.Act( this, NewWindowAction );
+			Navi.Act( NewWindowAction );
 	}
 
-	async System.Threading.Tasks.Task LoadWindowId() => WindowId = await Navi.WindowId( this );
+	async System.Threading.Tasks.Task LoadWindowId() => WindowId = await Navi.Window.GetIdAsync();
 
 	/// <summary>
 	/// The first window of the manifest that isn't open, so the one left after the other closes is never asked to open itself.

@@ -57,9 +57,9 @@ A `sealed class`, not a panel:
 ```csharp
 public sealed class PackagesViewModel
 {
-	readonly Panel app;                 // what every call to the computer is made with
+	readonly Navi navi;                 // the computer, as this app: every call goes through it
 
-	public PackagesViewModel( Panel app ) { ... }
+	public PackagesViewModel( Navi navi ) { ... }
 
 	public PackagesUiState UiState { get; private set; }
 	public int Revision => UiState.Revision;
@@ -84,16 +84,16 @@ public sealed class PackagesViewModel
 - **The guards are here, not in the UI.** `if ( refreshing ) return;` at the top of
   `FetchStoreAsync` is the rule that one page is fetched at a time; the disabled button is only its
   reflection.
-- **The panel argument is the only panel-shaped thing it knows.** It is used for `Navi.*` calls and
-  for nothing else — no `Children`, no classes, no styles, no `Tick` of a panel.
+- **It never sees the panel.** It gets the panel's `Navi` and makes its calls through that — no `Children`, no
+  classes, no styles, no `Tick` of a panel.
 
 ### `Packages.razor` — what it looks like
 
 ```razor
 @code
 {
-	/// <summary>The app's logic and its state. Made on first use: calls need the panel, which is `this`.</summary>
-	PackagesViewModel ViewModel => field ??= new(this);
+	/// <summary>The app's logic and its state. Made on first use, with the panel's Navi (the panel is a NaviApp).</summary>
+	PackagesViewModel ViewModel => field ??= new(Navi);
 
 	/// <summary>What is drawn below. Read only.</summary>
 	PackagesUiState UiState => ViewModel.UiState;
@@ -266,14 +266,14 @@ what makes it work: `UiState` is pure data, so the host can send it, and the pan
 host's.
 
 - **The host's copy** (offline, the only one) owns the view model. Its `Tick` runs the view model and calls
-  `Navi.Publish( this, ViewModel.UiState )`. Publishing the same object again sends nothing, which is why `Update`
+  `Navi.Publish( ViewModel.UiState )`. Publishing the same object again sends nothing, which is why `Update`
   replaces the record instead of changing it.
-- **A viewer's copy** (`Navi.IsViewer( this )`) has no view model and makes no calls: `NaviAppHost` refuses them.
-  It draws `Navi.GetState<TUiState>( this )`, or an `Empty` state until the first one arrives. The class is set
+- **A viewer's copy** (`Navi.IsViewer`) has no view model and makes no calls: `NaviAppHost` refuses them.
+  It draws `Navi.GetState<TUiState>()`, or an `Empty` state until the first one arrives. The class is set
   before the panel's first tick, so a viewer never creates a view model by accident.
-- **Controls are actions.** `@onclick=@( () => Navi.Act( this, CalculatorViewModel.PressAction, key.Label ) )`.
-  The host's copy gets it in `OnEvent` (`Navi.IsAction( e, out var action, out var args )`) and the view model's
-  `Act` turns it back into a method call, one case per control. Arguments are strings; parse them there, and ignore
+- **Controls are actions.** `@onclick=@( () => Navi.Act( CalculatorViewModel.PressAction, key.Label ) )`.
+  The host's copy gets it in `NaviApp.OnAction`, and the view model's `Act` turns it back into a method call, one
+  case per control. Arguments are strings; parse them there, and ignore
   what doesn't parse, as if the player had clicked nothing. Keep action names as constants on the view model.
 - **The state is sent to every player.** Keep it small (Pac-Man packs its dots into one string), leave out what
   never changes (Calculator's keypad is a static property), and remember that viewers get it a tick or so late
@@ -284,27 +284,17 @@ host's.
   does this.
 
 ```csharp
-CalculatorUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<CalculatorUiState>( this ) ?? CalculatorUiState.Empty : ViewModel.UiState;
+CalculatorUiState UiState => Navi.IsViewer ? Navi.GetState<CalculatorUiState>() ?? CalculatorUiState.Empty : ViewModel.UiState;
 
 public override void Tick()
 {
 	base.Tick();
 
-	if ( !Navi.IsViewer( this ) )
-		Navi.Publish( this, ViewModel.UiState );
+	if ( !Navi.IsViewer )
+		Navi.Publish( ViewModel.UiState );
 }
 
-protected override void OnEvent( PanelEvent e )
-{
-	if ( Navi.IsAction( e, out var action, out var args ) )
-	{
-		ViewModel.Act( action, args );
-		e.StopPropagation();
-		return;
-	}
-
-	base.OnEvent( e );
-}
+protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
 ```
 
 An action is what the player could have clicked, not data to trust: the host checks only that it came from the
@@ -317,7 +307,7 @@ Each window is a separate panel, so a window has its own `ViewModel` and `UiStat
 - **One owner for state they share.** Put it in a plain class the app's code owns (a static or a singleton held by the service panel's view model), and let each window's view model read it. Don't pass it through Navi, and don't have one window reach into another's panel: the panels are separate instances and a viewer's copy has nothing of the host's.
 - **The service is the app, the windows are views.** For a headless app, the service panel's view model does the work (timers, downloads, the tray menu) and the window panels only draw its state and call its methods. A window can then be closed and reopened without losing anything, which is the point of headless.
 
-The service's view model is made like any other: `new( this )` on first use. It makes the tray menu with `Navi.SetTray` and reacts to the player's tray clicks, which arrive in the panel's `OnEvent` as `Navi.IsTrayClick`, as a method call on the view model, one case per menu item, in the same way a shared app turns an action into a call.
+The service's view model is made like any other: `new( Navi )` on first use. It makes the tray menu with `navi.Tray.SetAsync` and reacts to the player's tray clicks, which arrive in the panel's `OnTrayClick`, as a method call on the view model, one case per menu item, in the same way a shared app turns an action into a call.
 
 ```csharp
 public void TrayClicked( string item )
@@ -325,13 +315,13 @@ public void TrayClicked( string item )
 	switch ( item )
 	{
 		case Navi.TrayPrimary:
-		case "settings": _ = Navi.OpenWindow( app, "settings" ); break;
+		case "settings": _ = navi.Window.OpenAsync( "settings" ); break;
 		case "sync": StartSync(); break;
 	}
 }
 ```
 
-Tray items change what the app shows, so keep them like any other state: build the list from `UiState` and call `Navi.SetTray` when it changes, not every tick.
+Tray items change what the app shows, so keep them like any other state: build the list from `UiState` and call `navi.Tray.SetAsync` when it changes, not every tick.
 
 ## If you come from Kotlin
 

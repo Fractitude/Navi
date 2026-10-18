@@ -79,7 +79,7 @@ public sealed class NaviWindow
 	public NaviWindowInfo Info { get; init; }
 
 	/// <summary>
-	/// What the title bar says after the app's name: the title the app set while running (<c>Navi.SetTitle</c>), or else the
+	/// What the title bar says after the app's name: the title the app set while running (<c>Navi.Window.SetTitleAsync</c>), or else the
 	/// one its manifest gave.
 	/// </summary>
 	public string Title
@@ -131,7 +131,7 @@ public sealed class NaviWindow
 }
 
 /// <summary>
-/// An app's icon in the system tray, which the app sets (<c>Navi.SetTray</c>). The desktop draws it and its menu: the
+/// An app's icon in the system tray, which the app sets (<c>Navi.Tray.SetAsync</c>). The desktop draws it and its menu: the
 /// app's items, then Quit, which the app can't change.
 /// </summary>
 public sealed class NaviTray
@@ -180,7 +180,7 @@ public sealed class NaviTray
 }
 
 /// <summary>
-/// An entry in a tray icon's menu. Choosing it gives the app's main panel its <see cref="Id"/> (<c>Navi.IsTrayClick</c>).
+/// An entry in a tray icon's menu. Choosing it gives the app's main panel its <see cref="Id"/> (<c>NaviApp.OnTrayClick</c>).
 /// </summary>
 public sealed class NaviTrayItem
 {
@@ -195,7 +195,7 @@ public sealed class NaviTrayItem
 
 /// <summary>
 /// A permission dialog on the desktop. Either a review of all the permissions an app declares, which sets exactly what it
-/// has (before its first launch, or from its taskbar menu), or a running app asking for more (<c>Navi.RequestPermissions</c>).
+/// has (before its first launch, or from its taskbar menu), or a running app asking for more (<c>Navi.Permissions.RequestAsync</c>).
 /// </summary>
 public sealed class NaviPermissionRequest
 {

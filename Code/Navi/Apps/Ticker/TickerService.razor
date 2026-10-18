@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* Demo of a headless, shared app (Assets/navi/apps/ticker.napp): this panel is its service. It is never drawn. On the *@
@@ -26,7 +26,7 @@
 	{
 		base.Tick();
 
-		if ( Navi.IsViewer( this ) )
+		if ( Navi.IsViewer )
 			return;
 
 		if ( sinceSecond >= 1f )
@@ -39,25 +39,17 @@
 		if ( shownSeconds != TickerState.Seconds )
 		{
 			shownSeconds = TickerState.Seconds;
-			_ = Navi.SetTray( this, "timer", $"{shownSeconds} s",
+			_ = Navi.Tray.SetAsync( "timer", $"{shownSeconds} s",
 				new Navi.TrayItem( "open", "Show count", "visibility" ),
 				new Navi.TrayItem( "reset", "Reset", "restart_alt" ) );
 		}
 	}
 
-	protected override void OnEvent( PanelEvent e )
+	protected override void OnTrayClick( string item )
 	{
-		if ( Navi.IsTrayClick( e, out var item ) )
-		{
-			if ( item == "reset" )
-				TickerState.Seconds = 0;
-			else
-				_ = Navi.OpenWindow( this, "log" );
-
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
+		if ( item == "reset" )
+			TickerState.Seconds = 0;
+		else
+			_ = Navi.Window.OpenAsync( "log" );
 	}
 }

@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* A Navi app like any other: a plain panel, described by Assets/navi/apps/calculator.napp. It is shared, so the panel *@
@@ -18,7 +18,7 @@
 			<div class="row">
 				@foreach ( var key in row )
 				{
-					<div class="key @key.Class" @onclick=@( () => Navi.Act( this, CalculatorViewModel.PressAction, key.Label ) )>@key.Label</div>
+					<div class="key @key.Class" @onclick=@( () => Navi.Act( CalculatorViewModel.PressAction, key.Label ) )>@key.Label</div>
 				}
 			</div>
 		}
@@ -35,27 +35,17 @@
 	/// <summary>
 	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	CalculatorUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<CalculatorUiState>( this ) ?? CalculatorUiState.Empty : ViewModel.UiState;
+	CalculatorUiState UiState => Navi.IsViewer ? Navi.GetState<CalculatorUiState>() ?? CalculatorUiState.Empty : ViewModel.UiState;
 
 	public override void Tick()
 	{
 		base.Tick();
 
-		if ( !Navi.IsViewer( this ) )
-			Navi.Publish( this, ViewModel.UiState );
+		if ( !Navi.IsViewer )
+			Navi.Publish( ViewModel.UiState );
 	}
 
-	protected override void OnEvent( PanelEvent e )
-	{
-		if ( Navi.IsAction( e, out var action, out var args ) )
-		{
-			ViewModel.Act( action, args );
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
-	}
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
 
 	protected override int BuildHash() => UiState.Revision;
 }

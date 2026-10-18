@@ -2,7 +2,7 @@ namespace Sandbox;
 
 /// <summary>
 /// What an app may do beyond the basics. Every app can open apps, list them and control its own window. Anything else needs
-/// a permission, which the player grants: when the app asks (<c>Navi.RequestPermissions</c>), or by opening it from the
+/// a permission, which the player grants: when the app asks (<c>Navi.Permissions.RequestAsync</c>), or by opening it from the
 /// taskbar with "Open with permissions...". An app lists the permissions it may ask for in its <see cref="NaviAppResource"/>.
 /// System apps get theirs without asking. Grants last until the app closes.
 /// </summary>
@@ -50,7 +50,8 @@ public static class NaviPermissions
 
 	/// <summary>
 	/// The error an app gets when it calls something it lacks the permission for. The app can catch it, ask for
-	/// the permission, and try again. The message ends with the permission id, so apps without Navi types can read it.
+	/// the permission, and try again. The message ends with the permission id, so the client, which has no Navi types, can
+	/// read it and throw <see cref="Navi.MissingPermissionException"/>.
 	/// </summary>
 	public static System.UnauthorizedAccessException Missing( string permission ) =>
 		new( $"Missing permission: {permission}" );

@@ -1,5 +1,5 @@
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace NaviApps
 
 @* A Navi app like any other: a plain panel, described by Assets/navi/apps/turntable.napp. It shows a model in 3D, *@
@@ -15,23 +15,23 @@
 			{
 				var index = i;
 				<div class="button @( index == UiState.ModelIndex ? "active" : "" )"
-				     @onclick=@( () => Navi.Act( this, TurntableViewModel.ModelAction, index.ToString() ) )>
+				     @onclick=@( () => Navi.Act( TurntableViewModel.ModelAction, index.ToString() ) )>
 					@TurntableUiState.Models[index].Label
 				</div>
 			}
 		</div>
 
 		<div class="row">
-			<div class="button" @onclick=@( () => Navi.Act( this, TurntableViewModel.RotateAction, "left" ) )>
+			<div class="button" @onclick=@( () => Navi.Act( TurntableViewModel.RotateAction, "left" ) )>
 				<i>rotate_left</i>
 			</div>
-			<div class="button spin" @onclick=@( () => Navi.Act( this, TurntableViewModel.SpinAction ) )>
+			<div class="button spin" @onclick=@( () => Navi.Act( TurntableViewModel.SpinAction ) )>
 				@UiState.SpinLabel
 			</div>
-			<div class="button" @onclick=@( () => Navi.Act( this, TurntableViewModel.RotateAction, "right" ) )>
+			<div class="button" @onclick=@( () => Navi.Act( TurntableViewModel.RotateAction, "right" ) )>
 				<i>rotate_right</i>
 			</div>
-			<div class="button tint" @onclick=@( () => Navi.Act( this, TurntableViewModel.TintAction ) )>
+			<div class="button tint" @onclick=@( () => Navi.Act( TurntableViewModel.TintAction ) )>
 				<div class="swatch" style="background-color: @UiState.Tint.Hex"></div>
 				@UiState.Tint.Label
 			</div>
@@ -49,7 +49,7 @@
 	/// <summary>
 	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	TurntableUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<TurntableUiState>( this ) ?? TurntableUiState.Empty : ViewModel.UiState;
+	TurntableUiState UiState => Navi.IsViewer ? Navi.GetState<TurntableUiState>() ?? TurntableUiState.Empty : ViewModel.UiState;
 
 	ScenePanel View { get; set; }
 
@@ -119,10 +119,10 @@
 	{
 		base.Tick();
 
-		if ( !Navi.IsViewer( this ) )
+		if ( !Navi.IsViewer )
 		{
 			ViewModel.Tick();
-			Navi.Publish( this, ViewModel.UiState );
+			Navi.Publish( ViewModel.UiState );
 		}
 
 		UpdateDrag();
@@ -193,7 +193,7 @@
 			predictedYaw = shownYaw;
 			unsent = false;
 			sinceSent = 0;
-			Navi.Act( this, TurntableViewModel.HoldAction, "1" );
+			Navi.Act( TurntableViewModel.HoldAction, "1" );
 			return;
 		}
 
@@ -212,7 +212,7 @@
 			{
 				// Still holding with the mouse still: say so, or the host lets go of the model.
 				sinceSent = 0;
-				Navi.Act( this, TurntableViewModel.HoldAction, "1" );
+				Navi.Act( TurntableViewModel.HoldAction, "1" );
 			}
 
 			return;
@@ -226,7 +226,7 @@
 			if ( unsent )
 				SendDrag();
 
-			Navi.Act( this, TurntableViewModel.HoldAction, "0" );
+			Navi.Act( TurntableViewModel.HoldAction, "0" );
 		}
 	}
 
@@ -235,7 +235,7 @@
 		unsent = false;
 		sinceSent = 0;
 
-		Navi.Act( this, TurntableViewModel.DragAction, (predictedYaw ?? shownYaw).ToString( System.Globalization.CultureInfo.InvariantCulture ) );
+		Navi.Act( TurntableViewModel.DragAction, (predictedYaw ?? shownYaw).ToString( System.Globalization.CultureInfo.InvariantCulture ) );
 	}
 
 	/// <summary>
@@ -372,17 +372,7 @@
 		scene = null;
 	}
 
-	protected override void OnEvent( PanelEvent e )
-	{
-		if ( Navi.IsAction( e, out var action, out var args ) )
-		{
-			ViewModel.Act( action, args );
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
-	}
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
 
 	protected override int BuildHash() => UiState.Revision;
 }

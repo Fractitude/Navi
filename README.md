@@ -31,17 +31,17 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 
 ## Make an app
 
-Every app is made the same way, whether it is built in, part of a game, or published to the Store: a plain Razor panel, plus a `.napp` manifest that describes it. The panel uses no Navi types; it talks to the computer through the `Navi` client.
+Every app is made the same way, whether it is built in, part of a game, or published to the Store: a Razor panel that derives from `NaviApp`, plus a `.napp` manifest that describes it. `NaviApp` and the `Navi` client are the one file of Navi an app uses (`Code/Navi/Client/Navi.cs`); a Store app copies it (see "Publish an app to the Store").
 
 1. Write the panel. Give it its own namespace so class names don't clash:
 
    ```razor
    @using Sandbox.UI
-   @inherits Panel
+   @inherits NaviApp
    @namespace NotesApp
 
    <root>
-   	<div class="button" @onclick=@(() => Navi.Close( this ))>Done</div>
+   	<div class="button" @onclick=@( () => Navi.Window.CloseAsync() )>Done</div>
    </root>
    ```
 
@@ -72,9 +72,7 @@ An app is three parts, and the panel is only the third:
 ```razor
 @code
 {
-	NotesViewModel viewModel;
-
-	NotesViewModel ViewModel => viewModel ??= new( this );
+	NotesViewModel ViewModel => field ??= new( Navi );
 	NotesUiState UiState => ViewModel.UiState;
 
 	protected override int BuildHash() => ViewModel.Revision;
@@ -83,7 +81,7 @@ An app is three parts, and the panel is only the third:
 
 One place changes the state, the panel never decides, not every change is worth a redraw, and what the panel must do to its own tree stays in the panel.
 
-The full contract — where each kind of rule goes, async and threads, the optional `Changed` event, and a Kotlin-to-C# translation — is in [`docs/app-architecture.md`](docs/app-architecture.md). `Packages` is the reference implementation: `Code/Navi/Apps/Packages/`. Store apps split the same way; a view model is plain C#, so it needs nothing from Navi.
+The full contract — where each kind of rule goes, async and threads, the optional `Changed` event, and a Kotlin-to-C# translation — is in [`docs/app-architecture.md`](docs/app-architecture.md). `Packages` is the reference implementation: `Code/Navi/Apps/Packages/`. Store apps split the same way. A view model is plain C# that takes the panel's `Navi`, never the panel.
 
 ### The manifest (`.napp`)
 
@@ -117,13 +115,13 @@ Ids are saved in `InstalledApps` and the other lists of granted rights, so don't
 
 An app is not the same thing as a window. A running app (`NaviProcess`) has any number of windows (`NaviWindow`) and may have an icon in the system tray (`NaviTray`).
 
-**More windows.** List them in the manifest under `Windows`, each with a panel class from the app's own code, and open them from the app with `Navi.OpenWindow( this, "settings" )`. An app has at most one window of each id, so opening one that is open brings it to the front. The panels are separate instances: they share state through the app's own code (a static class or service), not through Navi. An app can only open windows its manifest lists, and it needs no permission to.
+**More windows.** List them in the manifest under `Windows`, each with a panel class from the app's own code, and open them from the app with `Navi.Window.OpenAsync( "settings" )`. An app has at most one window of each id, so opening one that is open brings it to the front. The panels are separate instances: they share state through the app's own code (a static class or service), not through Navi. An app can only open windows its manifest lists, and it needs no permission to.
 
 **Headless.** With `Headless` in the manifest the app's `PanelType` is a service. It is created when the app starts and kept in a hidden layer of the desktop where it keeps ticking, and no window is made for it. It sets its tray icon and menu, and opens windows when asked:
 
 ```razor
 @using Sandbox.UI
-@inherits Panel
+@inherits NaviApp
 @namespace SyncApp
 
 <root></root>
@@ -137,7 +135,7 @@ An app is not the same thing as a window. A running app (`NaviProcess`) has any 
 		if ( !started )
 		{
 			started = true;
-			_ = Navi.SetTray( this, "cloud_sync", "Up to date",
+			_ = Navi.Tray.SetAsync( "cloud_sync", "Up to date",
 				new Navi.TrayItem( "settings", "Settings...", "settings" ),
 				new Navi.TrayItem( "sync", "Sync now", "sync" ) );
 		}
@@ -145,62 +143,55 @@ An app is not the same thing as a window. A running app (`NaviProcess`) has any 
 
 	bool started;
 
-	protected override void OnEvent( PanelEvent e )
+	protected override void OnTrayClick( string item )
 	{
-		if ( Navi.IsTrayClick( e, out var item ) )
-		{
-			if ( item is "settings" or Navi.TrayPrimary )
-				_ = Navi.OpenWindow( this, "settings" );
-			else if ( item == "sync" )
-				StartSync();
-
-			e.StopPropagation();
-			return;
-		}
-
-		base.OnEvent( e );
+		if ( item is "settings" or Navi.TrayPrimary )
+			_ = Navi.Window.OpenAsync( "settings" );
+		else if ( item == "sync" )
+			StartSync();
 	}
 }
 ```
 
 - **The tray is drawn by the desktop**, at the right end of the taskbar. Right-click opens the menu: the app's items (up to 12), then **Quit**, which the app can't remove or rename. Quit closes the app with all its windows. The tooltip and the menu heading start with the app's name, so an app can't pass for another one. Texts are cut to size (`NaviTray`).
-- **Left-click** gives the app `Navi.TrayPrimary`. Opening an app from the taskbar when it is already running without a window gives it the same click.
+- **Left-click** gives the app's `OnTrayClick` `Navi.TrayPrimary`. Opening an app from the taskbar when it is already running without a window gives it the same click.
 - **A headless app has a tray icon from the start** (its manifest icon), so the player can always see and quit it. A normal app may set one too.
 - **Where a click goes.** A tray click reaches the app's main panel only (the service, for a headless app). In multiplayer a `Shared` app hears it on the host's copy; one that isn't shared hears it on the clicking player's own copy, like every other click in it.
-- **Closing.** `Navi.Close( this )` from the service quits the app. Closing a secondary window only closes it.
+- **Closing.** `Navi.Window.CloseAsync()` from the service quits the app. Closing a secondary window only closes it.
 - **Shared apps** publish per window: each window's panel calls `Navi.Publish` and draws `Navi.GetState` for itself, and `Navi.Act` reaches the host's copy of the same window. State, scrolling and actions are kept by window key (`NaviWindow.Key`: the app's id, then `#` and the window id for the others). App ids can't contain `#`.
 - **Not a security boundary.** Window panel classes, like the main one, come from the app's code, and the host can name any panel class in a client's code (see "Multiplayer", last bullet).
 
 ## Talking to the computer
 
-Apps call the static `Navi` class with their own panel. Calls are async: they travel up the panel tree as a `navi.call` event and are answered a frame or so later.
+An app's panel derives from `NaviApp`, and its `Navi` property is the computer, as that app. Calls are async: they travel up the panel tree as a `navi.call` event and are answered a frame or so later. A view model takes the `Navi`, not the panel. A panel that can't derive from `NaviApp` makes its own with `new Navi( this )`, and passes its `OnEvent` to `Navi.TryGetAction` and `Navi.TryGetTrayClick`.
 
 | Call | Does | Needs |
 |---|---|---|
-| `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The window the panel is in. Closing the main window closes the app | |
-| `Navi.SetTitle( this, title )` | Change what the title bar says after the app's name (up to 32 characters; empty restores the `.napp` title) | |
-| `Navi.OpenWindow( this, id )`, `CloseWindow` | Open or close one of the windows the manifest lists | |
-| `Navi.SetTray( this, icon, tooltip, items )` | Set the app's tray icon and menu | |
-| `Navi.IsTrayClick( e, out id )` | In `OnEvent`: the player clicked the tray icon (`Navi.TrayPrimary`) or a menu item | |
-| `Navi.HasInput( this )` | True while the app has the player's controls (not async) | |
-| `Navi.GetApps( this )` | Every app, with installed and system flags | |
-| `Navi.GetStoreApps( this )` | Ids of the apps that came from the Store | |
-| `Navi.Launch( this, id )` | Open an app | |
-| `Navi.Install( this, id )`, `Uninstall` | Install or uninstall an app | `navi.apps.install` |
-| `Navi.CloseApp( this, id )` | Close another app | `navi.apps.manage` |
-| `Navi.SearchStore( this )` | Store packages, with an official flag | |
-| `Navi.GetStoreStatus( this )` | Installed and downloading package idents | |
-| `Navi.GetStoreBlacklist( this )` | Package idents the game blocks | |
-| `Navi.InstallPackage( this, ident )` | Download and install a Store app | `navi.store.install` |
-| `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
-| `Navi.GetDisplayScale( this )` | The display scale (1 is 100%) and the scales the player can pick | |
-| `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
-| `Navi.GetTheme( this )` | The theme, color scheme, blur level and transparency level | |
-| `Navi.GetWallpaper( this )`, `SetWallpaper( this, wallpaper )` | The wallpaper (`Paper` or `Glass`), independent of the theme | `navi.settings.change` (set) |
-| `Navi.SetTheme( this, theme )`, `SetColorScheme`, `SetBlurLevel`, `SetTransparencyLevel` | Change the look. See Theming | `navi.settings.change` |
-| `Navi.GetSnapping( this )` | Whether windows snap to the screen's edges and to each other's, and the distance in panel pixels | |
-| `Navi.SetSnapToScreenEdges( this, on )`, `SetSnapToWindows`, `SetSnapDistance` | Change window snapping | `navi.settings.change` |
-| `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
+| `Navi.Window.CloseAsync()`, `MinimizeAsync()`, `ToggleMaximizeAsync()` | The window the panel is in. Closing the main window closes the app | |
+| `Navi.Window.SetTitleAsync( title )` | Change what the title bar says after the app's name (up to 32 characters; empty restores the `.napp` title) | |
+| `Navi.Window.GetIdAsync()` | The manifest's id of the window the panel is in; empty for the main window | |
+| `Navi.Window.OpenAsync( id )`, `CloseAsync( id )` | Open or close one of the windows the manifest lists | |
+| `Navi.Tray.SetAsync( icon, tooltip, items )` | Set the app's tray icon and menu. Clicks arrive in `OnTrayClick` | |
+| `Navi.HasInput` | True while the app has the player's controls (not async) | |
+| `Navi.Input.Down( action )`, `Pressed( action )` | The player's keys while the app has them, also in a shared app (not async) | |
+| `Navi.Apps.ListAsync()` | Every app (`AppInfo`): installed or not, and its `AppKind` | |
+| `Navi.Apps.ListFromStoreAsync()` | Ids of the apps that came from the Store | |
+| `Navi.Apps.LaunchAsync( id )` | Open an app | |
+| `Navi.Apps.InstallAsync( id )`, `UninstallAsync( id )` | Install or uninstall an app | `navi.apps.install` |
+| `Navi.Apps.CloseAsync( id )` | Close another app | `navi.apps.manage` |
+| `Navi.Store.SearchAsync( text, skip, take )` | A `StorePage` of packages, each with an official flag | |
+| `Navi.Store.GetStatusAsync()` | Installed and downloading package idents | |
+| `Navi.Store.GetBlacklistAsync()` | Package idents the game blocks | |
+| `Navi.Store.InstallAsync( ident )` | Download and install a Store app | `navi.store.install` |
+| `Navi.GetVersionAsync()` | Goes up on every change. Poll it to know when to refresh | |
+| `Navi.Settings.GetDisplayScaleAsync()` | The display scale (1 is 100%) and the scales the player can pick | |
+| `Navi.Settings.SetDisplayScaleAsync( scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
+| `Navi.Settings.GetThemeAsync()` | The theme, color scheme, blur level and transparency level | |
+| `Navi.Settings.GetWallpaperAsync()`, `SetWallpaperAsync( wallpaper )` | The wallpaper (`Paper` or `Glass`), independent of the theme | `navi.settings.change` (set) |
+| `Navi.Settings.SetThemeAsync( theme )`, `SetColorSchemeAsync`, `SetBlurLevelAsync`, `SetTransparencyLevelAsync` | Change the look. See Theming | `navi.settings.change` |
+| `Navi.Settings.GetSnappingAsync()` | Whether windows snap to the screen's edges and to each other's, and the distance in panel pixels | |
+| `Navi.Settings.SetSnapToScreenEdgesAsync( on )`, `SetSnapToWindowsAsync`, `SetSnapDistanceAsync` | Change window snapping | `navi.settings.change` |
+| `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
 
 ## Theming
 
@@ -264,7 +255,7 @@ The host runs every computer, and other clients draw what it sends. Set the comp
 - **The desktop is the same everywhere.** Windows, positions, focus, installed apps, settings and prompts come from the host as a snapshot, in parts that are sent only when they change (`NetworkApps`, `NetworkState`, `NetworkWindows`, `NetworkSession`): moving a window sends only the windows. What the user does goes to the host as an RPC (`UserLaunch`, `UserClose`, `UserMoveWindow`...), which checks the caller is the user. On other clients every method that changes the computer (`Install`, `Launch`, `Close`...) does nothing: call them on the host. Saves are written and loaded on the host only.
 - **Only nearby players get it.** The host sends a computer's state only to players within `NaviComputer.NetworkRange` world units (default 1500), and always to its user. A player who comes back in range gets the latest state. The computer turns off its GameObject's Always Transmit for this; set `NetworkRange` to 0 to send to everyone. Out of range, the engine turns the whole computer off for that player, so the host spawns a plane over the screen (`NaviScreenStandIn`, colored `OutOfRangeColor`, black by default) that they see instead.
 - **Store apps follow the host.** A client downloads the Store apps the host has, so it can draw them.
-- **Shared apps** (`Shared` in the manifest) look the same to everyone. The host's copy runs the app and publishes its state with `Navi.Publish`. Every other client's copy is a viewer (`Navi.IsViewer`): it draws `Navi.GetState<T>`, makes no calls, and runs no logic. Controls call `Navi.Act( this, "action", args )`, which reaches the host's copy as an action (`Navi.IsAction` in `OnEvent`) from whichever client the user is on. Apps that capture input read keys with `Navi.InputDown` / `Navi.InputPressed`, which give the user's keys on the host (`NaviInputCapture.ForwardedActions` lists the ones sent). Keep the state small: it is sent to everyone, up to `NaviComputer.MaxAppState` characters. See `docs/app-architecture.md`.
+- **Shared apps** (`Shared` in the manifest) look the same to everyone. The host's copy runs the app and publishes its state with `Navi.Publish`. Every other client's copy is a viewer (`Navi.IsViewer`): it draws `Navi.GetState<T>`, makes no calls, and runs no logic. Controls call `Navi.Act( "action", args )`, which reaches the host's copy as an action (`OnAction`) from whichever client the user is on. Apps that capture input read keys with `Navi.Input.Down` / `Navi.Input.Pressed`, which give the user's keys on the host (`NaviInputCapture.ForwardedActions` lists the ones sent). Keep the state small: it is sent to everyone, up to `NaviComputer.MaxAppState` characters. See `docs/app-architecture.md`.
 - **Other apps run locally.** Without `Shared`, each client runs its own copy, so players see different things in the window, which shows a "Client-side" mark. Such a copy on a client can work its own window, and read the computer, but changes nothing else.
 - **What it trusts.** The host trusts the user's client that their clicks, and their answers to permission prompts, were real presses: the secure layer's real-mouse check runs on the user's machine. A modified client can fake both, for its own seat only. A client's copy never makes calls as an app; calls run only on the host's copy. A hostile host can make clients download any Store app, since they download what the host has installed. A client that lacks the manifests of the game's or libraries' apps (one that joins an editor session, say) takes them from the host, so a hostile host can also open any panel class in the client's code as an app; it only draws there, and can't change the client's computer.
 
@@ -274,8 +265,8 @@ Every app can open apps, list them and control its own window. Anything more nee
 
 - **The manifest declares them.** An app can only ever have the permissions its `.napp` lists.
 - **First launch asks first.** The first time the player opens an app that declares permissions, a dialog lists them, all ticked. The player unticks what they don't want and clicks Open; the app then runs with the rest. Cancel doesn't open it.
-- **Apps can ask while running.** `await Navi.RequestPermissions( this, Navi.Permission.InstallApps )` shows the same dialog for the ones it lacks and returns `(Granted, Denied)`.
-- **Missing permissions fail.** A call without its permission throws `UnauthorizedAccessException`. `Navi.MissingPermission( e )` says which one. `Navi.WithPermission( this, () => Navi.Install( this, id ) )` makes a call, asks for a missing permission, and tries once more.
+- **Apps can ask while running.** `await Navi.Permissions.RequestAsync( Navi.Permission.InstallApps )` shows the same dialog for the ones it lacks and returns which were `Granted` and which `Denied`.
+- **Missing permissions fail.** A call without its permission throws `Navi.MissingPermissionException`, whose `Permission` says which one. `Navi.WithPermissionAsync( () => Navi.Apps.InstallAsync( id ) )` makes a call, asks for a missing permission, and tries once more.
 - **Grants are remembered** per app (`NaviComputer.GrantedPermissions`), across launches. Uninstalling forgets them.
 - **The player can change them** from the taskbar menu: Permissions... (or Open with permissions... when the app is closed) shows every declared permission, ticked as granted. Unticking revokes.
 - **System apps** have root, which allows everything, and skip these dialogs. See below.
@@ -294,17 +285,17 @@ An app with `IsSystem` in its manifest asks for full system access: root. Root h
 - **Store system apps** ask when they are installed. After the download, before anything is installed, the player sees "Install ... with full system access?". Cancel, and the app isn't installed. The Store can't tell before the download, because the manifest is inside the package.
 - If a Store app becomes a system app in an update, it asks once before its next launch.
 - Accepted apps are kept in `NaviComputer.RootApps`. Uninstalling forgets them.
-- `Navi.HasRoot( this )` tells an app whether it has root.
+- `Navi.Permissions.HasRootAsync()` tells an app whether it has root.
 
 ## Sitting at the computer
 
 Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for every app. `NaviComputer.IsSeated` says whether the local player has it. Offline, the first click on the screen sits the player down.
 
 - The camera flies to the computer until the screen fills the view (`NaviInputCapture.FlyTime`, `Fill`).
-- The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself with `Navi.InputDown( this, "Forward" )` for W (or `Input.Down`, in an app that isn't shared). In multiplayer only the computer's user is pulled in.
+- The local player's `PlayerController` stops moving, looking and moving the camera. The app reads keys itself with `Navi.Input.Down( "Forward" )` for W (or `Input.Down`, in an app that isn't shared). In multiplayer only the computer's user is pulled in.
 - Once the screen fills the view, the mouse cursor is shown, and `WorldInput` aims with it, so the player can point and click anywhere on the computer (`FreeCursor`). Game code that hides the cursor every frame, like a crosshair, should skip that while `NaviInputCapture.Current` isn't null.
 - An Escape press is swallowed so the game menu doesn't open, and stands the player up (`NaviComputer.UserLeave`): the camera flies back and the controls return.
-- `Navi.HasInput( this )` is true while the app is in front and the player sits at the computer (its panel has the `navi-input` class). Pause when it isn't. Closing or minimizing the window doesn't stand the player up.
+- `Navi.HasInput` is true while the app is in front and the player sits at the computer (its panel has the `navi-input` class). Pause when it isn't. Closing or minimizing the window doesn't stand the player up.
 - Game code can check `NaviInputCapture.Current`, e.g. to hide a crosshair while it isn't null.
 
 `NaviInputCapture` is added to the computer automatically by `NaviDesktop`. The camera move needs a `WorldPanel`; with a `ScreenPanel` only the controls are taken.
@@ -313,13 +304,14 @@ Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for 
 
 Players make apps in their own addon project and publish them to sbox.game. Other players install them from the Store tab in Packages, in any game that has the Navi library. In the Omnipresence repo, `Addons/navi_pacman/` is an example: a Pac-Man game.
 
-**Don't install the Navi library in an app addon.** When an addon asset is published with code, s&box bundles every library in the addon project, and a bundled Navi would replace the host game's Navi when the app is installed. That's why apps use no Navi types: copy `Code/Navi/Client/Navi.cs` into the addon's `Code/` and change only its namespace line. The `.napp` asset type comes from the target game, which already has Navi.
+**Don't install the Navi library in an app addon.** When an addon asset is published with code, s&box bundles every library in the addon project, and a bundled Navi would replace the host game's Navi when the app is installed. That's why apps use no Navi types: copy `Code/Navi/Client/Navi.cs` into the addon's `Code/` and change only its namespace line. It holds `NaviApp` and the `Navi` client. A copy keeps working as Navi gets newer, because what it sends to the computer stays the same; copy it again to get the calls added since. The `.napp` asset type comes from the target game, which already has Navi.
 
 1. Create an addon project: in the s&box launcher, New Project > Addon.
 2. In Project Settings, set Target Game to a game that has the Navi library, e.g. `fractitude.omnipresence`. Restart the editor.
 3. Copy the `Navi` client in, if the app calls the computer. Write the app as in "Make an app".
 4. Press Play to test. Code changes hot-reload. Friends who join your editor session get the changes too.
-5. Publish the `.napp` from the asset browser. The addon's code is published with it. Prefix the package ident with `napp_`, e.g. `fractitude.napp_pacman`.
+5. Publish the app as a `.napp` package: in the Asset Browser, right-click the project's root folder (named after the project, e.g. "Navi PacMan") and choose **Batch Publish**. The `.napp` has no Publish action of its own, and the editor's Publish button publishes the addon project instead, which the Store doesn't list. The addon's code is published with the `.napp`. Prefix the package ident with `napp_`, e.g. `fractitude.napp_pacman`.
+6. To update a published app, run Batch Publish again: sbox.game gives each publish the next version number, so there is no version to bump.
 
 How the Store works:
 

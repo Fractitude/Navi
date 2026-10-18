@@ -10,9 +10,9 @@ namespace NaviApps;
 public sealed class SettingsViewModel
 {
 	/// <summary>
-	/// The app's panel. Every call to the computer is made with it, and it is the window the computer answers as.
+	/// The computer, as this app. Every call is made through it, and the computer answers as the window the app is in.
 	/// </summary>
-	readonly Panel app;
+	readonly Navi navi;
 
 	/// <summary>How often the computer's version is polled, in seconds: a change there means the settings may have changed.</summary>
 	const float PollInterval = 0.25f;
@@ -34,7 +34,7 @@ public sealed class SettingsViewModel
 	// What the computer said.
 
 	float displayScale = 1f;
-	float[] displayScales = [];
+	IReadOnlyList<float> displayScales = [];
 
 	Navi.Theme theme;
 	Navi.ColorScheme scheme;
@@ -52,9 +52,9 @@ public sealed class SettingsViewModel
 	bool polling;
 	RealTimeSince sincePoll;
 
-	public SettingsViewModel( Panel app )
+	public SettingsViewModel( Navi navi )
 	{
-		this.app = app ?? throw new System.ArgumentNullException( nameof(app) );
+		this.navi = navi ?? throw new System.ArgumentNullException( nameof(navi) );
 
 		UiState = new SettingsUiState
 		{
@@ -93,28 +93,28 @@ public sealed class SettingsViewModel
 	}
 
 	/// <summary>Put another wallpaper behind the windows.</summary>
-	public void ChooseWallpaper( Navi.Wallpaper choice ) => _ = RunAsync( () => Navi.SetWallpaper( app, choice ), "the wallpaper" );
+	public void ChooseWallpaper( Navi.Wallpaper choice ) => _ = RunAsync( () => navi.Settings.SetWallpaperAsync( choice ), "the wallpaper" );
 
 	/// <summary>Draw the computer in another theme.</summary>
-	public void ChooseTheme( Navi.Theme choice ) => _ = RunAsync( () => Navi.SetTheme( app, choice ), "the theme" );
+	public void ChooseTheme( Navi.Theme choice ) => _ = RunAsync( () => navi.Settings.SetThemeAsync( choice ), "the theme" );
 
 	/// <summary>Draw the computer light or dark.</summary>
-	public void ChooseScheme( Navi.ColorScheme choice ) => _ = RunAsync( () => Navi.SetColorScheme( app, choice ), "the color scheme" );
+	public void ChooseScheme( Navi.ColorScheme choice ) => _ = RunAsync( () => navi.Settings.SetColorSchemeAsync( choice ), "the color scheme" );
 
 	/// <summary>How strongly the Glass theme blurs what is behind a surface.</summary>
-	public void ChooseBlur( int level ) => _ = RunAsync( () => Navi.SetBlurLevel( app, level ), "the blur" );
+	public void ChooseBlur( int level ) => _ = RunAsync( () => navi.Settings.SetBlurLevelAsync( level ), "the blur" );
 
 	/// <summary>How much shows through the Glass theme's surfaces.</summary>
-	public void ChooseTransparency( int level ) => _ = RunAsync( () => Navi.SetTransparencyLevel( app, level ), "the transparency" );
+	public void ChooseTransparency( int level ) => _ = RunAsync( () => navi.Settings.SetTransparencyLevelAsync( level ), "the transparency" );
 
 	/// <summary>Snap windows to the screen's edges, or stop.</summary>
-	public void ChooseSnapToScreenEdges( bool snap ) => _ = RunAsync( () => Navi.SetSnapToScreenEdges( app, snap ), "snapping to the screen" );
+	public void ChooseSnapToScreenEdges( bool snap ) => _ = RunAsync( () => navi.Settings.SetSnapToScreenEdgesAsync( snap ), "snapping to the screen" );
 
 	/// <summary>Snap windows to each other's edges, or stop.</summary>
-	public void ChooseSnapToWindows( bool snap ) => _ = RunAsync( () => Navi.SetSnapToWindows( app, snap ), "snapping to windows" );
+	public void ChooseSnapToWindows( bool snap ) => _ = RunAsync( () => navi.Settings.SetSnapToWindowsAsync( snap ), "snapping to windows" );
 
 	/// <summary>How close an edge has to get to snap, in panel pixels.</summary>
-	public void ChooseSnapDistance( int distance ) => _ = RunAsync( () => Navi.SetSnapDistance( app, distance ), "the snap distance" );
+	public void ChooseSnapDistance( int distance ) => _ = RunAsync( () => navi.Settings.SetSnapDistanceAsync( distance ), "the snap distance" );
 
 	public void DismissNotice() => Update( uiState => uiState with { Notice = null } );
 
@@ -193,7 +193,7 @@ public sealed class SettingsViewModel
 	{
 		try
 		{
-			if ( !await Navi.SetDisplayScale( app, scale ) )
+			if ( !await navi.Settings.SetDisplayScaleAsync( scale ) )
 				Update( uiState => uiState with { Notice = "The computer can't use that scale." } );
 		}
 		catch ( System.Exception e )
@@ -222,15 +222,15 @@ public sealed class SettingsViewModel
 
 		try
 		{
-			var version = await Navi.GetVersion( app );
+			var version = await navi.GetVersionAsync();
 			if ( version == knownVersion )
 				return;
 
 			knownVersion = version;
-			(displayScale, displayScales) = await Navi.GetDisplayScale( app );
-			(theme, scheme, blurLevel, transparencyLevel) = await Navi.GetTheme( app );
-			wallpaper = await Navi.GetWallpaper( app );
-			(snapToScreenEdges, snapToWindows, snapDistance) = await Navi.GetSnapping( app );
+			(displayScale, displayScales) = await navi.Settings.GetDisplayScaleAsync();
+			(theme, scheme, blurLevel, transparencyLevel) = await navi.Settings.GetThemeAsync();
+			wallpaper = await navi.Settings.GetWallpaperAsync();
+			(snapToScreenEdges, snapToWindows, snapDistance) = await navi.Settings.GetSnappingAsync();
 
 			Update( uiState => uiState with
 			{

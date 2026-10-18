@@ -7,7 +7,7 @@ namespace Sandbox;
 public sealed class NaviWindowResource
 {
 	/// <summary>
-	/// Names the window to <c>Navi.OpenWindow</c>: 1 to 32 lowercase letters, digits, '-' or '_'. Unique within the app.
+	/// Names the window to <c>Navi.Window.OpenAsync</c>: 1 to 32 lowercase letters, digits, '-' or '_'. Unique within the app.
 	/// </summary>
 	[Property] public string Id { get; set; }
 
@@ -69,8 +69,8 @@ public sealed class NaviAppResource : GameResource
 
 	/// <summary>
 	/// The app starts without a window, in the system tray. <see cref="PanelType"/> is then its service: a panel that runs
-	/// while the app does and is never drawn. It sets its tray icon and menu (<c>Navi.SetTray</c>) and opens the windows
-	/// listed in <see cref="Windows"/> (<c>Navi.OpenWindow</c>). It runs until the player quits it from the tray menu.
+	/// while the app does and is never drawn. It sets its tray icon and menu (<c>Navi.Tray.SetAsync</c>) and opens the windows
+	/// listed in <see cref="Windows"/> (<c>Navi.Window.OpenAsync</c>). It runs until the player quits it from the tray menu.
 	/// </summary>
 	[Property] public bool Headless { get; set; }
 
