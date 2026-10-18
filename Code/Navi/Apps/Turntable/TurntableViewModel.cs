@@ -28,10 +28,27 @@ public sealed class TurntableViewModel
 	/// <summary>Turn the model by one step. Its argument is "left" or "right".</summary>
 	public const string RotateAction = "rotate";
 
+	/// <summary>Turn the model to the yaw in its argument, in degrees, as a player drags it.</summary>
+	public const string DragAction = "drag";
+
+	/// <summary>Grab ("1") or let go of ("0") the model, which pauses the spin while it is held.</summary>
+	public const string HoldAction = "hold";
+
+	/// <summary>
+	/// A hold lasts this many seconds without a message from the panel that has it, then lets go. The panel repeats the
+	/// message while the mouse is down, so this only matters when it never comes back (the player left).
+	/// </summary>
+	public const float HoldTimeout = 3;
+
 	/// <summary>
 	/// Time since <see cref="TurntableUiState.Yaw"/> was last set, which is how far a spin has turned the model since.
 	/// </summary>
 	RealTimeSince sinceYawSet = 0;
+
+	/// <summary>
+	/// Time since a panel last grabbed or dragged the model.
+	/// </summary>
+	RealTimeSince sinceHeld = 0;
 
 	/// <summary>
 	/// What the panel draws. Replaced whole on every change, and only ever read by the panel.
@@ -52,6 +69,10 @@ public sealed class TurntableViewModel
 			case SpinAction: ToggleSpin(); break;
 			case RotateAction when arg is "left": Rotate( RotateStep ); break;
 			case RotateAction when arg is "right": Rotate( -RotateStep ); break;
+			case DragAction when float.TryParse( arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var degrees ) && float.IsFinite( degrees ):
+				Drag( degrees );
+				break;
+			case HoldAction when arg is "1" or "0": Hold( arg == "1" ); break;
 		}
 	}
 
@@ -75,12 +96,43 @@ public sealed class TurntableViewModel
 		Update( uiState => uiState with { Yaw = Normalize( uiState.Yaw + degrees ) } );
 
 	/// <summary>
+	/// Turn the model to <paramref name="yaw"/> for a player dragging it. Counts as holding it. The dragging panel
+	/// already shows the model there, so the host sets the angle instead of adding to it: both end up in the same place
+	/// however late the messages are.
+	/// </summary>
+	public void Drag( float yaw )
+	{
+		sinceHeld = 0;
+		Update( uiState => uiState with { Holding = true, Yaw = Normalize( yaw ) } );
+	}
+
+	/// <summary>
+	/// Grab the model, or let go of it. While it is held it does not spin.
+	/// </summary>
+	public void Hold( bool held )
+	{
+		sinceHeld = 0;
+
+		if ( UiState.Holding != held )
+			Update( uiState => uiState with { Holding = held } );
+	}
+
+	/// <summary>
+	/// Called every frame by the host copy of the panel: lets go of a model whose holder went away.
+	/// </summary>
+	public void Tick()
+	{
+		if ( UiState.Holding && sinceHeld > HoldTimeout )
+			Hold( false );
+	}
+
+	/// <summary>
 	/// The only setter of <see cref="UiState"/>. Every new state starts from the yaw the model has reached, so the panel
 	/// spins it on from the state's own <see cref="TurntableUiState.Yaw"/> whatever the change was.
 	/// </summary>
 	void Update( System.Func<TurntableUiState, TurntableUiState> change )
 	{
-		var yaw = UiState.Spinning ? Normalize( UiState.Yaw + sinceYawSet * SpinSpeed ) : UiState.Yaw;
+		var yaw = UiState.IsTurning ? Normalize( UiState.Yaw + sinceYawSet * SpinSpeed ) : UiState.Yaw;
 		sinceYawSet = 0;
 
 		UiState = change( UiState with { Yaw = yaw } ) with { Revision = UiState.Revision + 1 };

@@ -12,6 +12,7 @@
 
 	.view
 	{
+		pointer-events: all;
 		height: 200px;
 		border: 2px solid $deep-bc;
 	}

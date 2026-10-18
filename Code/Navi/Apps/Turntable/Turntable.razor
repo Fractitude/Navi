@@ -53,6 +53,59 @@
 
 	ScenePanel View { get; set; }
 
+	// Zoom is the view of the player who zooms, like a scrollbar position: it is not shared, so each player zooms for
+	// themselves. Turning the model is shared (it is the model yaw), so a drag is sent to the host as actions.
+
+	/// <summary>
+	/// How far the camera is from where it fits the model, as a factor: below 1 is closer.
+	/// </summary>
+	float zoom = 0.75f;
+
+	/// <summary>
+	/// Distance, in model sizes, at which the camera starts.
+	/// </summary>
+	const float FitDistance = 2.1f;
+
+	const float MinZoom = 0.3f;
+	const float MaxZoom = 1.5f;
+
+	/// <summary>
+	/// How much one notch of the wheel zooms: the distance changes by this factor.
+	/// </summary>
+	const float WheelZoom = 1.1f;
+
+	/// <summary>
+	/// Degrees the model turns per pixel the mouse is dragged.
+	/// </summary>
+	const float DragDegrees = 0.5f;
+
+	/// <summary>
+	/// Seconds between the drag messages sent to the host, and between repeats of the hold while the mouse is still.
+	/// </summary>
+	const float DragInterval = 0.05f;
+	const float HoldInterval = 1;
+
+	// How far the player has slid the view from the model, in world units along the camera's right and up. Held within
+	// the model's radius so the model can't be lost off the screen.
+	Vector2 pan;
+	float modelRadius = 1;
+	bool panning;
+	bool rightDown;
+	Vector2 lastMouse;
+
+	bool dragging;
+	float lastMouseX;
+	RealTimeSince sinceSent;
+	float fitDistance = 1;
+
+	// A drag turns the model here at once and tells the host where it is. Waiting for the host to send the angle
+	// back would make the model follow the mouse a few times a second. The panel shows its own yaw (predictedYaw)
+	// from the press until the host has caught up with where the drag ended.
+	float shownYaw;
+	float? predictedYaw;
+	bool unsent;
+	RealTimeSince sinceReleased;
+
 	// The 3D scene is view plumbing, like a scrollbar: it holds no app state, it is rebuilt from UiState whenever the
 	// revision changes, and between revisions it only turns the model on from UiState.Yaw.
 	Scene scene;
@@ -67,8 +120,13 @@
 		base.Tick();
 
 		if ( !Navi.IsViewer( this ) )
+		{
+			ViewModel.Tick();
 			Navi.Publish( this, ViewModel.UiState );
+		}
 
+		UpdateDrag();
+		UpdatePan();
 		ShowState( UiState );
 	}
 
@@ -82,6 +140,11 @@
 
 		scene ??= CreateScene();
 
+		// A hot reload rebuilds the panel tree, which gives this panel a new, empty ScenePanel while the scene above
+		// survives in the field. Point the view at the scene again.
+		if ( View.RenderScene != scene )
+			View.RenderScene = scene;
+
 		if ( uiState.Revision != shownRevision )
 		{
 			shownRevision = uiState.Revision;
@@ -93,8 +156,102 @@
 			model.Tint = Color.Parse( uiState.Tint.Hex ) ?? Color.White;
 		}
 
-		var yaw = uiState.Spinning ? uiState.Yaw + sinceShown * TurntableViewModel.SpinSpeed : uiState.Yaw;
+		var yaw = uiState.IsTurning ? uiState.Yaw + sinceShown * TurntableViewModel.SpinSpeed : uiState.Yaw;
+
+		if ( predictedYaw is { } predicted )
+		{
+			var caughtUp = !uiState.Holding && System.MathF.Abs( AngleBetween( yaw, predicted ) ) < 0.5f;
+
+			if ( !dragging && (caughtUp || sinceReleased > 1) )
+				predictedYaw = null;
+			else
+				yaw = predicted;
+		}
+
+		shownYaw = yaw;
 		pivot.WorldRotation = Rotation.FromYaw( yaw );
+	}
+
+	/// <summary>
+	/// The angle from <paramref name="to"/> to <paramref name="from"/> in degrees, between -180 and 180.
+	/// </summary>
+	static float AngleBetween( float from, float to ) => ((from - to) % 360 + 540) % 360 - 180;
+
+	/// <summary>
+	/// While the mouse is held on the 3D view, turn the model with it here and tell the host where it is. The host pauses
+	/// the spin while the model is held. Letting go sends the last angle and lets go of the model.
+	/// </summary>
+	void UpdateDrag()
+	{
+		var pressed = View is { IsValid: true, HasActive: true };
+		var mouseX = View is { IsValid: true } ? View.MousePosition.x * View.ScaleFromScreen : 0f;
+
+		if ( pressed && !dragging )
+		{
+			dragging = true;
+			lastMouseX = mouseX;
+			predictedYaw = shownYaw;
+			unsent = false;
+			sinceSent = 0;
+			Navi.Act( this, TurntableViewModel.HoldAction, "1" );
+			return;
+		}
+
+		if ( pressed )
+		{
+			if ( mouseX != lastMouseX )
+			{
+				predictedYaw += (mouseX - lastMouseX) * DragDegrees;
+				lastMouseX = mouseX;
+				unsent = true;
+			}
+
+			if ( unsent && sinceSent > DragInterval )
+				SendDrag();
+			else if ( sinceSent > HoldInterval )
+			{
+				// Still holding with the mouse still: say so, or the host lets go of the model.
+				sinceSent = 0;
+				Navi.Act( this, TurntableViewModel.HoldAction, "1" );
+			}
+
+			return;
+		}
+
+		if ( dragging )
+		{
+			dragging = false;
+			sinceReleased = 0;
+
+			if ( unsent )
+				SendDrag();
+
+			Navi.Act( this, TurntableViewModel.HoldAction, "0" );
+		}
+	}
+
+	void SendDrag()
+	{
+		unsent = false;
+		sinceSent = 0;
+
+		Navi.Act( this, TurntableViewModel.DragAction, (predictedYaw ?? shownYaw).ToString( System.Globalization.CultureInfo.InvariantCulture ) );
+	}
+
+	/// <summary>
+	/// Zoom with the wheel while the mouse is over the 3D view. Anywhere else the wheel does what it did before.
+	/// </summary>
+	public override void OnMouseWheel( Vector2 value )
+	{
+		if ( View is not { IsValid: true, HasHovered: true } || camera is null || value.y == 0 )
+		{
+			base.OnMouseWheel( value );
+			return;
+		}
+
+		// Scrolling down moves the camera away.
+		zoom = System.Math.Clamp( zoom * System.MathF.Pow( WheelZoom, value.y ), MinZoom, MaxZoom );
+		PlaceCamera();
 	}
 
 	Scene CreateScene()
@@ -108,11 +265,13 @@
 
 			var cameraObject = new GameObject( true, "camera" );
 			camera = cameraObject.AddComponent<CameraComponent>();
-			camera.BackgroundColor = Color.Parse( "#14131f" ) ?? Color.Black;
+			camera.BackgroundColor = Color.Parse( "#c8c8cc" ) ?? Color.Gray;
 			camera.FieldOfView = 40;
 
 			var sun = new GameObject( true, "sun" );
-			sun.WorldRotation = Rotation.From( 50, 135, 0 );
+			// Shines the way the camera looks, from a little above and to its side, so the lit side of the model faces the
+			// player.
+			sun.WorldRotation = Rotation.From( 35, 20, 0 );
 			var light = sun.AddComponent<DirectionalLight>();
 			light.LightColor = Color.White * 2.5f;
 			light.SkyColor = Color.Parse( "#2a2840" ) ?? Color.Gray;
@@ -125,7 +284,8 @@
 	}
 
 	/// <summary>
-	/// Swap the model, centre it on the pivot and move the camera back until all of it is in view.
+	/// Swap the model, centre it on the pivot and move the camera back until all of it is in view, then as far as the
+	/// player has zoomed.
 	/// </summary>
 	void ShowModel( string path )
 	{
@@ -134,10 +294,74 @@
 		var bounds = model.Model.Bounds;
 		model.LocalPosition = -bounds.Center;
 
-		var distance = bounds.Size.Length * 1.4f;
-		var position = new Vector3( -distance, 0, distance * 0.35f );
-		camera.WorldPosition = position;
-		camera.WorldRotation = Rotation.LookAt( -position );
+		fitDistance = bounds.Size.Length * FitDistance;
+		modelRadius = bounds.Size.Length * 0.5f;
+		PlaceCamera();
+	}
+
+	/// <summary>
+	/// Put the camera where it looks at the model from the zoom distance, then slide it by the pan. Panning moves the
+	/// camera sideways without turning it, so the view stays level.
+	/// </summary>
+	void PlaceCamera()
+	{
+		var position = new Vector3( -1, 0, 0.35f ) * fitDistance * zoom;
+		var rotation = Rotation.LookAt( -position );
+
+		// The pan can't take the view further from the model's middle than the model's own radius.
+		if ( pan.Length > modelRadius )
+			pan = pan.Normal * modelRadius;
+
+		camera.WorldRotation = rotation;
+		camera.WorldPosition = position + rotation.Right * pan.x + rotation.Up * pan.y;
+	}
+
+	/// <summary>
+	/// While the right mouse button is held after pressing it on the 3D view, slide the view with the mouse so the model
+	/// follows it. Like zoom, panning is the view of the player who does it: it is not shared.
+	/// </summary>
+	void UpdatePan()
+	{
+		if ( View is not { IsValid: true } || camera is null )
+			return;
+
+		// The real button, as the lock screen's presses are: the panel only gets the left one as a click.
+		var held = Input.Keyboard.Down( "MOUSE2" );
+		var mouse = View.MousePosition * View.ScaleFromScreen;
+
+		var pressed = held && !rightDown;
+		rightDown = held;
+
+		if ( !held )
+		{
+			panning = false;
+			return;
+		}
+
+		if ( pressed )
+		{
+			// Only a press that starts on the view pans it, not a button held down while moving over it.
+			panning = View.HasHovered;
+			lastMouse = mouse;
+			return;
+		}
+
+		if ( !panning )
+			return;
+
+		var delta = mouse - lastMouse;
+		lastMouse = mouse;
+
+		if ( delta.x == 0 && delta.y == 0 )
+			return;
+
+		// How far one pixel of the view is in the world, at the middle of the model.
+		var width = View.Box.Rect.Width * View.ScaleFromScreen;
+		var perPixel = 2 * fitDistance * zoom * System.MathF.Tan( camera.FieldOfView * 0.5f * System.MathF.PI / 180 ) / System.MathF.Max( width, 1 );
+
+		// The model follows the mouse, so the camera goes the other way.
+		pan += new Vector2( -delta.x, delta.y ) * perPixel;
+		PlaceCamera();
 	}
 
 	public override void OnDeleted()

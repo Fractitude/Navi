@@ -21,11 +21,13 @@ public sealed record TurntableUiState
 	/// <summary>
 	/// The models to pick from. They never change, so they aren't part of the state that is sent.
 	/// </summary>
-	public static IReadOnlyList<TurntableModel> Models { get; } =
+	public static IReadOnlyList<TurntableModel> Models =>
 	[
-		new( "Cube", "models/dev/box.vmdl" ),
-		new( "Sphere", "models/dev/sphere.vmdl" ),
+		// The first one is the default. This is a property and not a field, which is only set when the class loads, so
+		// editing the list shows up after a hot reload.
 		new( "Citizen", "models/citizen/citizen.vmdl" ),
+		new( "Man", "models/citizen_human/citizen_human_male.vmdl" ),
+		new( "Woman", "models/citizen_human/citizen_human_female.vmdl" ),
 	];
 
 	/// <summary>
@@ -54,6 +56,16 @@ public sealed record TurntableUiState
 	public float Yaw { get; init; } = 30;
 
 	public bool Spinning { get; init; } = true;
+
+	/// <summary>
+	/// A player has the model grabbed to turn it by hand, which pauses the spin until they let go.
+	/// </summary>
+	public bool Holding { get; init; }
+
+	/// <summary>
+	/// Is the model turning by itself now: spinning, and not held.
+	/// </summary>
+	public bool IsTurning => Spinning && !Holding;
 
 	public TurntableModel Model => Models[ModelIndex];
 	public TurntableTint Tint => Tints[TintIndex];
