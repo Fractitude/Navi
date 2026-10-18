@@ -107,9 +107,7 @@
 		<div class="context" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;">
 			<div class="item"
 			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
-			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )>
-				<i>keep</i>@(pinnedToTaskbar ? "Unpin from taskbar" : "Pin to taskbar")
-			</div>
+			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )><i>push_pin</i>@(pinnedToTaskbar ? "Unpin" : "Pin to taskbar")</div>
 		</div>
 	}
 
