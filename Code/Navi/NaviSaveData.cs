@@ -8,6 +8,12 @@ namespace Sandbox;
 public sealed class NaviComputerSave
 {
 	public List<string> InstalledApps { get; set; } = new();
+
+	/// <summary>
+	/// The apps from the scene's <see cref="NaviComputer.InstalledApps"/> that this computer has already taken on. An app
+	/// in the scene's list that isn't here is new since the last launch, and gets installed.
+	/// </summary>
+	public List<string> ConfiguredApps { get; set; } = new();
 	public List<string> InstalledPackages { get; set; } = new();
 	public List<string> GrantedPermissions { get; set; } = new();
 	public List<string> ReviewedApps { get; set; } = new();

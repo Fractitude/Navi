@@ -529,9 +529,43 @@ public sealed partial class NaviComputer : Component
 		if ( !IsAuthority )
 			return;
 
+		sceneApps = InstalledApps?.ToList() ?? new();
+
 		// A save replaces what the scene set up, and downloads its own packages.
 		if ( !AutoSave || !Load() )
+		{
+			InstallSceneApps();
 			_ = DownloadInstalledPackagesAsync();
+		}
+	}
+
+	/// <summary>
+	/// <see cref="InstalledApps"/> as the scene had it when the game started, before a save replaced it.
+	/// </summary>
+	List<string> sceneApps;
+
+	/// <summary>
+	/// The apps in <see cref="sceneApps"/> that have been installed from it, once. These go in the save, so a save knows
+	/// which of the scene's apps it has seen.
+	/// </summary>
+	List<string> configuredApps = new();
+
+	/// <summary>
+	/// Install the scene's apps that this computer hasn't taken on yet. A save holds the installed apps as they were, so
+	/// without this an app added to the scene's list after the save was made would never be installed. An app the player
+	/// uninstalled stays uninstalled: it is already in <see cref="configuredApps"/>. An app that doesn't exist yet isn't
+	/// marked, and is tried again at the next start.
+	/// </summary>
+	void InstallSceneApps()
+	{
+		foreach ( var id in sceneApps ?? [] )
+		{
+			if ( configuredApps.Contains( id ) || NaviAppRegistry.Find( id ) is null )
+				continue;
+
+			configuredApps.Add( id );
+			Install( id );
+		}
 	}
 
 	/// <summary>
@@ -740,6 +774,9 @@ public sealed partial class NaviComputer : Component
 		savedJson = Json.Serialize( CaptureSave() );
 		savedVersion = Version;
 
+		// After the saved state is recorded, so what this installs counts as a change and is saved.
+		InstallSceneApps();
+
 		_ = DownloadInstalledPackagesAsync();
 		return true;
 	}
@@ -757,6 +794,7 @@ public sealed partial class NaviComputer : Component
 	NaviComputerSave CaptureSave( bool placements, bool secrets ) => new()
 	{
 		InstalledApps = InstalledApps?.ToList() ?? new(),
+		ConfiguredApps = configuredApps.ToList(),
 		InstalledPackages = InstalledPackages?.ToList() ?? new(),
 		GrantedPermissions = GrantedPermissions?.ToList() ?? new(),
 		ReviewedApps = ReviewedApps?.ToList() ?? new(),
@@ -805,6 +843,7 @@ public sealed partial class NaviComputer : Component
 	void ApplySave( NaviComputerSave save )
 	{
 		InstalledApps = save.InstalledApps?.Distinct().ToList() ?? new();
+		configuredApps = save.ConfiguredApps?.Distinct().ToList() ?? new();
 		InstalledPackages = save.InstalledPackages?.Distinct().ToList() ?? new();
 		GrantedPermissions = save.GrantedPermissions?.Where( x => NaviPermissions.IsKnown( x.Split( ' ' ).Last() ) ).Distinct().ToList() ?? new();
 		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();

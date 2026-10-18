@@ -83,6 +83,9 @@ public sealed class NaviInputCapture : Component
 	readonly List<ControllerState> controllers = new();
 	readonly List<WorldInput> worldInputs = new();
 
+	// The reach of the computer's world panels before they were widened for the seat. See WidenReach.
+	readonly List<(WorldPanel Panel, float Range)> reaches = new();
+
 	protected override void OnUpdate()
 	{
 		// Only the player using the computer gets pulled in. Everyone else watches from where they stand.
@@ -179,6 +182,31 @@ public sealed class NaviInputCapture : Component
 			End();
 	}
 
+	/// <summary>
+	/// A world panel only takes clicks within its <see cref="WorldPanel.InteractionRange"/> of the camera, and the seat
+	/// puts the camera where the whole screen fits the view: its corners are farther than its middle, and can be
+	/// farther than the range a game set for walking up to it. Widen the reach of the computer's panels (the desktop and
+	/// the secure layer) to cover the screen while the player sits, and put it back after.
+	/// </summary>
+	void WidenReach()
+	{
+		if ( Scene.Camera is not { } camera || !Components.TryGet<WorldPanel>( out var screen ) )
+			return;
+
+		var scale = Sandbox.UI.WorldPanel.ScreenToWorldScale * WorldScale.x;
+		var halfDiagonal = (screen.PanelSize * scale).Length * 0.5f;
+		var needed = ((ScreenView( camera ).Position - WorldPosition).Length + halfDiagonal) * 1.1f;
+
+		foreach ( var panel in GameObject.Components.GetAll<WorldPanel>( FindMode.EnabledInSelfAndDescendants ) )
+		{
+			if ( panel.InteractionRange >= needed )
+				continue;
+
+			reaches.Add( (panel, panel.InteractionRange) );
+			panel.InteractionRange = needed;
+		}
+	}
+
 	void Begin()
 	{
 		if ( state == State.Idle )
@@ -187,6 +215,7 @@ public sealed class NaviInputCapture : Component
 				playerView = camera.WorldTransform;
 
 			playerMouse = Mouse.Visibility;
+			WidenReach();
 
 			foreach ( var pc in Scene.GetAllComponents<PlayerController>().Where( x => !x.IsProxy ) )
 			{
@@ -223,6 +252,12 @@ public sealed class NaviInputCapture : Component
 			if ( wi.IsValid() ) wi.Enabled = true;
 		}
 
+		foreach ( var (panel, range) in reaches )
+		{
+			if ( panel.IsValid() ) panel.InteractionRange = range;
+		}
+
+		reaches.Clear();
 		Mouse.Visibility = playerMouse;
 		controllers.Clear();
 		worldInputs.Clear();
