@@ -284,15 +284,20 @@ public sealed partial class NaviComputer : Component
 	[Property] public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
 
 	/// <summary>
-	/// Ids of the apps installed most recently, newest first, at most <see cref="MaxRecentApps"/>. The start menu lists them
-	/// so they're easy to find. See <see cref="RecentApps"/>.
+	/// When each app was installed, in Unix seconds (UTC), by app id. The start menu lists the ones from the last
+	/// <see cref="RecentWindowSeconds"/> so they're easy to find. See <see cref="RecentApps"/>.
 	/// </summary>
-	[Property] public List<string> RecentlyInstalled { get; set; } = new();
+	public Dictionary<string, long> InstalledAt { get; set; } = new();
 
 	/// <summary>
-	/// How many recently installed apps the computer remembers.
+	/// How many recently installed apps the start menu lists.
 	/// </summary>
-	public const int MaxRecentApps = 4;
+	public const int MaxRecentApps = 2;
+
+	/// <summary>
+	/// How long after being installed an app counts as recently installed, in seconds.
+	/// </summary>
+	public const long RecentWindowSeconds = 60 * 60;
 
 	/// <summary>
 	/// Asset folders of this game whose app manifests ship with it, so their system apps are part of the OS: always installed,
@@ -758,7 +763,7 @@ public sealed partial class NaviComputer : Component
 		RootApps = RootApps?.ToList() ?? new(),
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		StartFavorites = StartFavorites?.ToList() ?? new(),
-		RecentlyInstalled = RecentlyInstalled?.ToList() ?? new(),
+		InstalledAt = InstalledAt is null ? new() : new( InstalledAt ),
 		LockKind = LockKind,
 		LockSalt = LockSalt,
 		LockVerifier = secrets ? lockVerifier : null,
@@ -806,7 +811,7 @@ public sealed partial class NaviComputer : Component
 		RootApps = save.RootApps?.Distinct().ToList() ?? new();
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
-		RecentlyInstalled = save.RecentlyInstalled?.Distinct().Take( MaxRecentApps ).ToList() ?? new();
+		InstalledAt = save.InstalledAt is null ? new() : new( save.InstalledAt );
 
 		// A lock needs its salt, and on the host its verifier: clients are never sent that one.
 		var hasLock = System.Enum.IsDefined( save.LockKind ) && save.LockKind != NaviLockKind.None
@@ -954,10 +959,22 @@ public sealed partial class NaviComputer : Component
 		(StartFavorites ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
 
 	/// <summary>
-	/// The apps installed most recently, newest first. Ones that aren't installed any more are left out.
+	/// The last <see cref="MaxRecentApps"/> apps installed within <see cref="RecentWindowSeconds"/>, newest first.
 	/// </summary>
-	public IEnumerable<NaviAppInfo> RecentApps =>
-		(RecentlyInstalled ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
+	public IEnumerable<NaviAppInfo> RecentApps
+	{
+		get
+		{
+			var since = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - RecentWindowSeconds;
+
+			return (InstalledAt ?? [])
+				.Where( x => x.Value >= since )
+				.OrderByDescending( x => x.Value )
+				.Select( x => NaviAppRegistry.Find( x.Key ) )
+				.Where( x => x is not null && IsInstalled( x ) )
+				.Take( MaxRecentApps );
+		}
+	}
 
 	public bool IsStartFavorite( string id ) => StartFavorites?.Contains( id ) ?? false;
 
@@ -1112,11 +1129,8 @@ public sealed partial class NaviComputer : Component
 		InstalledApps ??= new();
 		InstalledApps.Add( id );
 
-		RecentlyInstalled ??= new();
-		RecentlyInstalled.Remove( id );
-		RecentlyInstalled.Insert( 0, id );
-		if ( RecentlyInstalled.Count > MaxRecentApps )
-			RecentlyInstalled.RemoveRange( MaxRecentApps, RecentlyInstalled.Count - MaxRecentApps );
+		InstalledAt ??= new();
+		InstalledAt[id] = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
 		Version++;
 		return true;
@@ -1149,7 +1163,7 @@ public sealed partial class NaviComputer : Component
 		RootApps?.Remove( id );
 		TaskbarOrder?.Remove( id );
 		StartFavorites?.Remove( id );
-		RecentlyInstalled?.Remove( id );
+		InstalledAt?.Remove( id );
 
 		var windowPrefix = id + NaviWindow.KeySeparator;
 		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )

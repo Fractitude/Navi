@@ -14,7 +14,7 @@ public sealed class NaviComputerSave
 	public List<string> RootApps { get; set; } = new();
 	public List<string> TaskbarOrder { get; set; } = new();
 	public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
-	public List<string> RecentlyInstalled { get; set; } = new();
+	public Dictionary<string, long> InstalledAt { get; set; } = new();
 	public NaviLockKind LockKind { get; set; }
 	public string LockSalt { get; set; }
 
