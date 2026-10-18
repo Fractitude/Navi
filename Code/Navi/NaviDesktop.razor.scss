@@ -20,6 +20,8 @@ NaviDesktop
 // Child selectors (>) only, so these rules don't leak into the apps inside the windows.
 .window
 {
+	// NaviDesktop reveals a window once it has placed and laid it out.
+	opacity: 0;
 	position: absolute;
 	flex-direction: column;
 	min-width: 160px;

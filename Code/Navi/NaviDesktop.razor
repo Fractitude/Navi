@@ -504,6 +504,12 @@
 			if ( window is null )
 				continue;
 
+			// A new window stays invisible (opacity 0 in the stylesheet) for its first pass here: it has no position yet,
+			// and its size is only known after it has been laid out once. Shown from the second pass on, so it doesn't
+			// flash in the middle of the screen first.
+			if ( panel.Style.Left is not null )
+				panel.Style.Opacity = 1;
+
 			if ( window.IsMaximized )
 			{
 				panel.Style.Left = Length.Pixels( 0 );
