@@ -931,9 +931,9 @@ public sealed partial class NaviComputer : Component
 	}
 
 	/// <summary>
-	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Only the pinned apps keep the
-	/// order: an app that isn't pinned goes back after them when it closes. Returns false if the app isn't on the taskbar,
-	/// the index is out of range, or the icon is already there.
+	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Moving an app that isn't pinned
+	/// pins it, where it was put. Returns false if the app isn't on the taskbar, the index is out of range, or the icon is
+	/// already there.
 	/// </summary>
 	public bool MoveTaskbarApp( string id, int index )
 	{
@@ -947,7 +947,9 @@ public sealed partial class NaviComputer : Component
 
 		apps.RemoveAt( from );
 		apps.Insert( index, id );
-		TaskbarOrder = apps.Where( IsTaskbarPinned ).ToList();
+		var pinned = TaskbarOrder?.ToHashSet() ?? [];
+		pinned.Add( id );
+		TaskbarOrder = apps.Where( pinned.Contains ).ToList();
 		Version++;
 		return true;
 	}
