@@ -195,13 +195,6 @@ public sealed partial class NaviComputer
 	}
 
 	/// <summary>
-	/// Installed apps that may show up in the notification settings: the ones that declare
-	/// <see cref="NaviPermissions.Notify"/>, have a notification in the list, or are muted.
-	/// </summary>
-	public IEnumerable<NaviAppInfo> NotifyingApps => Installed.Where( x =>
-		x.Permissions.Contains( NaviPermissions.Notify ) || IsNotificationsMuted( x.Id ) || notifications.Any( y => y.AppId == x.Id ) );
-
-	/// <summary>
 	/// Forget an uninstalled app's notifications, and that it was muted.
 	/// </summary>
 	void ForgetNotifications( string appId )

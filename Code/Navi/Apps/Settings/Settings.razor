@@ -98,7 +98,7 @@
 
 				<div class="setting">
 					<div class="name">Apps</div>
-					<div class="description">A muted app's notifications go to the list quietly: no sound, no banner.</div>
+					<div class="description">A muted app's notifications go to the list quietly.</div>
 				</div>
 
 				@foreach ( var row in UiState.NotificationApps )
@@ -120,7 +120,7 @@
 
 				@if ( UiState.NotificationApps.Count == 0 )
 				{
-					<div class="empty">No app here sends notifications.</div>
+					<div class="empty">No apps are installed.</div>
 				}
 				break;
 

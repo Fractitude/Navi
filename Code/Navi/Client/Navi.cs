@@ -730,7 +730,7 @@ public sealed class Navi
 	public const int MaxNotificationTitle = 64, MaxNotificationText = 280;
 
 	/// <summary>
-	/// An app that can send notifications, and whether the player muted it.
+	/// An installed app, and whether the player muted its notifications.
 	/// </summary>
 	public sealed record NotificationApp( string AppId, bool Muted );
 
@@ -756,7 +756,7 @@ public sealed class Navi
 		public Task<bool> DismissAsync( int id ) => navi.CallAsync<bool>( "notifications.dismiss", id );
 
 		/// <summary>
-		/// The installed apps that can send notifications, and whether each is muted.
+		/// Every installed app, core apps too, and whether each one's notifications are muted.
 		/// </summary>
 		public async Task<IReadOnlyList<NotificationApp>> ListAppsAsync()
 		{
@@ -766,7 +766,7 @@ public sealed class Navi
 
 		/// <summary>
 		/// Mute another app's notifications, or unmute them. Needs <see cref="Permission.ChangeSettings"/>. False if the app
-		/// isn't installed, or is this one.
+		/// isn't installed, or is this one (core apps may change their own).
 		/// </summary>
 		public Task<bool> SetMutedAsync( string appId, bool muted ) =>
 			navi.CallAsync<bool>( "notifications.set-muted", appId, muted );

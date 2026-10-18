@@ -305,7 +305,7 @@ public sealed class SettingsViewModel
 		SnapDistances.Append( snapDistance ).Distinct().Order().Select( x => new ThemeOption( x, $"{x} px", x == snapDistance ) ).ToArray();
 
 	/// <summary>
-	/// The apps that can send notifications, by name. On is sent back as 0 (not muted), Muted as 1.
+	/// Every installed app, core apps too, by name. On is sent back as 0 (not muted), Muted as 1.
 	/// </summary>
 	IReadOnlyList<NotificationAppRow> BuildNotificationApps() => notificationApps
 		.Select( x => (Setting: x, App: apps.FirstOrDefault( y => y.Id == x.AppId )) )

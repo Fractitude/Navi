@@ -77,7 +77,7 @@ public sealed record SettingsUiState
 	/// <summary>Windows: whether either kind of snapping is on, so the distance row applies.</summary>
 	public bool SnapsToAnything { get; init; }
 
-	/// <summary>Notifications: the apps that can send them, by name, each with whether it is muted.</summary>
+	/// <summary>Notifications: every installed app, by name, each with whether it is muted.</summary>
 	public IReadOnlyList<NotificationAppRow> NotificationApps { get; init; } = [];
 
 	/// <summary>A message about the last change that failed, or null. Clicking it dismisses it.</summary>

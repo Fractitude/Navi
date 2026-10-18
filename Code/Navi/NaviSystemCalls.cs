@@ -108,15 +108,16 @@ public static class NaviSystemCalls
 				return computer.DismissNotification( Arg<int>( args, 0, method ), self );
 
 			case "notifications.apps":
-				return computer.NotifyingApps.Select( x => (x.Id, computer.IsNotificationsMuted( x.Id )) ).ToArray();
+				return computer.Installed.Select( x => (x.Id, computer.IsNotificationsMuted( x.Id )) ).ToArray();
 
 			case "notifications.set-muted":
 			{
 				Require( process, NaviPermissions.ChangeSettings );
 
-				// Muting is the player's word against an app, so no app can take it back for itself.
+				// Muting is the player's word against an app, so no app can take it back for itself. Core apps are the OS,
+				// and Settings has to reach its own row like any other.
 				var id = Arg<string>( args, 0, method );
-				return id != self && computer.SetNotificationsMuted( id, Arg<bool>( args, 1, method ) );
+				return (id != self || process.App.IsCore) && computer.SetNotificationsMuted( id, Arg<bool>( args, 1, method ) );
 			}
 
 			// Permissions.
