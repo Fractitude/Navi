@@ -66,6 +66,10 @@ public static class NaviSystemCalls
 			}
 		}
 
+		// Files. The host has them; a client's own copy of an app gets an error.
+		if ( method.StartsWith( "files." ) )
+			return NaviFileCalls.Run( computer, process, method, args );
+
 		switch ( method )
 		{
 			// The window the panel is in.

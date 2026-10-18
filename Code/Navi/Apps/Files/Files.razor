@@ -1,0 +1,246 @@
+@using Sandbox.UI
+@inherits NaviApp
+@namespace NaviApps
+
+@* The file explorer: places and drives on the left, the open folder on the right. A core app *@
+@* (Assets/navi/apps/files.napp), so it reaches every file. It is shared, because only the host has the files: the *@
+@* panel draws FilesUiState, and its controls are actions (Navi.Act) that the host's copy runs. *@
+
+<root>
+	<div class="sidebar">
+		<div class="section">Places</div>
+		@foreach ( var place in UiState.Places )
+		{
+			<div class="place @( place.Selected ? "active" : "" )"
+			     @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, place.Path ) )>
+				<i>@place.Icon</i>
+				<div class="place-name">@place.Label</div>
+			</div>
+		}
+
+		<div class="section">Drives</div>
+		@foreach ( var drive in UiState.Drives )
+		{
+			<div class="place @( drive.Selected ? "active" : "" )"
+			     @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, drive.Path ) )>
+				<i>@drive.Icon</i>
+				<div class="place-name">@drive.Label</div>
+				@if ( drive.Ejectable )
+				{
+					<i class="eject" tooltip="Eject"
+					   @onclick=@( ( PanelEvent e ) => Eject( drive.Path, e ) )>eject</i>
+				}
+			</div>
+		}
+	</div>
+
+	<div class="main">
+		<div class="toolbar">
+			<div class="tool @( UiState.CanBack ? "" : "disabled" )" tooltip="Back"
+			     @onclick=@( () => Navi.Act( FilesViewModel.BackAction ) )>
+				<i>arrow_back</i>
+			</div>
+			<div class="tool @( UiState.CanForward ? "" : "disabled" )" tooltip="Forward"
+			     @onclick=@( () => Navi.Act( FilesViewModel.ForwardAction ) )>
+				<i>arrow_forward</i>
+			</div>
+			<div class="tool @( UiState.CanUp ? "" : "disabled" )" tooltip="Enclosing folder"
+			     @onclick=@( () => Navi.Act( FilesViewModel.UpAction ) )>
+				<i>arrow_upward</i>
+			</div>
+
+			<div class="crumbs">
+				@foreach ( var crumb in UiState.Crumbs )
+				{
+					@if ( crumb.Path != "/" )
+					{
+						<div class="separator">/</div>
+					}
+					<div class="crumb" @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, crumb.Path ) )>@crumb.Label</div>
+				}
+			</div>
+		</div>
+
+		<div class="toolbar actions">
+			@if ( UiState.InTrash )
+			{
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Put back"
+				     @onclick=@( () => Navi.Act( FilesViewModel.RestoreAction ) )>
+					<i>restore_from_trash</i>
+				</div>
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Delete for good"
+				     @onclick=@( () => Navi.Act( FilesViewModel.TrashAction ) )>
+					<i>delete_forever</i>
+				</div>
+				<div class="tool wide @( UiState.ListEmpty ? "disabled" : "" )"
+				     @onclick=@( () => Navi.Act( FilesViewModel.EmptyTrashAction ) )>
+					Empty trash
+				</div>
+			}
+			else
+			{
+				<div class="tool" tooltip="New folder" @onclick=@( () => Navi.Act( FilesViewModel.NewFolderAction ) )>
+					<i>create_new_folder</i>
+				</div>
+				<div class="tool" tooltip="New text file" @onclick=@( () => Navi.Act( FilesViewModel.NewFileAction ) )>
+					<i>note_add</i>
+				</div>
+				<div class="divider"></div>
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Rename"
+				     @onclick=@( () => Navi.Act( FilesViewModel.StartRenameAction ) )>
+					<i>edit</i>
+				</div>
+				<div class="tool @( UiState.HasSelection ? "" : "disabled" )" tooltip="Make alias"
+				     @onclick=@( () => Navi.Act( FilesViewModel.MakeAliasAction ) )>
+					<i>shortcut</i>
+				</div>
+				<div class="tool @( UiState.HasSelection ? "" : "disabled" )" tooltip="Make symlink"
+				     @onclick=@( () => Navi.Act( FilesViewModel.MakeSymlinkAction ) )>
+					<i>link</i>
+				</div>
+				<div class="divider"></div>
+				<div class="tool @( UiState.HasSelection ? "" : "disabled" )" tooltip="Copy"
+				     @onclick=@( () => Navi.Act( FilesViewModel.CopyAction ) )>
+					<i>content_copy</i>
+				</div>
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Cut"
+				     @onclick=@( () => Navi.Act( FilesViewModel.CutAction ) )>
+					<i>content_cut</i>
+				</div>
+				<div class="tool @( UiState.CanPaste ? "" : "disabled" )" tooltip="Paste"
+				     @onclick=@( () => Navi.Act( FilesViewModel.PasteAction ) )>
+					<i>content_paste</i>
+				</div>
+				<div class="divider"></div>
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Move to trash"
+				     @onclick=@( () => Navi.Act( FilesViewModel.TrashAction ) )>
+					<i>delete</i>
+				</div>
+			}
+
+			<div class="spacer"></div>
+
+			<div class="tool @( UiState.ShowHidden ? "active" : "" )"
+			     tooltip=@( UiState.ShowHidden ? "Hide hidden files" : "Show hidden files" )
+			     @onclick=@( () => Navi.Act( FilesViewModel.ToggleHiddenAction ) )>
+				<i>@( UiState.ShowHidden ? "visibility" : "visibility_off" )</i>
+			</div>
+		</div>
+
+		@if ( UiState.Renaming )
+		{
+			<div class="rename">
+				<i>edit</i>
+				<TextEntry @ref="RenameEntry" Value=@( UiState.RenameText ) MaxLength=@( 255 )
+				           OnTextEdited=@RenameEdited
+				           onsubmit=@( () => Navi.Act( FilesViewModel.SubmitRenameAction ) )/>
+				<div class="tool" tooltip="Rename" @onclick=@( () => Navi.Act( FilesViewModel.SubmitRenameAction ) )>
+					<i>check</i>
+				</div>
+				<div class="tool" tooltip="Cancel" @onclick=@( () => Navi.Act( FilesViewModel.CancelRenameAction ) )>
+					<i>close</i>
+				</div>
+			</div>
+		}
+
+		@if ( UiState.Notice is not null )
+		{
+			<div class="notice" @onclick=@( () => Navi.Act( FilesViewModel.DismissNoticeAction ) )>
+				@UiState.Notice
+			</div>
+		}
+
+		<div class="list">
+			@if ( UiState.ListEmpty )
+			{
+				<div class="empty">@UiState.EmptyText</div>
+			}
+
+			@foreach ( var row in UiState.Rows )
+			{
+				<div class="row @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" )"
+				     @onclick=@( () => Navi.Act( FilesViewModel.SelectAction, row.Path ) )
+				     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
+					<i class="icon">@row.Icon</i>
+					<div class="name">@row.Name</div>
+					@if ( row.Badge != "" )
+					{
+						<div class="badge">@row.Badge</div>
+					}
+					<div class="detail">@row.Detail</div>
+					<div class="modified">@row.Modified</div>
+				</div>
+			}
+		</div>
+
+		<div class="status">@UiState.Status</div>
+	</div>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state, in the host's copy only.
+	/// </summary>
+	FilesViewModel ViewModel => field ??= new( Navi );
+
+	/// <summary>
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
+	/// </summary>
+	FilesUiState UiState => Navi.IsViewer ? Navi.GetState<FilesUiState>() ?? FilesUiState.Empty : ViewModel.UiState;
+
+	TextEntry RenameEntry;
+
+	/// <summary>The <see cref="FilesUiState.RenameSession"/> the rename field was last focused for.</summary>
+	int focusedRename;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		FocusRename();
+
+		if ( Navi.IsViewer )
+			return;
+
+		ViewModel.Tick();
+		Navi.Publish( ViewModel.UiState );
+	}
+
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	/// <summary>
+	/// The eject button sits on the drive's row: it ejects, and the row's own click doesn't open the drive.
+	/// </summary>
+	void Eject( string path, PanelEvent e )
+	{
+		e.StopPropagation();
+		Navi.Act( FilesViewModel.EjectAction, path );
+	}
+
+	/// <summary>
+	/// The rename field reports every edit here, as an action, so other players see the name being typed.
+	/// </summary>
+	void RenameEdited( string text ) => Navi.Act( FilesViewModel.SetRenameTextAction, text );
+
+	/// <summary>
+	/// Put the caret in the rename field once each time it opens. Only where the app runs for the player at the computer
+	/// (offline, or the host's own seat): on a viewer it would take the keys of whoever is watching, so a player on a
+	/// client clicks the field.
+	/// </summary>
+	void FocusRename()
+	{
+		if ( UiState.RenameSession == focusedRename || RenameEntry is null || !Navi.HasInput || Navi.IsViewer )
+			return;
+
+		focusedRename = UiState.RenameSession;
+		RenameEntry.Focus();
+	}
+
+	/// <summary>
+	/// Typing doesn't bump the revision. The field still follows the host's text, except where it has focus: the player
+	/// is typing there, and the host is a keystroke behind.
+	/// </summary>
+	protected override int BuildHash() =>
+		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText );
+}

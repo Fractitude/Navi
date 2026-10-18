@@ -1,0 +1,328 @@
+@import "../../Themes/_paper-light.scss";
+
+@mixin files-style
+{
+	Files
+	{
+		width: 480px;
+		height: 280px;
+		flex-direction: row;
+		color: $ink-t;
+	}
+
+	.sidebar
+	{
+		width: 126px;
+		flex-shrink: 0;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px;
+		background-color: $surface2-bg;
+		border-right: 1px solid $line-bc;
+
+		.section
+		{
+			padding: 6px 4px 2px;
+			font-size: 9px;
+			font-weight: 700;
+			text-transform: uppercase;
+			opacity: 0.6;
+		}
+	}
+
+	.place
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 6px;
+		font-size: 11px;
+		font-weight: 700;
+		cursor: pointer;
+
+		> i
+		{
+			flex-shrink: 0;
+			font-size: 14px;
+		}
+
+		.place-name
+		{
+			flex-grow: 1;
+			flex-basis: 0;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.eject
+		{
+			opacity: 0.6;
+
+			&:hover
+			{
+				opacity: 1;
+			}
+		}
+
+		&.active
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+		}
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $deep-bg;
+		}
+	}
+
+	.main
+	{
+		flex-grow: 1;
+		flex-basis: 0;
+		min-width: 0;
+		flex-direction: column;
+	}
+
+	.toolbar
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 2px;
+		padding: 4px 6px;
+		border-bottom: 1px solid $line-bc;
+
+		&.actions
+		{
+			background-color: $surface-bg;
+		}
+	}
+
+	.tool
+	{
+		flex-shrink: 0;
+		min-width: 22px;
+		height: 22px;
+		justify-content: center;
+		align-items: center;
+		font-size: 15px;
+		cursor: pointer;
+
+		&.wide
+		{
+			padding: 0 8px;
+			font-size: 11px;
+			font-weight: 700;
+			border: 1px solid $line-bc;
+		}
+
+		&.active
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+		}
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $deep-bg;
+		}
+
+		&.disabled
+		{
+			opacity: 0.3;
+			pointer-events: none;
+		}
+	}
+
+	.divider
+	{
+		width: 1px;
+		height: 14px;
+		margin: 0 3px;
+		background-color: $line-bg;
+	}
+
+	.spacer
+	{
+		flex-grow: 1;
+	}
+
+	.crumbs
+	{
+		flex-grow: 1;
+		flex-basis: 0;
+		min-width: 0;
+		flex-direction: row;
+		align-items: center;
+		margin-left: 6px;
+		overflow: hidden;
+		font-size: 11px;
+
+		.crumb
+		{
+			flex-shrink: 0;
+			padding: 2px 3px;
+			font-weight: 700;
+			white-space: nowrap;
+			cursor: pointer;
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $deep-bg;
+			}
+		}
+
+		.separator
+		{
+			flex-shrink: 0;
+			opacity: 0.5;
+		}
+	}
+
+	.rename
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 6px;
+		background-color: $paper-bg;
+		border-bottom: 1px solid $line-bc;
+
+		> i
+		{
+			font-size: 14px;
+		}
+
+		TextEntry
+		{
+			flex-grow: 1;
+			font-size: 11px;
+		}
+	}
+
+	.notice
+	{
+		flex-shrink: 0;
+		padding: 4px 8px;
+		font-size: 11px;
+		color: #ffffff;
+		background-color: #a0442c;
+		cursor: pointer;
+	}
+
+	.list
+	{
+		flex-grow: 1;
+		flex-direction: column;
+		padding: 2px 0;
+		overflow-y: scroll;
+		background-color: $paper-bg;
+	}
+
+	.empty
+	{
+		padding: 16px;
+		font-size: 11px;
+		opacity: 0.6;
+		justify-content: center;
+	}
+
+	.row
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 8px;
+		font-size: 11px;
+		cursor: pointer;
+
+		.icon
+		{
+			flex-shrink: 0;
+			font-size: 15px;
+		}
+
+		.name
+		{
+			flex-grow: 1;
+			flex-basis: 0;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.badge
+		{
+			flex-shrink: 0;
+			padding: 0 4px;
+			font-size: 9px;
+			font-weight: 700;
+			border: 1px solid $line-bc;
+		}
+
+		.detail
+		{
+			flex-shrink: 0;
+			width: 80px;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			opacity: 0.7;
+		}
+
+		.modified
+		{
+			flex-shrink: 0;
+			width: 90px;
+			white-space: nowrap;
+			opacity: 0.7;
+		}
+
+		&.faded
+		{
+			opacity: 0.55;
+		}
+
+		&:hover
+		{
+			background-color: $surface-bg;
+		}
+
+		&.selected
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+		}
+	}
+
+	.status
+	{
+		flex-shrink: 0;
+		padding: 3px 8px;
+		font-size: 10px;
+		opacity: 0.8;
+		border-top: 1px solid $line-bc;
+		background-color: $surface-bg;
+	}
+}
+
+@include files-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark { @include files-style; }
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light { @include files-style; }
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark { @include files-style; }

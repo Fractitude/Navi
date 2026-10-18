@@ -15,7 +15,8 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
 - `NaviPermissions` lists what apps can be allowed to do.
-- `Packages`, `Settings`, `Calculator`, `Turntable` (a model drawn in 3D with a `ScenePanel`) and `WebBrowser` (the engine's `WebPanel`, with a history of its own) are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
+- `NaviFileSystem` is the computer's files (`NaviComputer.Files`), and `Files` is the app that browses them. See "Files".
+- `Packages`, `Settings`, `Files`, `Calculator`, `Turntable` (a model drawn in 3D with a `ScenePanel`) and `WebBrowser` (the engine's `WebPanel`, with a history of its own) are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
 
 ## Windows
 
@@ -195,6 +196,10 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Notifications.DismissAsync( id )` | Take one of the app's own notifications out of the list | |
 | `Navi.Notifications.ListAppsAsync()` | Every installed app, core apps too, and whether each is muted | |
 | `Navi.Notifications.SetMutedAsync( appId, muted )` | Mute another app's notifications, or unmute them | `navi.settings.change` |
+| `Navi.Files.ListAsync( path )`, `GetInfoAsync`, `ReadTextAsync`, `WriteTextAsync`, `CreateFolderAsync` | Files and folders. See "Files" | `navi.files.access`, except in the app's own folder |
+| `Navi.Files.CreateSymlinkAsync`, `CreateAliasAsync`, `ResolveAliasAsync`, `MoveAsync`, `CopyAsync`, `TrashAsync`, `DeleteAsync` | Links, moving, the trash | the same |
+| `Navi.Files.RestoreAsync( path )`, `EjectAsync( path )` | Put back from the trash; take out a removable drive | `navi.files.access` |
+| `Navi.Files.GetAppFolderAsync()`, `GetDrivesAsync()`, `GetVersionAsync()`, `GetTrashPathAsync()` | The app's own folder, the drives, a version to poll | |
 | `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
 
 ## Notifications
@@ -213,6 +218,23 @@ var id = await Navi.Notifications.SendAsync( "Download finished", "notes.txt is 
 - **Limits.** The list keeps the newest 50, and 10 per app. An app dismisses only its own (`DismissAsync`). Uninstalling an app forgets its notifications and that it was muted.
 - **Saved and shared.** The list and the muted apps are saved with the computer, and sent to every client with its state. In a shared app only the host's copy should send; a client's own copy of an app that isn't shared sends nothing.
 - **Game code** can send one for any installed app with `NaviComputer.Notify( appId, title, text, sound )`, on the host.
+
+## Files
+
+Each computer has its own files, laid out like macOS and Linux rather than Windows: one tree from `/`, with no drive letters. Only what is made on the computer is there; nothing reaches the player's real files.
+
+- **Drives.** The drive inside (`NaviComputer.DriveName`, "Navi HD") is `/`. A removable drive (flash drive, external disk: a `NaviDrive` made with `removable: true`) is put in with `NaviComputer.MountDrive` and shows at `/Volumes/{Label}`; `EjectDrive` takes it out. Each drive has its own capacity: the inside one is `DriveSizeMegabytes` (32 MB by default, since the host keeps every computer's files). Every entry costs its name and contents plus 64 bytes, and a drive holds at most 20000 entries.
+- **Layout.** A new drive has `/Documents`, `/Downloads`, `/Volumes` and `/Library/Apps`. `/`, `/Volumes`, `/Library`, `/Library/Apps`, each drive's top folder and its `.Trash` can't be moved, renamed or deleted.
+- **Names are case-sensitive**: `Notes.txt` and `notes.txt` are two files. A name can't be `.` or `..`, or have `/` or control characters in it, and is up to 255 characters. Names starting with `.` are hidden in Files unless the player shows them. Paths are absolute; `.` and `..` in them are worked out from the text, before links are followed.
+- **Files hold text** for now (`ReadTextAsync`, `WriteTextAsync`). Any name works; Files makes `.txt` ones. No app opens files yet.
+- **Symlinks** (`CreateSymlinkAsync`) point at a path, absolute or relative to the link's folder, like on Unix. Paths go through them, so a link to a folder acts as that folder. They break when the target moves. A path through more than 16 links is taken for a loop.
+- **Aliases** (`CreateAliasAsync`) point at the entry itself, like macOS aliases and Windows shortcuts, so they keep finding it after a move or rename on its drive. Paths don't go through them: an app calls `ResolveAliasAsync` (Files does on a double-click). If the target's drive is out, or the target was moved to another drive (which copies it), the alias falls back to the path it was made with. Shortcuts point at files and folders only, never at apps.
+- **Trash.** `TrashAsync` moves an entry to its drive's `.Trash` and remembers where it was; `RestoreAsync` puts it back. `DeleteAsync` deletes for good.
+- **Errors.** A failed call throws `Navi.FileException`, whose `Error` says why (`NotFound`, `AlreadyExists`, `NoSpace`, `Protected`...). A missing permission throws `MissingPermissionException` as usual.
+- **Permissions.** Every app has a folder of its own, `/Library/Apps/{app id}` with the id's `/` written as `:` (`GetAppFolderAsync`). It needs no permission there. Anything else needs `navi.files.access`. A path is checked as the app wrote it and again where it leads, so a symlink in the app's folder can't reach out of it, and `..` can't either. Uninstalling an app deletes its folder.
+- **Saved by the host.** Each drive is saved apart from its computer, in `navi/saves/{slot}/drives/{drive id}.json` (the inside drive's id is the computer's `SaveKey`), a second after its files last change. Removable drives keep their own id, so their files go with them. Files aren't sent to clients.
+- **Multiplayer.** Only the host has the files, so an app that uses them should be `Shared` (Files is). A client's own copy of an app that isn't shared gets `FileError.Unavailable`.
+- **Console** (host only; each takes an optional computer `SaveKey` last, else the seated computer): `navi_fs_ls [path]`, `navi_fs_cat path`, `navi_fs_write path text`, `navi_fs_mkdir path`, `navi_fs_ln target path`, `navi_fs_alias target path`, `navi_fs_mv from to`, `navi_fs_rm path`, `navi_fs_drives`, `navi_fs_usb [label]` (puts in a new 8 MB drive, to try `/Volumes`) and `navi_fs_eject path`.
 
 ## Theming
 

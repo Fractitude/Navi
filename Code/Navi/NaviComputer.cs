@@ -538,6 +538,9 @@ public sealed partial class NaviComputer : Component
 			_ = DownloadInstalledPackagesAsync();
 		}
 
+		if ( Files is null )
+			LoadFiles( read: AutoSave );
+
 		hasNotifications = true;
 	}
 
@@ -684,6 +687,8 @@ public sealed partial class NaviComputer : Component
 		if ( !IsAuthority )
 			return;
 
+		UpdateFilesSave();
+
 		// The delay counts from the latest change.
 		if ( changedVersion != Version )
 		{
@@ -748,6 +753,7 @@ public sealed partial class NaviComputer : Component
 			return;
 
 		savedVersion = Version;
+		SaveFiles();
 
 		var save = CaptureSave();
 		var json = Json.Serialize( save );
@@ -774,6 +780,7 @@ public sealed partial class NaviComputer : Component
 			DismissPermissionRequest( request );
 
 		RestoreSave( save );
+		LoadFiles( read: true );
 
 		// What the save brings didn't arrive just now: no banners, no sound.
 		arrivedUpTo = -1;
@@ -1256,6 +1263,7 @@ public sealed partial class NaviComputer : Component
 		StartFavorites?.Remove( id );
 		InstalledAt?.Remove( id );
 		ForgetNotifications( id );
+		ForgetAppFolder( id );
 
 		var windowPrefix = id + NaviWindow.KeySeparator;
 		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )

@@ -92,6 +92,7 @@ public sealed class Navi
 		Settings = new SettingsCalls( this );
 		Store = new StoreCalls( this );
 		Notifications = new NotificationCalls( this );
+		Files = new FileCalls( this );
 		Input = new InputState( this );
 	}
 
@@ -131,6 +132,11 @@ public sealed class Navi
 	public NotificationCalls Notifications { get; }
 
 	/// <summary>
+	/// The computer's files: its drive and any removable ones.
+	/// </summary>
+	public FileCalls Files { get; }
+
+	/// <summary>
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
 	/// </summary>
 	public InputState Input { get; }
@@ -167,6 +173,11 @@ public sealed class Navi
 			when ( e is not MissingPermissionException && e.Message.StartsWith( MissingPrefix ) )
 		{
 			throw new MissingPermissionException( e.Message[MissingPrefix.Length..], e );
+		}
+		catch ( InvalidOperationException e )
+			when ( e is not FileException && FileException.TryParse( e.Message, out var error, out var path ) )
+		{
+			throw new FileException( error, path, e );
 		}
 	}
 
@@ -422,6 +433,12 @@ public sealed class Navi
 		/// Send the player notifications.
 		/// </summary>
 		public const string Notify = "navi.notifications.post";
+
+		/// <summary>
+		/// Read, change and delete every file on the computer. Without it an app has only its own folder
+		/// (<see cref="FileCalls.GetAppFolderAsync"/>).
+		/// </summary>
+		public const string Files = "navi.files.access";
 	}
 
 	/// <summary>
@@ -770,6 +787,237 @@ public sealed class Navi
 		/// </summary>
 		public Task<bool> SetMutedAsync( string appId, bool muted ) =>
 			navi.CallAsync<bool>( "notifications.set-muted", appId, muted );
+	}
+
+	/// <summary>
+	/// What a file system entry is.
+	/// </summary>
+	public enum FileKind
+	{
+		Folder,
+		File,
+
+		/// <summary>
+		/// Points at a path, like a Unix symlink. Paths through it are followed, so it acts as what it points at. It
+		/// breaks if that moves.
+		/// </summary>
+		Symlink,
+
+		/// <summary>
+		/// Points at an entry itself, like a macOS alias or a Windows shortcut, so it still finds it after a move or
+		/// rename. Paths don't go through it: resolve it with <see cref="FileCalls.ResolveAliasAsync"/>.
+		/// </summary>
+		Alias,
+	}
+
+	/// <summary>
+	/// A file, folder or link. <paramref name="Size"/> is a file's size in bytes. <paramref name="Target"/> is a
+	/// symlink's target path, or the path an alias was made to. <paramref name="TrashedFrom"/> is where an entry in the
+	/// trash came from. <paramref name="Items"/> counts what a folder holds. <paramref name="IsDrive"/> is a drive's top
+	/// folder.
+	/// </summary>
+	public sealed record FileInfo(
+		string Name,
+		string Path,
+		FileKind Kind,
+		long Size,
+		DateTimeOffset Created,
+		DateTimeOffset Modified,
+		string Target,
+		string TrashedFrom,
+		int Items,
+		bool IsDrive )
+	{
+		public bool IsFolder => Kind == FileKind.Folder;
+	}
+
+	/// <summary>
+	/// A drive in the computer, and where it is in its files. The one inside is at "/", removable ones in "/Volumes".
+	/// Sizes are in bytes.
+	/// </summary>
+	public sealed record DriveInfo( string Id, string Label, string Path, long Capacity, long Used, bool Removable )
+	{
+		public long Free => Math.Max( 0, Capacity - Used );
+	}
+
+	/// <summary>
+	/// Why a file call failed.
+	/// </summary>
+	public enum FileError
+	{
+		NotFound,
+		AlreadyExists,
+		NotAFolder,
+		IsAFolder,
+		NotEmpty,
+		NoSpace,
+		InvalidName,
+		LinkLoop,
+
+		/// <summary>
+		/// Part of how the computer is laid out (a drive, /Volumes, /Library, the trash, the app's own folder), or a
+		/// folder moved into itself.
+		/// </summary>
+		Protected,
+
+		/// <summary>
+		/// The files are on the host, and this is a client's own copy of the app. Make the app Shared to use files in
+		/// multiplayer.
+		/// </summary>
+		Unavailable,
+
+		Unknown,
+	}
+
+	const string FilePrefix = "File error ";
+
+	/// <summary>
+	/// A file call failed. A missing permission throws <see cref="MissingPermissionException"/> instead.
+	/// </summary>
+	public sealed class FileException : InvalidOperationException
+	{
+		public FileException( FileError error, string path, Exception inner = null )
+			: base( $"{FilePrefix}[{error}]: {path}", inner )
+		{
+			Error = error;
+			Path = path;
+		}
+
+		public FileError Error { get; }
+		public string Path { get; }
+
+		/// <summary>
+		/// Read the computer's error message: "File error [NotFound]: /path".
+		/// </summary>
+		internal static bool TryParse( string message, out FileError error, out string path )
+		{
+			error = FileError.Unknown;
+			path = null;
+
+			var end = message?.IndexOf( "]: ", StringComparison.Ordinal ) ?? -1;
+			if ( end < 0 || !message.StartsWith( FilePrefix + "[", StringComparison.Ordinal ) )
+				return false;
+
+			error = Enum.TryParse<FileError>( message[(FilePrefix.Length + 1)..end], out var known ) ? known : FileError.Unknown;
+			path = message[(end + 3)..];
+			return true;
+		}
+	}
+
+	/// <summary>
+	/// The computer's files, as on macOS and Linux: one tree from "/", case-sensitive names, absolute paths
+	/// ("/Documents/notes.txt"). Only files made on the computer are there. An app has its own folder
+	/// (<see cref="GetAppFolderAsync"/>) and needs <see cref="Permission.Files"/> for anything else. A failed call throws
+	/// <see cref="FileException"/>. Only the host has the files: in multiplayer, use them from a Shared app.
+	/// </summary>
+	public sealed class FileCalls( Navi navi )
+	{
+		/// <summary>
+		/// Goes up whenever a file changes, or a drive is put in or taken out. Poll it to know when to list again.
+		/// </summary>
+		public Task<int> GetVersionAsync() => navi.CallAsync<int>( "files.version" );
+
+		/// <summary>
+		/// The folder this app has to itself, e.g. "/Library/Apps/fractitude.napp_notes". It needs no permission.
+		/// Uninstalling the app deletes it.
+		/// </summary>
+		public Task<string> GetAppFolderAsync() => navi.CallAsync<string>( "files.app-folder" );
+
+		public async Task<IReadOnlyList<DriveInfo>> GetDrivesAsync()
+		{
+			var drives = await navi.CallAsync<(string, string, string, long, long, bool)[]>( "files.drives" );
+			return drives.Select( x => new DriveInfo( x.Item1, x.Item2, x.Item3, x.Item4, x.Item5, x.Item6 ) ).ToArray();
+		}
+
+		/// <summary>
+		/// What a folder holds, sorted by name. Drives in it (in "/Volumes") are folders with <see cref="FileInfo.IsDrive"/>.
+		/// </summary>
+		public async Task<IReadOnlyList<FileInfo>> ListAsync( string path )
+		{
+			var entries = await navi.CallAsync<(string, string, int, long, long, long, (string, string, int, bool))[]>(
+				"files.list", path );
+			return entries.Select( ToInfo ).ToArray();
+		}
+
+		/// <summary>
+		/// One entry, or null if there is none. With <paramref name="followLinks"/> a symlink at the path gives what it
+		/// points at; without, the link itself.
+		/// </summary>
+		public async Task<FileInfo> GetInfoAsync( string path, bool followLinks = true ) =>
+			await navi.CallAsync( "files.info", path, followLinks )
+				is ValueTuple<string, string, int, long, long, long, ValueTuple<string, string, int, bool>> entry
+				? ToInfo( entry )
+				: null;
+
+		public Task<string> ReadTextAsync( string path ) => navi.CallAsync<string>( "files.read", path );
+
+		/// <summary>
+		/// Write a text file, making it or replacing what is in it. Returns its path.
+		/// </summary>
+		public Task<string> WriteTextAsync( string path, string text ) =>
+			navi.CallAsync<string>( "files.write", path, text ?? "" );
+
+		public Task<string> CreateFolderAsync( string path ) => navi.CallAsync<string>( "files.create-folder", path );
+
+		/// <summary>
+		/// Make a symlink at <paramref name="path"/> to <paramref name="target"/>, absolute or relative to the link's
+		/// folder. The target needn't exist.
+		/// </summary>
+		public Task<string> CreateSymlinkAsync( string path, string target ) =>
+			navi.CallAsync<string>( "files.symlink", path, target );
+
+		/// <summary>
+		/// Make an alias at <paramref name="path"/> to the entry at <paramref name="target"/>, which must exist.
+		/// </summary>
+		public Task<string> CreateAliasAsync( string path, string target ) =>
+			navi.CallAsync<string>( "files.alias", path, target );
+
+		/// <summary>
+		/// Where an alias points now, or null if what it pointed at is gone.
+		/// </summary>
+		public Task<string> ResolveAliasAsync( string path ) => navi.CallAsync<string>( "files.resolve-alias", path );
+
+		/// <summary>
+		/// Move or rename an entry. <paramref name="to"/> is its new full path and must not exist. A symlink moves as
+		/// itself.
+		/// </summary>
+		public Task<string> MoveAsync( string from, string to ) => navi.CallAsync<string>( "files.move", from, to );
+
+		/// <summary>
+		/// Copy an entry and everything in it. Links are copied as links.
+		/// </summary>
+		public Task<string> CopyAsync( string from, string to ) => navi.CallAsync<string>( "files.copy", from, to );
+
+		/// <summary>
+		/// Move an entry to the trash of its drive. Returns where it is now.
+		/// </summary>
+		public Task<string> TrashAsync( string path ) => navi.CallAsync<string>( "files.trash", path );
+
+		/// <summary>
+		/// Put an entry in the trash back where it was. Needs <see cref="Permission.Files"/>.
+		/// </summary>
+		public Task<string> RestoreAsync( string path ) => navi.CallAsync<string>( "files.restore", path );
+
+		/// <summary>
+		/// Delete an entry for good, with everything in it. A symlink or alias is deleted, not what it points at.
+		/// </summary>
+		public Task DeleteAsync( string path ) => navi.CallAsync( "files.delete", path );
+
+		/// <summary>
+		/// Take out the removable drive whose top folder is <paramref name="path"/>. Needs <see cref="Permission.Files"/>.
+		/// False if it isn't one.
+		/// </summary>
+		public Task<bool> EjectAsync( string path ) => navi.CallAsync<bool>( "files.eject", path );
+
+		/// <summary>
+		/// The trash folder of the drive <paramref name="path"/> is on.
+		/// </summary>
+		public Task<string> GetTrashPathAsync( string path = "/" ) => navi.CallAsync<string>( "files.trash-path", path );
+
+		static FileInfo ToInfo( (string, string, int, long, long, long, (string, string, int, bool)) x ) => new(
+			x.Item1, x.Item2, (FileKind)x.Item3, x.Item4,
+			DateTimeOffset.FromUnixTimeSeconds( x.Item5 ), DateTimeOffset.FromUnixTimeSeconds( x.Item6 ),
+			x.Item7.Item1, x.Item7.Item2, x.Item7.Item3, x.Item7.Item4 );
 	}
 
 	/// <summary>

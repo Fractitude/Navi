@@ -142,6 +142,47 @@ public static class NaviSaveData
 		}
 	}
 
+	static string DrivePathFor( string id ) => $"navi/saves/{Slot}/drives/{id}.json";
+
+	/// <summary>
+	/// A drive's files in the current slot, or null if it has none. Each drive has its own file, apart from its
+	/// computer's, so a removable drive keeps its files on any computer: <c>navi/saves/{slot}/drives/{drive}.json</c>.
+	/// </summary>
+	public static NaviDriveSave ReadDrive( string id )
+	{
+		if ( !IsPlainName( id ) || FileSystem.Data is not { } data || !data.FileExists( DrivePathFor( id ) ) )
+			return null;
+
+		try
+		{
+			return data.ReadJson<NaviDriveSave>( DrivePathFor( id ) );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't read drive '{id}': {e.Message}" );
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Write a drive's files to the current slot.
+	/// </summary>
+	public static void WriteDrive( string id, NaviDriveSave save )
+	{
+		if ( !IsPlainName( id ) || FileSystem.Data is not { } data )
+			return;
+
+		try
+		{
+			data.CreateDirectory( $"navi/saves/{Slot}/drives" );
+			data.WriteJson( DrivePathFor( id ), save );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't save drive '{id}': {e.Message}" );
+		}
+	}
+
 	/// <summary>
 	/// Load every computer in the scene from the current slot. Computers without a save there keep what they have.
 	/// </summary>

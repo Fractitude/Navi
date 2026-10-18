@@ -1,0 +1,17 @@
+{
+  "Title": "Files",
+  "Description": "Browse, make and change the files on this computer.",
+  "Icon": "folder",
+  "Color": "#6f8fb0",
+  "PanelType": "NaviApps.Files",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": true,
+  "Permissions": [
+    "navi.files.access"
+  ],
+  "IsSystem": true,
+  "__references": [],
+  "__version": 0
+}

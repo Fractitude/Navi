@@ -34,6 +34,11 @@ public static class NaviPermissions
 	public const string Notify = "navi.notifications.post";
 
 	/// <summary>
+	/// Read, change and delete every file on the computer. Without it an app has only its own folder.
+	/// </summary>
+	public const string Files = "navi.files.access";
+
+	/// <summary>
 	/// How a permission is shown to the player.
 	/// </summary>
 	public record Info( string Id, string Title, string Description, string Icon );
@@ -45,6 +50,7 @@ public static class NaviPermissions
 		new( ManageApps, "Manage apps", "Close other apps' windows.", "tab" ),
 		new( ChangeSettings, "Change settings", "Change this computer's settings, such as the display scale.", "settings" ),
 		new( Notify, "Send notifications", "Show you notifications, which can play a sound.", "notifications" ),
+		new( Files, "Files", "See, change and delete every file on this computer.", "folder" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );
