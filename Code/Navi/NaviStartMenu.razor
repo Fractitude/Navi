@@ -205,9 +205,15 @@
 			if ( Searching )
 				return [(null, Matches)];
 
-			return [("All apps", Computer.Installed.OrderBy( x => x.Name ).ToList())];
+			return [("All apps", Computer.Installed.Where( x => !IsFooterApp( x ) ).OrderBy( x => x.Name ).ToList())];
 		}
 	}
+
+	/// <summary>
+	/// Whether the footer has the app, so the list leaves it out: Settings and the Store (Packages).
+	/// </summary>
+	static bool IsFooterApp( NaviAppInfo app ) =>
+		app.Id is NaviAppRegistry.SettingsApp or NaviAppRegistry.PackagesApp;
 
 	protected override void OnAfterTreeRender( bool firstTime )
 	{
