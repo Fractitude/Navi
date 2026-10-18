@@ -8,7 +8,7 @@
   "Windows": [
     {
       "Id": "log",
-      "Title": "Count",
+      "Title": "",
       "PanelType": "NaviApps.TickerWindow",
       "CanMinimize": true,
       "CanMaximize": false,

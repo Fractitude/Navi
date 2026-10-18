@@ -13,6 +13,15 @@
 	RealTimeSince sinceSecond;
 	int shownSeconds = -1;
 
+	/// <summary>
+	/// The count lives in a static so the window can reach it, and statics outlive a play session in the editor. Starting the
+	/// service is the start of the count.
+	/// </summary>
+	public TickerService()
+	{
+		TickerState.Seconds = 0;
+	}
+
 	public override void Tick()
 	{
 		base.Tick();
