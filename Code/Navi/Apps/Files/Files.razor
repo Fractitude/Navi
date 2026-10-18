@@ -49,16 +49,26 @@
 				<i>arrow_upward</i>
 			</div>
 
+			@* A path too long to fit loses its start, not its end: the trail moves to the right of a box that *@
+			@* clips it, and an ellipsis shows something was cut. *@
 			<div class="crumbs">
-				@foreach ( var crumb in UiState.Crumbs )
+				@if ( crumbsClipped )
 				{
-					@if ( crumb.Path != "/" )
-					{
-						<div class="separator @( crumb.Ahead ? "ahead" : "" )">/</div>
-					}
-					<div class="crumb @( crumb.Ahead ? "ahead" : "" )"
-					     @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, crumb.Path ) )>@crumb.Label</div>
+					<div class="clipped">…</div>
 				}
+				<div class="trail-box @( crumbsClipped ? "clipping" : "" )" @ref="TrailBox">
+					<div class="trail" @ref="Trail">
+						@foreach ( var crumb in UiState.Crumbs )
+						{
+							@if ( crumb.Path != "/" )
+							{
+								<div class="separator @( crumb.Ahead ? "ahead" : "" )">/</div>
+							}
+							<div class="crumb @( crumb.Ahead ? "ahead" : "" )"
+							     @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, crumb.Path ) )>@crumb.Label</div>
+						}
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -226,11 +236,18 @@
 	/// <summary>The <see cref="FilesUiState.RenameSession"/> the rename field was last focused for.</summary>
 	int focusedRename;
 
+	Panel TrailBox;
+	Panel Trail;
+
+	/// <summary>The breadcrumb trail is wider than its box, so its start is cut off.</summary>
+	bool crumbsClipped;
+
 	public override void Tick()
 	{
 		base.Tick();
 
 		FocusRename();
+		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )
 			return;
@@ -330,5 +347,6 @@
 	/// is typing there, and the host is a keystroke behind.
 	/// </summary>
 	protected override int BuildHash() =>
-		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText );
+		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText,
+			crumbsClipped );
 }

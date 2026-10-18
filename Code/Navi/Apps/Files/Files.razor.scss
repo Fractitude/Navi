@@ -163,8 +163,36 @@
 		flex-direction: row;
 		align-items: center;
 		margin-left: 6px;
-		overflow: hidden;
 		font-size: 11px;
+
+		.clipped
+		{
+			flex-shrink: 0;
+			padding: 2px 4px 2px 0;
+			opacity: 0.5;
+		}
+
+		// Clips the trail. When it's too wide it's lined up at the right, so it overflows on the left.
+		.trail-box
+		{
+			flex-grow: 1;
+			flex-basis: 0;
+			min-width: 0;
+			flex-direction: row;
+			overflow: hidden;
+
+			&.clipping
+			{
+				justify-content: flex-end;
+			}
+		}
+
+		.trail
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			align-items: center;
+		}
 
 		.crumb
 		{
