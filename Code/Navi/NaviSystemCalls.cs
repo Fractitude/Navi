@@ -78,6 +78,14 @@ public static class NaviSystemCalls
 			case "window.maximize":
 				return computer.ToggleMaximized( self, windowId );
 
+			// The id of the window the panel is in: empty for the main window.
+			case "window.id":
+				return windowId;
+
+			// The title of the window the panel is in. The desktop puts the app's name before it.
+			case "window.title":
+				return computer.SetTitle( self, windowId, Arg<string>( args, 0, method ) );
+
 			// The app's other windows, which only its manifest can define.
 			case "window.open":
 				return computer.OpenWindow( self, Arg<string>( args, 0, method ) );

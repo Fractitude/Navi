@@ -273,6 +273,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 				IsMinimized = x.IsMinimized,
 				IsMaximized = x.IsMaximized,
 				ZIndex = x.ZIndex,
+				Title = x.Title,
 			} ).ToList(),
 		},
 		Requests = permissionRequests.Select( x => new NaviRequestSnapshot
@@ -358,6 +359,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			window.IsMinimized = entry.IsMinimized;
 			window.IsMaximized = entry.IsMaximized;
 			window.ZIndex = entry.ZIndex;
+			window.Title = NaviAppInfo.Cap( entry.Title, NaviWindow.MaxTitle );
 			windows[process].Add( window );
 		}
 

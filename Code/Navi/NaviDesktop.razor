@@ -399,7 +399,7 @@
 	/// can't pass for another app's.
 	/// </summary>
 	static string WindowTitle( NaviWindow window ) =>
-		string.IsNullOrEmpty( window.Info.Title ) ? window.App.Name : $"{window.App.Name} - {window.Info.Title}";
+		string.IsNullOrEmpty( window.Title ) ? window.App.Name : $"{window.App.Name} {window.Title}";
 
 	/// <summary>
 	/// Run a taskbar menu item and close the menu. The click doesn't reach the icon, so it doesn't also open the app.

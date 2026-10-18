@@ -78,6 +78,18 @@ public sealed class NaviWindow
 	public NaviProcess Process { get; init; }
 	public NaviWindowInfo Info { get; init; }
 
+	/// <summary>
+	/// What the title bar says after the app's name: the title the app set while running (<c>Navi.SetTitle</c>), or else the
+	/// one its manifest gave.
+	/// </summary>
+	public string Title
+	{
+		get => title ?? Info.Title;
+		set => title = string.IsNullOrWhiteSpace( value ) ? null : value;
+	}
+
+	string title;
+
 	public NaviAppInfo App => Process.App;
 
 	/// <summary>
@@ -893,6 +905,26 @@ public sealed partial class NaviComputer : Component
 		}
 
 		window.Process.WindowList.Remove( window );
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Change what a window's title bar says after the app's name, cut to <see cref="NaviWindow.MaxTitle"/>. Empty goes back to
+	/// the manifest's title. Returns false if the window isn't open.
+	/// </summary>
+	public bool SetTitle( string id, string windowId, string title )
+	{
+		if ( !IsAuthority || GetWindow( id, windowId ) is not { IsService: false } window )
+			return false;
+
+		title = NaviAppInfo.Cap( title?.Trim(), NaviWindow.MaxTitle );
+
+		// An app may set it every frame; only a change redraws the desktop.
+		if ( window.Title == (string.IsNullOrEmpty( title ) ? window.Info.Title : title) )
+			return true;
+
+		window.Title = title;
 		Version++;
 		return true;
 	}

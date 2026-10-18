@@ -71,6 +71,17 @@ public static class Navi
 	/// </summary>
 	public static Task<bool> ToggleMaximize( Panel app ) => Call<bool>( app, "window.maximize" );
 
+	/// <summary>
+	/// The id the .napp gave the window this panel is in, or empty for the app's main window.
+	/// </summary>
+	public static Task<string> WindowId( Panel app ) => Call<string>( app, "window.id" );
+
+	/// <summary>
+	/// Change what the title bar of the window this panel is in says after the app's name, up to 32 characters. Empty goes back
+	/// to the title in the .napp. It is safe to call every frame. In a shared app only the host's copy should call it.
+	/// </summary>
+	public static Task SetTitle( Panel app, string title ) => Call( app, "window.title", title ?? "" );
+
 	// More windows, and the system tray. An app can open the windows its .napp lists under Windows, one of each, and a
 	// headless app (Headless in the .napp) starts with none: its main panel is a service that is never drawn and runs until
 	// the player quits it from its tray menu. Call these from the main panel, or the service.

@@ -29,5 +29,13 @@ TickerWindow
 			color: #f2eee2;
 			background-color: #6e6a5c;
 		}
+
+		&.disabled
+		{
+			cursor: not-allowed;
+			opacity: 0.5;
+			color: inherit;
+			background-color: #c9c3b0;
+		}
 	}
 }

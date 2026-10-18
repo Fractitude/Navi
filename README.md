@@ -177,6 +177,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | Call | Does | Needs |
 |---|---|---|
 | `Navi.Close( this )`, `Minimize`, `ToggleMaximize` | The window the panel is in. Closing the main window closes the app | |
+| `Navi.SetTitle( this, title )` | Change what the title bar says after the app's name (up to 32 characters; empty restores the `.napp` title) | |
 | `Navi.OpenWindow( this, id )`, `CloseWindow` | Open or close one of the windows the manifest lists | |
 | `Navi.SetTray( this, icon, tooltip, items )` | Set the app's tray icon and menu | |
 | `Navi.IsTrayClick( e, out id )` | In `OnEvent`: the player clicked the tray icon (`Navi.TrayPrimary`) or a menu item | |

@@ -13,6 +13,14 @@
       "CanMinimize": true,
       "CanMaximize": false,
       "CanResize": false
+    },
+    {
+      "Id": "log2",
+      "Title": "",
+      "PanelType": "NaviApps.TickerWindow",
+      "CanMinimize": true,
+      "CanMaximize": false,
+      "CanResize": false
     }
   ],
   "CanMinimize": true,

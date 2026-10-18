@@ -134,6 +134,11 @@ public sealed class NaviWindowSnapshot
 	public bool IsMinimized { get; set; }
 	public bool IsMaximized { get; set; }
 	public int ZIndex { get; set; }
+
+	/// <summary>
+	/// The title bar's text after the app's name, as the app has it now. See <see cref="NaviWindow.Title"/>.
+	/// </summary>
+	public string Title { get; set; } = "";
 }
 
 /// <summary>

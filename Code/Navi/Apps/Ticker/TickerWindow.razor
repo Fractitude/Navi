@@ -8,15 +8,24 @@
 <root>
 	<div class="count">@UiState.Seconds s</div>
 	<div class="button" @onclick=@( () => Navi.Act( this, ResetAction ) )>Reset</div>
+	<div class="button @( UiState.AllOpen ? "disabled" : "" )" @onclick=@OnNewWindow>New window</div>
 </root>
 
 @code
 {
 	const string ResetAction = "reset";
+	const string NewWindowAction = "new-window";
 
 	TickerUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<TickerUiState>( this ) ?? TickerUiState.Empty : hostState;
 
 	TickerUiState hostState = TickerUiState.Empty;
+
+	/// <summary>
+	/// Which of the manifest's windows this is, once the computer has said (host only).
+	/// </summary>
+	public string WindowId { get; private set; }
+
+	bool askedId;
 
 	public override void Tick()
 	{
@@ -25,8 +34,23 @@
 		if ( Navi.IsViewer( this ) )
 			return;
 
-		if ( hostState.Seconds != TickerState.Seconds )
-			hostState = new TickerUiState { Seconds = TickerState.Seconds };
+		if ( !askedId )
+		{
+			askedId = true;
+			_ = LoadWindowId();
+		}
+
+		// Closed windows leave the list. A window numbers itself only while there is more than one.
+		TickerState.Windows.RemoveAll( x => !x.IsValid );
+		if ( !TickerState.Windows.Contains( this ) )
+			TickerState.Windows.Add( this );
+
+		var number = TickerState.Windows.IndexOf( this ) + 1;
+		_ = Navi.SetTitle( this, TickerState.Windows.Count > 1 ? $"#{number}" : "" );
+
+		var allOpen = TickerState.Windows.Count >= TickerState.WindowIds.Length;
+		if ( hostState.Seconds != TickerState.Seconds || hostState.AllOpen != allOpen )
+			hostState = new TickerUiState { Seconds = TickerState.Seconds, AllOpen = allOpen };
 
 		Navi.Publish( this, hostState );
 	}
@@ -37,6 +61,8 @@
 		{
 			if ( action == ResetAction )
 				TickerState.Seconds = 0;
+			else if ( action == NewWindowAction )
+				_ = Navi.OpenWindow( this, FreeWindowId() );
 
 			e.StopPropagation();
 			return;
@@ -45,5 +71,21 @@
 		base.OnEvent( e );
 	}
 
-	protected override int BuildHash() => UiState.Seconds;
+	void OnNewWindow()
+	{
+		if ( !UiState.AllOpen )
+			Navi.Act( this, NewWindowAction );
+	}
+
+	async System.Threading.Tasks.Task LoadWindowId() => WindowId = await Navi.WindowId( this );
+
+	/// <summary>
+	/// The first window of the manifest that isn't open, so the one left after the other closes is never asked to open itself.
+	/// With all of them open the last one, which only comes to the front.
+	/// </summary>
+	static string FreeWindowId() =>
+		TickerState.WindowIds.FirstOrDefault( id => !TickerState.Windows.Any( x => x.IsValid && x.WindowId == id ) )
+		?? TickerState.WindowIds[^1];
+
+	protected override int BuildHash() => System.HashCode.Combine( UiState.Seconds, UiState.AllOpen );
 }
