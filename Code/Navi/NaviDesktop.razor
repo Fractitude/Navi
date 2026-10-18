@@ -441,10 +441,12 @@
 
 	/// <summary>
 	/// What the title bar says: the app's name, then the window's own title. The app's name is always first, so a window
-	/// can't pass for another app's.
+	/// can't pass for another app's. A pre-packaged app is part of the OS and can't be a stranger's, so its window's own title
+	/// stands alone (a browser says the page's title), and the app's name is what shows until it has one.
 	/// </summary>
 	static string WindowTitle( NaviWindow window ) =>
-		string.IsNullOrEmpty( window.Title ) ? window.App.Name : $"{window.App.Name} {window.Title}";
+		string.IsNullOrEmpty( window.Title ) ? window.App.Name :
+		window.App.IsPrepackaged ? window.Title : $"{window.App.Name} {window.Title}";
 
 	/// <summary>
 	/// Run a taskbar menu item and close the menu. The click doesn't reach the icon, so it doesn't also open the app.

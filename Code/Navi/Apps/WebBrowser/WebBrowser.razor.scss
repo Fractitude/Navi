@@ -1,0 +1,82 @@
+WebBrowser
+{
+	width: 420px;
+	height: 260px;
+	flex-direction: column;
+	padding: 6px;
+	gap: 6px;
+}
+
+.toolbar
+{
+	flex-shrink: 0;
+	flex-direction: row;
+	align-items: center;
+	gap: 4px;
+}
+
+.button
+{
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+	justify-content: center;
+	align-items: center;
+	font-size: 16px;
+	color: #2a2840;
+	border: 1px solid #8a8472;
+	cursor: pointer;
+
+	&:hover
+	{
+		color: #f2eee2;
+		background-color: #2a2840;
+		border-color: #2a2840;
+	}
+
+	&.disabled
+	{
+		opacity: 0.4;
+		cursor: default;
+		pointer-events: none;
+	}
+}
+
+// The address field. The engine's TextEntry is dark; Navi's panels are paper.
+.address
+{
+	flex-grow: 1;
+	min-width: 0;
+
+	.textentry
+	{
+		width: 100%;
+		min-width: 0;
+		padding: 3px 6px;
+		font-size: 11px;
+		color: #2a2840;
+		background-color: #f2eee2;
+		border: 1px solid #8a8472;
+	}
+}
+
+// A message about the last thing tried, e.g. an address that can't be opened. Click to dismiss.
+.notice
+{
+	flex-shrink: 0;
+	padding: 4px 6px;
+	font-size: 10px;
+	color: #f2eee2;
+	background-color: #8a3a3a;
+	cursor: pointer;
+}
+
+// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
+.page
+{
+	flex-grow: 1;
+	flex-shrink: 1;
+	min-height: 0;
+	background-color: #ffffff;
+	border: 1px solid #8a8472;
+}

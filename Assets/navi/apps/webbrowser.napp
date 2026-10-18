@@ -1,0 +1,15 @@
+{
+  "Title": "Web Browser",
+  "Description": "Browse the web.",
+  "Icon": "language",
+  "Color": "#6a8fb0",
+  "PanelType": "NaviApps.WebBrowser",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": false,
+  "Permissions": [],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

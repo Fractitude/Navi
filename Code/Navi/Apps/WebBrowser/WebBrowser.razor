@@ -1,0 +1,100 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. It makes no calls to *@
+@* the computer but the window title. The page itself is the engine's WebPanel. *@
+@* It isn't shared: a web page is drawn from the client's own pixels, so each player browses on their own copy. *@
+
+<root>
+	<div class="toolbar">
+		<div class="button @( UiState.CanGoBack ? "" : "disabled" )" tooltip="Back" @onclick=@( () => ViewModel.GoBack() )>
+			<i>arrow_back</i>
+		</div>
+		<div class="button @( UiState.CanGoForward ? "" : "disabled" )" tooltip="Forward" @onclick=@( () => ViewModel.GoForward() )>
+			<i>arrow_forward</i>
+		</div>
+		<div class="button" tooltip="Reload" @onclick=@( () => ViewModel.Reload() )>
+			<i>refresh</i>
+		</div>
+		<div class="button" tooltip="Home" @onclick=@( () => ViewModel.GoHome() )>
+			<i>home</i>
+		</div>
+
+		<div class="address">
+			<TextEntry Value=@( UiState.AddressText ) Placeholder="Search or enter an address"
+			           OnTextEdited=@AddressEdited
+			           onsubmit=@( () => ViewModel.SubmitAddress() )/>
+		</div>
+	</div>
+
+	@if ( UiState.Notice is not null )
+	{
+		<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+			@UiState.Notice
+		</div>
+	}
+
+	<WebPanel @ref="Web" class="page"/>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state. Made on first use: its calls to the computer are made with the app's own panel, which
+	/// is this.
+	/// </summary>
+	WebBrowserViewModel ViewModel => field ??= new(this);
+
+	/// <summary>
+	/// What is drawn above. Read only: the view model replaces it, and its revision is what makes this panel redraw.
+	/// </summary>
+	WebBrowserUiState UiState => ViewModel.UiState;
+
+	WebPanel Web;
+
+	/// <summary>The <see cref="WebBrowserUiState.LoadId"/> the page was last told to load.</summary>
+	int loadedId;
+
+	/// <summary>
+	/// The page is a panel of the engine, so loading into it and reading which address it is on are done here, between it
+	/// and the view model. Neither is app state.
+	/// </summary>
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( Web is null )
+			return;
+
+		if ( loadedId != UiState.LoadId )
+		{
+			loadedId = UiState.LoadId;
+			Load( UiState.Url );
+		}
+
+		ViewModel.PageChanged( Web.Surface?.Url, Web.Surface?.PageTitle );
+	}
+
+	/// <summary>
+	/// The engine refuses addresses it doesn't allow, and says so by throwing.
+	/// </summary>
+	void Load( string url )
+	{
+		try
+		{
+			Web.Url = url;
+		}
+		catch ( System.Exception e )
+		{
+			ViewModel.LoadFailed( e.Message );
+		}
+	}
+
+	/// <summary>
+	/// The address field reports every edit here. Typing doesn't redraw; Enter loads.
+	/// </summary>
+	void AddressEdited( string text ) => ViewModel.SetAddressText( text );
+
+	protected override int BuildHash() => ViewModel.Revision;
+}

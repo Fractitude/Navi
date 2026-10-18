@@ -15,7 +15,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
 - `NaviPermissions` lists what apps can be allowed to do.
-- `Packages`, `Settings`, `Calculator` and `Turntable` (a model drawn in 3D with a `ScenePanel`) are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
+- `Packages`, `Settings`, `Calculator`, `Turntable` (a model drawn in 3D with a `ScenePanel`) and `WebBrowser` (the engine's `WebPanel`, with a history of its own) are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
 
 ## Windows
 
@@ -26,7 +26,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - Right-click a taskbar icon for its menu: Open, Permissions..., Close.
 - A shield in a window's title bar means the app has full system access (root). Nothing else shows it.
 - An app can have more than one window, and a headless app has none at first, only an icon in the system tray. See "Headless apps and more windows".
-- A title bar always starts with the app's name; a window's own title (if the manifest gives one) comes after it.
+- A title bar always starts with the app's name; a window's own title (if the manifest gives one) comes after it. The exception is a pre-packaged app, which is part of the OS: its window's own title stands alone (the Web Browser shows the page's title), and the app's name shows while there is none.
 - Clicking the taskbar icon of an app with several windows minimizes or restores all of them. Closing an app's main window closes the app and its other windows.
 
 ## Make an app
