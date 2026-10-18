@@ -931,28 +931,28 @@ public sealed partial class NaviComputer : Component
 	}
 
 	/// <summary>
-	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Moving an app that isn't pinned
-	/// in among the pinned ones pins it there; moving it among the apps that are only open reorders those, and pins nothing.
-	/// A pinned app stays among the pinned ones. Returns false if the app isn't on the taskbar, the index is out of range,
-	/// or the icon is already there.
+	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. With <paramref name="pin"/> an app
+	/// that isn't pinned becomes pinned, at <paramref name="index"/> among the pinned ones (after them all if that is their
+	/// count); without it, moving it among the apps that are only open reorders those, and pins nothing. A pinned app stays
+	/// among the pinned ones. Returns false if the app isn't on the taskbar, the index is out of range, or the icon is
+	/// already there and isn't being pinned.
 	/// </summary>
-	public bool MoveTaskbarApp( string id, int index )
+	public bool MoveTaskbarApp( string id, int index, bool pin = false )
 	{
 		if ( !IsAuthority )
 			return false;
 
 		var apps = TaskbarApps.Select( x => x.Id ).ToList();
 		var from = apps.IndexOf( id );
-		if ( from < 0 || index < 0 || index >= apps.Count || index == from )
+		if ( from < 0 || index < 0 || index >= apps.Count || (index == from && !(pin && !IsTaskbarPinned( id ))) )
 			return false;
 
-		var pinnedCount = apps.Count( IsTaskbarPinned );
 		var wasPinned = IsTaskbarPinned( id );
 
 		apps.RemoveAt( from );
 		apps.Insert( index, id );
 
-		if ( wasPinned || index < pinnedCount )
+		if ( wasPinned || pin )
 		{
 			var pinned = TaskbarOrder?.ToHashSet() ?? [];
 			pinned.Add( id );

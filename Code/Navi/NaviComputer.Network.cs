@@ -667,10 +667,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// The user dragged an app's taskbar icon to a new place. See <see cref="MoveTaskbarApp"/>.
 	/// </summary>
 	[Rpc.Host]
-	public void UserMoveTaskbarApp( string id, int index )
+	public void UserMoveTaskbarApp( string id, int index, bool pin )
 	{
 		if ( Authorize() )
-			MoveTaskbarApp( id, index );
+			MoveTaskbarApp( id, index, pin );
 	}
 
 	/// <summary>
