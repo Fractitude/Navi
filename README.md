@@ -15,7 +15,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - `NaviAppResource` (`.napp`) is an app's manifest. Every app has one. `NaviAppRegistry` finds them all, so a new app needs no registration code.
 - `Navi` (`Code/Navi/Client/Navi.cs`) is the client every app uses to talk to the computer. `NaviSystemCalls` answers it.
 - `NaviPermissions` lists what apps can be allowed to do.
-- `Packages`, `Settings` and `Calculator` are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
+- `Packages`, `Settings`, `Calculator` and `Turntable` (a model drawn in 3D with a `ScenePanel`) are the built-in apps, in `Code/Navi/Apps/` with their manifests in `Assets/navi/apps/`. Open Packages with the NAVI button. Its Store tab lists apps players published to sbox.game. Packages is the reference for how an app is split: a `UiState` it draws, a view model that does the work, and a stateless panel (see "Keep the panel stateless").
 
 ## Windows
 

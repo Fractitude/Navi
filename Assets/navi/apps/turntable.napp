@@ -1,0 +1,15 @@
+{
+  "Title": "Turntable",
+  "Description": "Spin a model in 3D.",
+  "Icon": "view_in_ar",
+  "Color": "#a890e0",
+  "PanelType": "NaviApps.Turntable",
+  "CanMinimize": true,
+  "CanMaximize": false,
+  "CanResize": false,
+  "Shared": true,
+  "Permissions": [],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

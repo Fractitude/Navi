@@ -1,0 +1,70 @@
+Turntable
+{
+	width: 260px;
+	flex-direction: column;
+	padding: 6px;
+	gap: 6px;
+}
+
+.view
+{
+	height: 200px;
+	border: 2px solid #4a4638;
+}
+
+.controls
+{
+	flex-direction: column;
+	gap: 4px;
+}
+
+.row
+{
+	flex-direction: row;
+	gap: 4px;
+}
+
+.button
+{
+	flex-grow: 1;
+	flex-basis: 0;
+	height: 26px;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+	gap: 4px;
+	font-size: 12px;
+	font-weight: 700;
+	color: #f2eee2;
+	background-color: #2a2840;
+	border: 1px solid #4a4638;
+	cursor: pointer;
+
+	i
+	{
+		font-size: 16px;
+	}
+
+	&.active
+	{
+		color: #2a2840;
+		background-color: #e0b060;
+	}
+
+	&.spin, &.tint
+	{
+		flex-grow: 2;
+	}
+
+	&:hover
+	{
+		border-color: #f2eee2;
+	}
+}
+
+.swatch
+{
+	width: 10px;
+	height: 10px;
+	border: 1px solid #f2eee2;
+}

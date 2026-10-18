@@ -1,0 +1,164 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace NaviApps
+
+@* A Navi app like any other: a plain panel, described by Assets/navi/apps/turntable.napp. It shows a model in 3D, *@
+@* rendered by a ScenePanel from a small scene of its own. It is shared, so the panel only draws TurntableUiState, *@
+@* and its buttons are actions (Navi.Act) that the host's copy runs. *@
+
+<root>
+	<ScenePanel @ref="View" class="view"/>
+
+	<div class="controls">
+		<div class="row">
+			@for ( var i = 0; i < TurntableUiState.Models.Count; i++ )
+			{
+				var index = i;
+				<div class="button @( index == UiState.ModelIndex ? "active" : "" )"
+				     @onclick=@( () => Navi.Act( this, TurntableViewModel.ModelAction, index.ToString() ) )>
+					@TurntableUiState.Models[index].Label
+				</div>
+			}
+		</div>
+
+		<div class="row">
+			<div class="button" @onclick=@( () => Navi.Act( this, TurntableViewModel.RotateAction, "left" ) )>
+				<i>rotate_left</i>
+			</div>
+			<div class="button spin" @onclick=@( () => Navi.Act( this, TurntableViewModel.SpinAction ) )>
+				@UiState.SpinLabel
+			</div>
+			<div class="button" @onclick=@( () => Navi.Act( this, TurntableViewModel.RotateAction, "right" ) )>
+				<i>rotate_right</i>
+			</div>
+			<div class="button tint" @onclick=@( () => Navi.Act( this, TurntableViewModel.TintAction ) )>
+				<div class="swatch" style="background-color: @UiState.Tint.Hex"></div>
+				@UiState.Tint.Label
+			</div>
+		</div>
+	</div>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state, in the host's copy only.
+	/// </summary>
+	TurntableViewModel ViewModel => field ??= new();
+
+	/// <summary>
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
+	/// </summary>
+	TurntableUiState UiState => Navi.IsViewer( this ) ? Navi.GetState<TurntableUiState>( this ) ?? TurntableUiState.Empty : ViewModel.UiState;
+
+	ScenePanel View { get; set; }
+
+	// The 3D scene is view plumbing, like a scrollbar: it holds no app state, it is rebuilt from UiState whenever the
+	// revision changes, and between revisions it only turns the model on from UiState.Yaw.
+	Scene scene;
+	GameObject pivot;
+	ModelRenderer model;
+	CameraComponent camera;
+	int shownRevision = -1;
+	RealTimeSince sinceShown;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !Navi.IsViewer( this ) )
+			Navi.Publish( this, ViewModel.UiState );
+
+		ShowState( UiState );
+	}
+
+	/// <summary>
+	/// Make the scene look like <paramref name="uiState"/>: its model, tint and the yaw it has spun to by now.
+	/// </summary>
+	void ShowState( TurntableUiState uiState )
+	{
+		if ( View is null )
+			return;
+
+		scene ??= CreateScene();
+
+		if ( uiState.Revision != shownRevision )
+		{
+			shownRevision = uiState.Revision;
+			sinceShown = 0;
+
+			if ( model.Model?.ResourcePath != uiState.Model.Path )
+				ShowModel( uiState.Model.Path );
+
+			model.Tint = Color.Parse( uiState.Tint.Hex ) ?? Color.White;
+		}
+
+		var yaw = uiState.Spinning ? uiState.Yaw + sinceShown * TurntableViewModel.SpinSpeed : uiState.Yaw;
+		pivot.WorldRotation = Rotation.FromYaw( yaw );
+	}
+
+	Scene CreateScene()
+	{
+		var created = new Scene();
+
+		using ( created.Push() )
+		{
+			pivot = new GameObject( true, "pivot" );
+			model = new GameObject( pivot, true, "model" ).AddComponent<ModelRenderer>();
+
+			var cameraObject = new GameObject( true, "camera" );
+			camera = cameraObject.AddComponent<CameraComponent>();
+			camera.BackgroundColor = Color.Parse( "#14131f" ) ?? Color.Black;
+			camera.FieldOfView = 40;
+
+			var sun = new GameObject( true, "sun" );
+			sun.WorldRotation = Rotation.From( 50, 135, 0 );
+			var light = sun.AddComponent<DirectionalLight>();
+			light.LightColor = Color.White * 2.5f;
+			light.SkyColor = Color.Parse( "#2a2840" ) ?? Color.Gray;
+
+			new GameObject( true, "ambient" ).AddComponent<AmbientLight>().Color = Color.Parse( "#4a4638" ) ?? Color.Gray;
+		}
+
+		View.RenderScene = created;
+		return created;
+	}
+
+	/// <summary>
+	/// Swap the model, centre it on the pivot and move the camera back until all of it is in view.
+	/// </summary>
+	void ShowModel( string path )
+	{
+		model.Model = Model.Load( path );
+
+		var bounds = model.Model.Bounds;
+		model.LocalPosition = -bounds.Center;
+
+		var distance = bounds.Size.Length * 1.4f;
+		var position = new Vector3( -distance, 0, distance * 0.35f );
+		camera.WorldPosition = position;
+		camera.WorldRotation = Rotation.LookAt( -position );
+	}
+
+	public override void OnDeleted()
+	{
+		base.OnDeleted();
+
+		scene?.Destroy();
+		scene = null;
+	}
+
+	protected override void OnEvent( PanelEvent e )
+	{
+		if ( Navi.IsAction( e, out var action, out var args ) )
+		{
+			ViewModel.Act( action, args );
+			e.StopPropagation();
+			return;
+		}
+
+		base.OnEvent( e );
+	}
+
+	protected override int BuildHash() => UiState.Revision;
+}
