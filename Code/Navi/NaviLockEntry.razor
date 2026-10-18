@@ -1,0 +1,270 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace Sandbox
+
+@* Where the player types a password or draws a pattern, for the lock screen and for setting the lock. Only the secure *@
+@* layer makes one, so it is never inside an app. What is typed or drawn stays in this panel on this client: nothing here *@
+@* is synced or sent, it only comes out through OnSubmit, when the player submits, and the secure layer turns that into *@
+@* a proof (NaviLockCrypto) before anything goes to the host. A password is drawn as dots, by how long it is, and the *@
+@* text field that takes the typing is drawn invisible. Only a real mouse press starts a pattern or presses the button. *@
+
+<root>
+	@if ( Kind == NaviLockKind.Password )
+	{
+		<div class="password" @onclick=@(() => Entry?.Focus())>
+			<div class="field">
+				<TextEntry @ref="Entry" class="typing" MaxLength=@( NaviLockCrypto.MaxPasswordLength )
+				           CharacterRegex="[a-zA-Z0-9]"
+				           onsubmit=@( () => SubmitPassword() )/>
+
+				<div class="dots">
+					@if ( Length == 0 )
+					{
+						<div class="placeholder">Password or PIN</div>
+					}
+
+					@for ( var i = 0; i < Length; i++ )
+					{
+						<div class="dot"></div>
+					}
+				</div>
+			</div>
+
+			<div class="go"
+			     @onmousedown=@(( PanelEvent e ) => PressGo( e ))
+			     @onclick=@(( PanelEvent e ) => ReleaseGo( e ))>
+				<i>arrow_forward</i>
+			</div>
+		</div>
+	}
+	else if ( Kind == NaviLockKind.Pattern )
+	{
+		<div class="pattern" @ref="Grid" @onmousedown=@(( PanelEvent e ) => StartPattern( e ))>
+			@foreach ( var (from, to) in Segments() )
+			{
+				var a = Center( from );
+				var b = to;
+				var length = (b - a).Length;
+				var angle = System.MathF.Atan2( b.y - a.y, b.x - a.x ) * 180f / System.MathF.PI;
+
+				<div class="line" style="left: @((int)a.x)px; top: @((int)a.y - 2)px; width: @((int)length)px; transform: rotate( @((int)angle)deg );"></div>
+			}
+
+			@for ( var i = 0; i < NaviLockCrypto.PatternSize * NaviLockCrypto.PatternSize; i++ )
+			{
+				var center = Center( i );
+
+				<div class="node @(nodes.Contains( i ) ? "on" : "")" style="left: @((int)(center.x - NodeSize * 0.5f))px; top: @((int)(center.y - NodeSize * 0.5f))px;">
+					<div class="core"></div>
+				</div>
+			}
+		</div>
+	}
+
+	@if ( !string.IsNullOrEmpty( Message ) )
+	{
+		<div class="message">@Message</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>
+	/// Password or Pattern: what is being entered.
+	/// </summary>
+	public NaviLockKind Kind { get; set; }
+
+	/// <summary>
+	/// Given what the player entered, when they submit: the password, or a pattern as its dots' numbers in order. Checked
+	/// against <see cref="NaviLockCrypto.IsAcceptable"/> before it is given.
+	/// </summary>
+	public System.Action<string> OnSubmit { get; set; }
+
+	/// <summary>
+	/// The entry takes input: the secure layer's controls are armed (see <see cref="NaviSecurePrompt.Armed"/>) and the host
+	/// isn't making the player wait.
+	/// </summary>
+	public bool Enabled { get; set; }
+
+	/// <summary>
+	/// A line under the entry, such as why the last try didn't work.
+	/// </summary>
+	public string Message { get; set; }
+
+	/// <summary>
+	/// Width and height of the pattern's grid, in panel pixels, and of one dot's cell and its ring.
+	/// </summary>
+	const float CellSize = 56f;
+
+	const float NodeSize = 32f;
+
+	TextEntry Entry;
+	Panel Grid;
+
+	int Length => Entry?.TextLength ?? 0;
+
+	// The dots of the pattern, in the order they were joined, and whether the mouse is held down on the grid, drawing it.
+	readonly List<int> nodes = new();
+	bool drawing;
+
+	Vector2 cursor;
+
+	/// <summary>
+	/// Forget what was typed or drawn. Called after each submit, so nothing waits in this panel.
+	/// </summary>
+	public void Clear()
+	{
+		if ( Entry is not null )
+			Entry.Text = "";
+		nodes.Clear();
+		drawing = false;
+	}
+
+	protected override void OnAfterTreeRender( bool firstTime )
+	{
+		base.OnAfterTreeRender( firstTime );
+
+		if ( firstTime && Kind == NaviLockKind.Password )
+			Entry?.Focus();
+	}
+
+	/// <summary>
+	/// Where the middle of a dot is, in the grid's panel pixels.
+	/// </summary>
+	static Vector2 Center( int node ) =>
+		new( (node % NaviLockCrypto.PatternSize + 0.5f) * CellSize, (node / NaviLockCrypto.PatternSize + 0.5f) * CellSize );
+
+	/// <summary>
+	/// The lines to draw: between the dots joined so far, and from the last of them to the mouse while drawing.
+	/// </summary>
+	IEnumerable<(int From, Vector2 To)> Segments()
+	{
+		for ( var i = 1; i < nodes.Count; i++ )
+			yield return (nodes[i - 1], Center( nodes[i] ));
+
+		if ( drawing && nodes.Count > 0 )
+			yield return (nodes[^1], cursor);
+	}
+
+	// A real press: apps can raise panel events, but can't fake the hardware state behind Input.Keyboard.
+	bool goPressed;
+
+	void PressGo( PanelEvent e )
+	{
+		goPressed = Enabled && e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" );
+	}
+
+	void ReleaseGo( PanelEvent e )
+	{
+		var real = goPressed && Enabled && e.This.HasHovered;
+		goPressed = false;
+
+		if ( real )
+			SubmitPassword();
+	}
+
+	void SubmitPassword()
+	{
+		if ( !Enabled )
+			return;
+
+		var text = Entry?.Text ?? "";
+		if ( !NaviLockCrypto.IsAcceptable( NaviLockKind.Password, text ) )
+		{
+			Message = $"Use {NaviLockCrypto.MinPasswordLength} to {NaviLockCrypto.MaxPasswordLength} letters or digits.";
+			return;
+		}
+
+		Submit( text );
+	}
+
+	void StartPattern( PanelEvent e )
+	{
+		if ( !Enabled || e is not MousePanelEvent { MouseButton: MouseButtons.Left } || !Input.Keyboard.Down( "MOUSE1" ) )
+			return;
+
+		nodes.Clear();
+		drawing = true;
+		Message = null;
+		Follow();
+	}
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !drawing )
+			return;
+
+		// Letting go ends the pattern, wherever the mouse is. So does losing the right to enter one.
+		if ( !Enabled || !Input.Keyboard.Down( "MOUSE1" ) )
+		{
+			drawing = false;
+			FinishPattern();
+			return;
+		}
+
+		Follow();
+	}
+
+	/// <summary>
+	/// Add the dot the mouse is over, and the one between it and the last dot if they are two apart in a straight line.
+	/// </summary>
+	void Follow()
+	{
+		if ( Grid is null )
+			return;
+
+		cursor = Grid.MousePosition * Grid.ScaleFromScreen;
+
+		for ( var node = 0; node < NaviLockCrypto.PatternSize * NaviLockCrypto.PatternSize; node++ )
+		{
+			if ( nodes.Contains( node ) || (Center( node ) - cursor).Length > NodeSize * 0.6f )
+				continue;
+
+			if ( nodes.Count > 0 && Between( nodes[^1], node ) is { } between && !nodes.Contains( between ) )
+				nodes.Add( between );
+
+			nodes.Add( node );
+		}
+	}
+
+	/// <summary>
+	/// The dot halfway between two, if they are two apart along a row, a column or a diagonal.
+	/// </summary>
+	static int? Between( int a, int b )
+	{
+		var (ax, ay) = (a % NaviLockCrypto.PatternSize, a / NaviLockCrypto.PatternSize);
+		var (bx, by) = (b % NaviLockCrypto.PatternSize, b / NaviLockCrypto.PatternSize);
+
+		if ( System.Math.Abs( ax - bx ) is not (0 or 2) || System.Math.Abs( ay - by ) is not (0 or 2) )
+			return null;
+
+		return (ax + bx) / 2 + (ay + by) / 2 * NaviLockCrypto.PatternSize;
+	}
+
+	void FinishPattern()
+	{
+		var secret = string.Concat( nodes );
+
+		if ( !NaviLockCrypto.IsAcceptable( NaviLockKind.Pattern, secret ) )
+		{
+			Message = $"Connect at least {NaviLockCrypto.MinPatternNodes} dots.";
+			nodes.Clear();
+			return;
+		}
+
+		Submit( secret );
+	}
+
+	void Submit( string secret )
+	{
+		Message = null;
+		OnSubmit?.Invoke( secret );
+		Clear();
+	}
+
+	// What is drawn depends on how many dots there are and where the mouse is, not on what they are.
+	protected override int BuildHash() =>
+		System.HashCode.Combine( Kind, Enabled, Message, Length, nodes.Count, drawing ? cursor : default );
+}

@@ -48,6 +48,14 @@ public sealed class NaviComputerSnapshot
 	/// Connection id of the player who locked it. See <see cref="NaviComputer.LockOwner"/>.
 	/// </summary>
 	public System.Guid LockOwner { get; set; }
+
+	/// <summary>
+	/// Wrong passwords or patterns tried, and until when the host won't check another (UTC ticks, 0 for no wait). See
+	/// <see cref="NaviComputer.FailedAttempts"/>.
+	/// </summary>
+	public int FailedAttempts { get; set; }
+
+	public long RetryAt { get; set; }
 }
 
 /// <summary>
@@ -61,6 +69,8 @@ public sealed class NaviSessionSnapshot
 	public System.Guid User { get; set; }
 	public bool Locked { get; set; }
 	public System.Guid LockOwner { get; set; }
+	public int FailedAttempts { get; set; }
+	public long RetryAt { get; set; }
 }
 
 /// <summary>

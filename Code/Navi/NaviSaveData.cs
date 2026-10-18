@@ -15,6 +15,13 @@ public sealed class NaviComputerSave
 	public List<string> TaskbarOrder { get; set; } = new();
 	public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
 	public List<string> RecentlyInstalled { get; set; } = new();
+	public NaviLockKind LockKind { get; set; }
+	public string LockSalt { get; set; }
+
+	/// <summary>
+	/// The host's hash of the lock's proof. In what is saved to disk, never in what the host sends to clients.
+	/// </summary>
+	public string LockVerifier { get; set; }
 	public float DisplayScale { get; set; } = 1f;
 	public Navi.Theme Theme { get; set; } = Navi.Theme.Paper;
 	public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;

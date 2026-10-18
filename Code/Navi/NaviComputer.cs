@@ -724,13 +724,14 @@ public sealed partial class NaviComputer : Component
 	/// <summary>
 	/// What the player changed on this computer, as it would be saved.
 	/// </summary>
-	public NaviComputerSave CaptureSave() => CaptureSave( placements: true );
+	public NaviComputerSave CaptureSave() => CaptureSave( placements: true, secrets: true );
 
 	/// <summary>
 	/// What the player changed on this computer. Without <paramref name="placements"/>, it leaves out where windows
-	/// were, which only the host needs.
+	/// were, which only the host needs. Without <paramref name="secrets"/>, it leaves out the lock's verifier, which only the
+	/// host keeps and is never sent.
 	/// </summary>
-	NaviComputerSave CaptureSave( bool placements ) => new()
+	NaviComputerSave CaptureSave( bool placements, bool secrets ) => new()
 	{
 		InstalledApps = InstalledApps?.ToList() ?? new(),
 		InstalledPackages = InstalledPackages?.ToList() ?? new(),
@@ -740,6 +741,9 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		StartFavorites = StartFavorites?.ToList() ?? new(),
 		RecentlyInstalled = RecentlyInstalled?.ToList() ?? new(),
+		LockKind = LockKind,
+		LockSalt = LockSalt,
+		LockVerifier = secrets ? lockVerifier : null,
 		DisplayScale = DisplayScale,
 		Theme = Theme,
 		ColorScheme = ColorScheme,
@@ -784,6 +788,14 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
 		RecentlyInstalled = save.RecentlyInstalled?.Distinct().Take( MaxRecentApps ).ToList() ?? new();
+
+		// A lock needs its salt, and on the host its verifier: clients are never sent that one.
+		var hasLock = System.Enum.IsDefined( save.LockKind ) && save.LockKind != NaviLockKind.None
+			&& NaviLockCrypto.IsHex( save.LockSalt, NaviLockCrypto.SaltLength )
+			&& (!IsAuthority || NaviLockCrypto.IsHex( save.LockVerifier, NaviLockCrypto.ProofLength ));
+		LockKind = hasLock ? save.LockKind : NaviLockKind.None;
+		LockSalt = hasLock ? save.LockSalt.ToUpperInvariant() : null;
+		lockVerifier = hasLock && IsAuthority ? save.LockVerifier.ToUpperInvariant() : null;
 
 		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
 
@@ -850,7 +862,7 @@ public sealed partial class NaviComputer : Component
 	/// The window that has the player's input: the window in front, while someone sits at the computer. Otherwise null.
 	/// See <see cref="NaviInputCapture"/>.
 	/// </summary>
-	public NaviWindow InputCapture => HasUser && !IsLocked ? FocusedWindow : null;
+	public NaviWindow InputCapture => HasUser && !IsLocked && !SecureEntryActive ? FocusedWindow : null;
 
 	/// <summary>
 	/// Installed apps, sorted by name.

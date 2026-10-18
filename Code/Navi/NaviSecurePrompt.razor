@@ -7,16 +7,19 @@
 @* whole screen, so apps can't be clicked. Apps can't reach it through their panel's ancestors, and every control *@
 @* in it only reacts to a real mouse press made after the prompt has been up for a moment. See the Security section *@
 @* of AGENTS.md for what this does and doesn't protect against. The lock screen is here for the same reason: it *@
-@* covers the whole screen, and only a real press from the player who locked it can unlock it. *@
+@* covers the whole screen. Without a password only a real press from the player who locked it unlocks it. With one, *@
+@* the password or pattern is typed or drawn here (NaviLockEntry), made into a proof on this client and only that is sent: *@
+@* see NaviLockCrypto. The dialog that sets or changes the lock is here for the same reason, so no app sees either. *@
 
-<root class="@(Locked ? "active locked" : Request is null ? "" : "active") @(Computer?.ThemeClasses)"
+<root class="@(Locked ? "active locked" : Request is null && setup == SetupStep.None ? "" : "active") @(Computer?.ThemeClasses)"
 	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
 	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
 	@if ( Locked )
 	{
 		var now = System.DateTime.Now;
+		var credential = Computer.HasLockCredential;
 
-		<div class="lock-screen @(Armed && Computer.IsLockOwner ? "" : "arming")"
+		<div class="lock-screen @(credential ? "entering" : Armed && Computer.IsLockOwner ? "" : "arming")"
 			@onmousedown=@(( PanelEvent e ) => Press( e ))
 			@onclick=@(( PanelEvent e ) => Release( e, () => Unlock() ))>
 			<div class="time">@now.ToString( "HH:mm" )</div>
@@ -24,7 +27,11 @@
 
 			<div class="status">
 				<i>lock</i>
-				@if ( !Computer.IsLockOwner )
+				@if ( credential )
+				{
+					@(Computer.IsSeated ? "Locked" : "Locked. Click to sit down.")
+				}
+				else if ( !Computer.IsLockOwner )
 				{
 					@($"Locked by {Computer.Locker?.DisplayName ?? "another player"}")
 				}
@@ -36,6 +43,100 @@
 				{
 					@("Locked. Click to unlock.")
 				}
+			</div>
+
+			@* Only the player at the screen gets the entry. Everyone else sees that it is locked, and nothing of what is entered:
+			   it isn't sent to anyone, see NaviLockEntry. *@
+			@if ( credential && Computer.IsSeated )
+			{
+				<NaviLockEntry @ref="UnlockEntry" class="unlock-entry" Kind=@Computer.LockKind Enabled=@(Armed && !Computer.IsLockedOut)
+					Message=@UnlockMessage OnSubmit=@SubmitUnlock></NaviLockEntry>
+			}
+		</div>
+	}
+	else if ( setup != SetupStep.None )
+	{
+		<div class="dialog @(Armed ? "" : "arming")">
+			<div class="dialog-title">
+				<div class="heading">Lock screen</div>
+				<i class="lock" tooltip="Navi is asking this, not an app">lock</i>
+			</div>
+
+			@switch ( setup )
+			{
+				case SetupStep.Current:
+					<div class="dialog-text">Enter the current @KindName( Computer.LockKind ) to change the lock.</div>
+					<NaviLockEntry @ref="SetupEntry" Kind=@Computer.LockKind Enabled=@(Armed && !Computer.IsLockedOut)
+						Message=@SetupMessage OnSubmit=@SubmitCurrent></NaviLockEntry>
+					break;
+
+				case SetupStep.Choose:
+					<div class="dialog-text">What should unlock the screen? It is checked on this computer's host without ever being sent: only a hash of it is.</div>
+
+					<div class="permission ticked"
+						@onmousedown=@(( PanelEvent e ) => Press( e ))
+						@onclick=@(( PanelEvent e ) => Release( e, () => ChooseKind( NaviLockKind.Password ) ))>
+						<i class="glyph">password</i>
+						<div class="perm-text">
+							<div class="perm-title">Password or PIN</div>
+							<div class="perm-description">@NaviLockCrypto.MinPasswordLength to @NaviLockCrypto.MaxPasswordLength letters and digits. Digits only is a PIN.</div>
+						</div>
+					</div>
+
+					<div class="permission ticked"
+						@onmousedown=@(( PanelEvent e ) => Press( e ))
+						@onclick=@(( PanelEvent e ) => Release( e, () => ChooseKind( NaviLockKind.Pattern ) ))>
+						<i class="glyph">pattern</i>
+						<div class="perm-text">
+							<div class="perm-title">Pattern</div>
+							<div class="perm-description">Drag the mouse across at least @NaviLockCrypto.MinPatternNodes dots.</div>
+						</div>
+					</div>
+
+					@if ( Computer.HasLockCredential )
+					{
+						<div class="permission ticked"
+							@onmousedown=@(( PanelEvent e ) => Press( e ))
+							@onclick=@(( PanelEvent e ) => Release( e, () => RemoveLock() ))>
+							<i class="glyph">lock_open</i>
+							<div class="perm-text">
+								<div class="perm-title">No password</div>
+								<div class="perm-description">Only the player who locked the screen can unlock it, with a click.</div>
+							</div>
+						</div>
+					}
+					break;
+
+				case SetupStep.New:
+					<div class="dialog-text">Choose a @KindName( newKind ).</div>
+					<NaviLockEntry @ref="SetupEntry" Kind=@newKind Enabled=@Armed Message=@SetupMessage OnSubmit=@SubmitNew></NaviLockEntry>
+					break;
+
+				case SetupStep.Confirm:
+					<div class="dialog-text">Enter the @KindName( newKind ) again to confirm it.</div>
+					<NaviLockEntry @ref="SetupEntry" Kind=@newKind Enabled=@Armed Message=@SetupMessage OnSubmit=@SubmitConfirm></NaviLockEntry>
+					break;
+
+				case SetupStep.Saving:
+					<div class="dialog-text">@SavingStatus</div>
+					break;
+			}
+
+			<div class="dialog-buttons">
+				@if ( setup is SetupStep.New or SetupStep.Confirm )
+				{
+					<div class="button"
+						@onmousedown=@(( PanelEvent e ) => Press( e ))
+						@onclick=@(( PanelEvent e ) => Release( e, () => BackToChoose() ))>
+						Back
+					</div>
+				}
+
+				<div class="button @(saveDone ? "primary" : "")"
+					@onmousedown=@(( PanelEvent e ) => Press( e ))
+					@onclick=@(( PanelEvent e ) => Release( e, () => EndSetup() ))>
+					@(saveDone ? "Done" : "Cancel")
+				</div>
 			</div>
 		</div>
 	}
@@ -132,8 +233,219 @@
 
 	void Unlock()
 	{
-		if ( Computer.IsLockOwner )
+		if ( !Computer.HasLockCredential && Computer.IsLockOwner )
 			Computer.UserUnlock();
+	}
+
+	enum SetupStep { None, Current, Choose, New, Confirm, Saving }
+
+	// Setting the lock: the steps, and what has been entered. Secrets only live here, on this client, until they are made
+	// into proofs and sent; the password and the pattern themselves are never sent.
+	SetupStep setup;
+	NaviLockKind newKind;
+	string currentProof = "";
+	string newSecret;
+	string pendingSalt;
+	int pendingKind;
+	int failedBefore;
+	bool saveDone;
+	string SetupMessage;
+	string SavingStatus;
+	RealTimeSince sinceSent;
+
+	// Unlocking: a proof was sent and the host hasn't answered yet.
+	bool unlockPending;
+	int unlockFailedBefore;
+	string unlockMessage;
+	RealTimeSince sinceUnlockSent;
+
+	NaviLockEntry UnlockEntry;
+	NaviLockEntry SetupEntry;
+
+	string UnlockMessage => Computer.IsLockedOut ? $"Too many tries. Wait {WaitSeconds}s." : unlockMessage;
+
+	int WaitSeconds => (int)System.Math.Ceiling( (Computer.RetryAt - System.DateTime.UtcNow).TotalSeconds );
+
+	static string KindName( NaviLockKind kind ) => kind == NaviLockKind.Pattern ? "pattern" : "password";
+
+	void BeginSetup()
+	{
+		setup = Computer.HasLockCredential ? SetupStep.Current : SetupStep.Choose;
+		ClearSetup();
+		sinceShown = 0;
+	}
+
+	void EndSetup()
+	{
+		setup = SetupStep.None;
+		Computer.LockSetupRequested = false;
+		ClearSetup();
+	}
+
+	void ClearSetup()
+	{
+		currentProof = "";
+		newSecret = null;
+		pendingSalt = null;
+		SetupMessage = null;
+		saveDone = false;
+	}
+
+	void BackToChoose()
+	{
+		newSecret = null;
+		SetupMessage = null;
+		setup = SetupStep.Choose;
+	}
+
+	/// <summary>
+	/// The player entered the password or pattern for the lock screen. Only its proof goes to the host.
+	/// </summary>
+	void SubmitUnlock( string secret )
+	{
+		if ( !Armed || !Computer.HasLockCredential || !NaviLockCrypto.IsAcceptable( Computer.LockKind, secret ) )
+			return;
+
+		unlockFailedBefore = Computer.FailedAttempts;
+		unlockPending = true;
+		unlockMessage = null;
+		sinceUnlockSent = 0;
+		Computer.UserUnlockWith( NaviLockCrypto.Proof( Computer.LockKind, secret, Computer.LockSalt ) );
+	}
+
+	/// <summary>
+	/// The current password or pattern, before changing the lock. The host is the one that finds out if it is right, when it
+	/// is sent along with the new one.
+	/// </summary>
+	void SubmitCurrent( string secret )
+	{
+		if ( !Armed || !NaviLockCrypto.IsAcceptable( Computer.LockKind, secret ) )
+			return;
+
+		currentProof = NaviLockCrypto.Proof( Computer.LockKind, secret, Computer.LockSalt );
+		SetupMessage = null;
+		setup = SetupStep.Choose;
+	}
+
+	void ChooseKind( NaviLockKind kind )
+	{
+		newKind = kind;
+		SetupMessage = null;
+		setup = SetupStep.New;
+	}
+
+	void SubmitNew( string secret )
+	{
+		if ( !Armed )
+			return;
+
+		newSecret = secret;
+		SetupMessage = null;
+		setup = SetupStep.Confirm;
+	}
+
+	void SubmitConfirm( string secret )
+	{
+		if ( !Armed )
+			return;
+
+		if ( secret != newSecret )
+		{
+			newSecret = null;
+			SetupMessage = $"Those didn't match. Choose the {KindName( newKind )} again.";
+			setup = SetupStep.New;
+			return;
+		}
+
+		var salt = NaviLockCrypto.NewSalt();
+		SendLock( (int)newKind, salt, NaviLockCrypto.Proof( newKind, secret, salt ), "Saving the lock..." );
+	}
+
+	void RemoveLock()
+	{
+		SendLock( (int)NaviLockKind.None, "", "", "Removing the lock..." );
+	}
+
+	void SendLock( int kind, string salt, string proof, string status )
+	{
+		pendingKind = kind;
+		pendingSalt = salt;
+		failedBefore = Computer.FailedAttempts;
+		SavingStatus = status;
+		saveDone = false;
+		sinceSent = 0;
+		setup = SetupStep.Saving;
+
+		Computer.UserSetLock( currentProof, kind, salt, proof );
+		newSecret = null;
+	}
+
+	/// <summary>
+	/// Follow the lock: open or close the setup dialog, keep the player's keys from any app while a secret is typed, and
+	/// see what the host made of what was sent.
+	/// </summary>
+	void UpdateLock()
+	{
+		var seated = Computer.IsSeated;
+		var wanted = Computer.LockSetupRequested && seated && !Locked;
+
+		if ( Computer.LockSetupRequested && !wanted )
+			EndSetup();
+		else if ( wanted && setup == SetupStep.None )
+			BeginSetup();
+
+		// The player standing up, or the screen locking, drops a half-made lock.
+		if ( setup != SetupStep.None && !wanted )
+			EndSetup();
+
+		Computer.SecureEntryActive = seated && ((Locked && Computer.HasLockCredential) || setup != SetupStep.None);
+
+		if ( unlockPending )
+		{
+			if ( !Locked )
+			{
+				unlockPending = false;
+				unlockMessage = null;
+			}
+			else if ( Computer.FailedAttempts > unlockFailedBefore )
+			{
+				unlockPending = false;
+				unlockMessage = $"Wrong {KindName( Computer.LockKind )}.";
+			}
+			else if ( sinceUnlockSent > 3f )
+			{
+				unlockPending = false;
+				unlockMessage = "The computer didn't answer.";
+			}
+		}
+
+		if ( setup == SetupStep.Saving && !saveDone )
+		{
+			if ( pendingKind == (int)NaviLockKind.None ? !Computer.HasLockCredential : Computer.LockSalt == pendingSalt )
+			{
+				saveDone = true;
+				SavingStatus = pendingKind == (int)NaviLockKind.None ? "The lock is removed." : "The lock is set. It guards the screen from now on.";
+			}
+			else if ( Computer.FailedAttempts > failedBefore )
+			{
+				SetupMessage = $"That wasn't the current {KindName( Computer.LockKind )}.";
+				currentProof = "";
+				setup = SetupStep.Current;
+			}
+			else if ( sinceSent > 3f )
+			{
+				saveDone = true;
+				SavingStatus = "The computer didn't change the lock.";
+			}
+		}
+	}
+
+	protected override void OnDisabled()
+	{
+		base.OnDisabled();
+
+		if ( Computer.IsValid() )
+			Computer.SecureEntryActive = false;
 	}
 
 	/// <summary>
@@ -157,6 +469,8 @@
 
 	protected override void OnUpdate()
 	{
+		UpdateLock();
+
 		var request = Request;
 		var seated = Computer.IsValid() && Computer.IsSeated;
 
@@ -230,6 +544,7 @@
 	}
 
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Request, Armed, Computer?.CanUse, Computer?.IsSeated, Unticked.Count, string.Join( ",", Unticked ),
-			Computer?.ThemeClasses, (Locked, Computer?.LockOwner, System.DateTime.Now.Minute) );
+		System.HashCode.Combine( (Request, Armed, Computer?.CanUse, Computer?.IsSeated), Unticked.Count, string.Join( ",", Unticked ),
+			Computer?.ThemeClasses, (Locked, Computer?.LockOwner, System.DateTime.Now.Minute),
+			(setup, newKind, SetupMessage, SavingStatus, saveDone), (UnlockMessage, Computer?.HasLockCredential, Computer?.LockKind) );
 }

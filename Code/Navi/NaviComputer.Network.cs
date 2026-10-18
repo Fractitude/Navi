@@ -196,6 +196,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			User = snapshot.User,
 			Locked = IsLocked,
 			LockOwner = LockOwner,
+			FailedAttempts = FailedAttempts,
+			RetryAt = RetryAt.Ticks,
 		} );
 		if ( session != NetworkSession )
 			NetworkSession = session;
@@ -291,7 +293,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	NaviComputerSnapshot CaptureSnapshot() => new()
 	{
 		// Only the host opens windows, so clients don't need where they were. It would change with every drag.
-		State = CaptureSave( placements: false ),
+		State = CaptureSave( placements: false, secrets: false ),
 		Apps = Installed
 			.Concat( running.Select( x => x.App ) )
 			.Concat( permissionRequests.Select( x => x.App ) )
@@ -334,6 +336,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		User = UserId,
 		Locked = IsLocked,
 		LockOwner = LockOwner,
+		FailedAttempts = FailedAttempts,
+		RetryAt = RetryAt.Ticks,
 	};
 
 	/// <summary>
@@ -359,6 +363,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 				User = session.User,
 				Locked = session.Locked,
 				LockOwner = session.LockOwner,
+				FailedAttempts = session.FailedAttempts,
+				RetryAt = session.RetryAt,
 			};
 		}
 		catch ( System.Exception e )
@@ -378,6 +384,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		UserId = snapshot.User;
 		IsLocked = snapshot.Locked;
 		LockOwner = snapshot.LockOwner;
+		FailedAttempts = snapshot.FailedAttempts;
+		RetryAt = snapshot.RetryAt > 0 ? new System.DateTime( snapshot.RetryAt, System.DateTimeKind.Utc ) : default;
 
 		var processes = new List<NaviProcess>();
 		foreach ( var entry in snapshot.Layout?.Processes ?? [] )
@@ -479,8 +487,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	void UpdateSeat()
 	{
-		// The player who locked the screen left the game: nobody could unlock it.
-		if ( IsLocked && LockOwner != default && Locker is null )
+		// The player who locked the screen left the game: nobody could unlock it. One with a password stays locked, for
+		// whoever knows it.
+		if ( IsLocked && !HasLockCredential && LockOwner != default && Locker is null )
 			Unlock();
 
 		if ( UserId == default )
@@ -750,6 +759,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		IsLocked = false;
 		LockOwner = default;
+		FailedAttempts = 0;
+		RetryAt = default;
 		Version++;
 		return true;
 	}
@@ -765,12 +776,13 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
-	/// The user unlocks the screen. Only the player who locked it may (see <see cref="LockOwner"/>), and only from the seat.
+	/// The user unlocks a screen that has no password or pattern. Only the player who locked it may (see
+	/// <see cref="LockOwner"/>), and only from the seat. One with a password is unlocked with <see cref="UserUnlockWith"/>.
 	/// </summary>
 	[Rpc.Host]
 	public void UserUnlock()
 	{
-		if ( !Authorize( whileLocked: true ) || !IsLocked )
+		if ( !Authorize( whileLocked: true ) || !IsLocked || HasLockCredential )
 			return;
 
 		var caller = Networking.IsActive ? Rpc.Caller ?? Connection.Local : null;

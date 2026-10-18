@@ -621,6 +621,18 @@ NaviDesktop
 				margin-left: auto;
 			}
 
+			// Just the icon, next to Lock.
+			.action.lock-options
+			{
+				margin-left: auto;
+				padding: 5px 6px;
+
+				+ .action.lock
+				{
+					margin-left: 0;
+				}
+			}
+
 			.action
 			{
 				flex-direction: row;
