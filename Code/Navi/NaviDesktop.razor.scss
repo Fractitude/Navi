@@ -616,16 +616,6 @@ NaviDesktop
 				text-overflow: ellipsis;
 			}
 
-			.badge
-			{
-				flex-shrink: 0;
-				padding: 0 4px;
-				font-size: 9px;
-				font-weight: 700;
-				color: $paper-t;
-				background-color: $ink-bg;
-			}
-
 			&:hover
 			{
 				background-color: $surface2-bg;
@@ -969,13 +959,6 @@ NaviDesktop
 		.footer
 		{
 			border-top-color: $edge;
-		}
-
-		.entry .badge
-		{
-			color: #ffffff;
-			background-color: $accent;
-			border-radius: 6px;
 		}
 	}
 
