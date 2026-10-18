@@ -384,8 +384,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		UserId = snapshot.User;
 		IsLocked = snapshot.Locked;
 		LockOwner = snapshot.LockOwner;
-		FailedAttempts = snapshot.FailedAttempts;
-		RetryAt = snapshot.RetryAt > 0 ? new System.DateTime( snapshot.RetryAt, System.DateTimeKind.Utc ) : default;
+		seenFailed = snapshot.FailedAttempts;
+		seenRetryAt = snapshot.RetryAt > 0 ? new System.DateTime( snapshot.RetryAt, System.DateTimeKind.Utc ) : default;
 
 		var processes = new List<NaviProcess>();
 		foreach ( var entry in snapshot.Layout?.Processes ?? [] )
@@ -491,6 +491,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		// whoever knows it.
 		if ( IsLocked && !HasLockCredential && LockOwner != default && Locker is null )
 			Unlock();
+
+		PruneAttempts();
 
 		if ( UserId == default )
 			return;
@@ -759,8 +761,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		IsLocked = false;
 		LockOwner = default;
-		FailedAttempts = 0;
-		RetryAt = default;
+		attempts.Clear();
 		Version++;
 		return true;
 	}

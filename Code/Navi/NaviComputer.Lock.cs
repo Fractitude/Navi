@@ -29,15 +29,35 @@ public sealed partial class NaviComputer
 	public bool HasLockCredential => LockKind != NaviLockKind.None;
 
 	/// <summary>
-	/// Wrong passwords or patterns since the last right one, or since the screen was unlocked another way. Sent to every
-	/// client so the player sees it, but it says nothing about what was tried.
+	/// Wrong tries and the wait after them, for each connection, kept by the host: one player's wrong tries never make
+	/// another wait. Cleared for a connection by its right one, and for all of them when the screen is unlocked another way.
+	/// Offline there is only one, under the empty id.
 	/// </summary>
-	public int FailedAttempts { get; private set; }
+	readonly Dictionary<System.Guid, (int Failed, System.DateTime RetryAt)> attempts = new();
+
+	// What the host said about the player in the seat, on a client.
+	int seenFailed;
+	System.DateTime seenRetryAt;
 
 	/// <summary>
-	/// Until when the host refuses to check anything, after too many wrong tries, in UTC. Default if it isn't refusing.
+	/// Wrong passwords or patterns the player in the seat has tried since their last right one, counted by the host for their
+	/// connection. Sent to every client so the player sees it, but it says nothing about what was tried.
 	/// </summary>
-	public System.DateTime RetryAt { get; private set; }
+	public int FailedAttempts => IsAuthority ? Attempts( UserId ).Failed : seenFailed;
+
+	/// <summary>
+	/// Until when the host refuses to check anything from the player in the seat, after too many wrong tries, in UTC.
+	/// Default if it isn't refusing.
+	/// </summary>
+	public System.DateTime RetryAt => IsAuthority ? Attempts( UserId ).RetryAt : seenRetryAt;
+
+	(int Failed, System.DateTime RetryAt) Attempts( System.Guid connection ) =>
+		attempts.TryGetValue( connection, out var entry ) ? entry : default;
+
+	/// <summary>
+	/// On the host, in an RPC: the connection that called. Offline, the empty id.
+	/// </summary>
+	System.Guid CallerId => Networking.IsActive ? (Rpc.Caller ?? Connection.Local)?.Id ?? default : default;
 
 	/// <summary>
 	/// Wrong tries allowed before the host starts making the player wait.
@@ -50,7 +70,7 @@ public sealed partial class NaviComputer
 	public const int MaxLockoutSeconds = 300;
 
 	/// <summary>
-	/// The host won't check a proof yet. Only the host enforces it; clients show it.
+	/// The host won't check a proof from the player in the seat yet. Only the host enforces it; clients show it.
 	/// </summary>
 	public bool IsLockedOut => RetryAt > System.DateTime.UtcNow;
 
@@ -67,33 +87,42 @@ public sealed partial class NaviComputer
 	public bool SecureEntryActive { get; internal set; }
 
 	/// <summary>
-	/// On the host: is this the proof of the current password? Counts a wrong one, and makes the player wait after
-	/// <see cref="FreeAttempts"/> of them. Anything that isn't a proof isn't counted.
+	/// On the host, in an RPC: is this the proof of the current password? Counts a wrong one against the caller's connection,
+	/// and makes that player wait after <see cref="FreeAttempts"/> of them. Anything that isn't a proof isn't counted, and
+	/// nothing is checked while the caller is waiting.
 	/// </summary>
 	bool CheckLockProof( string proof )
 	{
-		if ( !IsAuthority || !HasLockCredential || lockVerifier is null || IsLockedOut || !NaviLockCrypto.IsHex( proof, NaviLockCrypto.ProofLength ) )
+		var caller = CallerId;
+		var (failed, retryAt) = Attempts( caller );
+
+		if ( !IsAuthority || !HasLockCredential || lockVerifier is null || retryAt > System.DateTime.UtcNow
+			|| !NaviLockCrypto.IsHex( proof, NaviLockCrypto.ProofLength ) )
 			return false;
 
 		if ( NaviLockCrypto.Matches( proof, lockVerifier ) )
 		{
-			ClearFailedAttempts();
+			attempts.Remove( caller );
+			Version++;
 			return true;
 		}
 
-		FailedAttempts++;
-		if ( FailedAttempts > FreeAttempts )
-			RetryAt = System.DateTime.UtcNow.AddSeconds( System.Math.Min( MaxLockoutSeconds, 5 * System.Math.Pow( 2, FailedAttempts - FreeAttempts - 1 ) ) );
+		failed++;
+		if ( failed > FreeAttempts )
+			retryAt = System.DateTime.UtcNow.AddSeconds( System.Math.Min( MaxLockoutSeconds, 5 * System.Math.Pow( 2, failed - FreeAttempts - 1 ) ) );
 
+		attempts[caller] = (failed, retryAt);
 		Version++;
 		return false;
 	}
 
-	void ClearFailedAttempts()
+	/// <summary>
+	/// On the host: forget the wrong tries of connections that have left the game.
+	/// </summary>
+	void PruneAttempts()
 	{
-		FailedAttempts = 0;
-		RetryAt = default;
-		Version++;
+		foreach ( var id in attempts.Keys.Where( x => x != default && Connection.Find( x ) is null ).ToList() )
+			attempts.Remove( id );
 	}
 
 	/// <summary>
