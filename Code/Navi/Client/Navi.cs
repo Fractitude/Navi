@@ -302,6 +302,33 @@ public static class Navi
 	/// </summary>
 	public static Task<bool> SetTransparencyLevel( Panel app, int level ) => Call<bool>( app, "theme.set-transparency", level );
 
+	/// <summary>
+	/// The most <see cref="SetSnapDistance"/> accepts, in panel pixels.
+	/// </summary>
+	public const int MaxSnapDistance = 40;
+
+	/// <summary>
+	/// Whether windows snap to the screen's edges and to each other's, and how close in panel pixels an edge has to get.
+	/// </summary>
+	public static Task<(bool ScreenEdges, bool Windows, int Distance)> GetSnapping( Panel app ) =>
+		Call<(bool, bool, int)>( app, "snap.get" );
+
+	/// <summary>
+	/// Let windows snap to the screen's edges or not. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetSnapToScreenEdges( Panel app, bool snap ) => Call<bool>( app, "snap.set-screen", snap );
+
+	/// <summary>
+	/// Let windows snap to each other's edges or not. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetSnapToWindows( Panel app, bool snap ) => Call<bool>( app, "snap.set-windows", snap );
+
+	/// <summary>
+	/// How close, in panel pixels, an edge has to get to snap, 1 to <see cref="MaxSnapDistance"/>. Needs
+	/// <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetSnapDistance( Panel app, int distance ) => Call<bool>( app, "snap.set-distance", distance );
+
 	// The Store.
 
 	/// <summary>

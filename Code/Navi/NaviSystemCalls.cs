@@ -174,6 +174,21 @@ public static class NaviSystemCalls
 				Require( process, NaviPermissions.ChangeSettings );
 				return computer.SetTransparencyLevel( Arg<int>( args, 0, method ) );
 
+			case "snap.get":
+				return (computer.SnapToScreenEdges, computer.SnapToWindows, computer.SnapDistance);
+
+			case "snap.set-screen":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetSnapToScreenEdges( Arg<bool>( args, 0, method ) );
+
+			case "snap.set-windows":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetSnapToWindows( Arg<bool>( args, 0, method ) );
+
+			case "snap.set-distance":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetSnapDistance( Arg<int>( args, 0, method ) );
+
 			// The Store.
 			case "store.search":
 			{

@@ -398,6 +398,67 @@ public sealed partial class NaviComputer : Component
 		return true;
 	}
 
+	public const int DefaultSnapDistance = 12;
+
+	/// <summary>
+	/// The most <see cref="SnapDistance"/> can be, in panel pixels.
+	/// </summary>
+	public const int MaxSnapDistance = 40;
+
+	/// <summary>
+	/// Whether a window being moved or resized snaps to the edges of the screen.
+	/// </summary>
+	[Property] public bool SnapToScreenEdges { get; set; } = true;
+
+	/// <summary>
+	/// Whether a window being moved or resized snaps to the edges of the other windows.
+	/// </summary>
+	[Property] public bool SnapToWindows { get; set; } = true;
+
+	/// <summary>
+	/// How close, in panel pixels, a window's edge has to get to snap to an edge.
+	/// </summary>
+	[Property, Range( 1, MaxSnapDistance )] public int SnapDistance { get; set; } = DefaultSnapDistance;
+
+	/// <summary>
+	/// Set <see cref="SnapToScreenEdges"/>.
+	/// </summary>
+	public bool SetSnapToScreenEdges( bool snap )
+	{
+		if ( !IsAuthority )
+			return false;
+
+		SnapToScreenEdges = snap;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Set <see cref="SnapToWindows"/>.
+	/// </summary>
+	public bool SetSnapToWindows( bool snap )
+	{
+		if ( !IsAuthority )
+			return false;
+
+		SnapToWindows = snap;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Set <see cref="SnapDistance"/>. Returns false if it is out of range.
+	/// </summary>
+	public bool SetSnapDistance( int distance )
+	{
+		if ( !IsAuthority || distance is < 1 or > MaxSnapDistance )
+			return false;
+
+		SnapDistance = distance;
+		Version++;
+		return true;
+	}
+
 	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
@@ -665,6 +726,9 @@ public sealed partial class NaviComputer : Component
 		ColorScheme = ColorScheme,
 		BlurLevel = BlurLevel,
 		TransparencyLevel = TransparencyLevel,
+		SnapToScreenEdges = SnapToScreenEdges,
+		SnapToWindows = SnapToWindows,
+		SnapDistance = SnapDistance,
 		WindowPlacements = placements ? CapturePlacements() : new(),
 	};
 
@@ -706,6 +770,10 @@ public sealed partial class NaviComputer : Component
 		ColorScheme = System.Enum.IsDefined( save.ColorScheme ) ? save.ColorScheme : Navi.ColorScheme.Light;
 		BlurLevel = int.Clamp( save.BlurLevel, 0, MaxThemeLevel );
 		TransparencyLevel = int.Clamp( save.TransparencyLevel, 0, MaxThemeLevel );
+
+		SnapToScreenEdges = save.SnapToScreenEdges;
+		SnapToWindows = save.SnapToWindows;
+		SnapDistance = int.Clamp( save.SnapDistance, 1, MaxSnapDistance );
 
 		// Whether a window may be maximized or sized is checked when it opens, against its manifest at that time.
 		windowPlacements.Clear();

@@ -871,20 +871,30 @@
 	}
 
 	/// <summary>
-	/// How close, in panel pixels, a dragged window's edge has to get to the screen's edge or another window's edge to snap to it.
-	/// Zero turns snapping off.
+	/// How close, in panel pixels, a dragged window's edge has to get to an edge to snap to it. The player's choice, see
+	/// <see cref="NaviComputer.SnapDistance"/>.
 	/// </summary>
-	[Property] public float SnapDistance { get; set; } = 12f;
+	float SnapDistance => Computer.SnapDistance;
 
 	/// <summary>
 	/// The positions along one axis that a dragged window's edges snap to: the screen's edges and the edges of the other
-	/// windows. <paramref name="horizontal"/> picks the x axis. A window only counts if it is within <see cref="SnapDistance"/>
-	/// of the dragged one on the other axis, from <paramref name="from"/> to <paramref name="to"/>.
+	/// windows, as far as the player has those turned on. <paramref name="horizontal"/> picks the x axis. A window only
+	/// counts if it is within <see cref="SnapDistance"/> of the dragged one on the other axis, from <paramref name="from"/>
+	/// to <paramref name="to"/>.
 	/// </summary>
 	List<float> SnapLines( Panel screen, bool horizontal, float from, float to )
 	{
 		var bounds = screen.Box.Rect.Size * screen.ScaleFromScreen;
-		var lines = new List<float> { 0f, horizontal ? bounds.x : bounds.y };
+		var lines = new List<float>();
+
+		if ( Computer.SnapToScreenEdges )
+		{
+			lines.Add( 0f );
+			lines.Add( horizontal ? bounds.x : bounds.y );
+		}
+
+		if ( !Computer.SnapToWindows )
+			return lines;
 
 		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ) )
 		{

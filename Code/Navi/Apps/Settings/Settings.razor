@@ -47,6 +47,52 @@
 				</div>
 				break;
 
+			case SettingsCategory.Windows:
+				<div class="heading">Windows</div>
+
+				<div class="setting">
+					<div class="name">Snap to screen edges</div>
+					<div class="description">Windows you move or resize stick to the edges of the screen.</div>
+					<div class="options">
+						@foreach ( var option in UiState.SnapScreenOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapScreenAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting">
+					<div class="name">Snap to windows</div>
+					<div class="description">Windows you move or resize stick to the edges of other windows.</div>
+					<div class="options">
+						@foreach ( var option in UiState.SnapWindowsOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapWindowsAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting @( UiState.SnapsToAnything ? "" : "unavailable" )">
+					<div class="name">Snap distance</div>
+					<div class="description">How close an edge has to get before it snaps. Applies to both.</div>
+					<div class="options">
+						@foreach ( var option in UiState.SnapDistanceOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSnapDistanceAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+				break;
+
 			case SettingsCategory.Theming:
 				<div class="heading">Theming</div>
 

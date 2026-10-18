@@ -24,7 +24,11 @@ public sealed class SettingsViewModel
 	[
 		(SettingsCategory.Display, "Display", "monitor"),
 		(SettingsCategory.Theming, "Theming", "palette"),
+		(SettingsCategory.Windows, "Windows", "web_asset"),
 	];
+
+	/// <summary>The distances the Windows page offers for snapping, in panel pixels.</summary>
+	static readonly int[] SnapDistances = [4, 8, 12, 20, 30];
 
 	// What the computer said.
 
@@ -35,6 +39,10 @@ public sealed class SettingsViewModel
 	Navi.ColorScheme scheme;
 	int blurLevel;
 	int transparencyLevel;
+
+	bool snapToScreenEdges;
+	bool snapToWindows;
+	int snapDistance;
 
 	/// <summary>The computer's version when the settings were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -94,6 +102,15 @@ public sealed class SettingsViewModel
 	/// <summary>How much shows through the Glass theme's surfaces.</summary>
 	public void ChooseTransparency( int level ) => _ = RunAsync( () => Navi.SetTransparencyLevel( app, level ), "the transparency" );
 
+	/// <summary>Snap windows to the screen's edges, or stop.</summary>
+	public void ChooseSnapToScreenEdges( bool snap ) => _ = RunAsync( () => Navi.SetSnapToScreenEdges( app, snap ), "snapping to the screen" );
+
+	/// <summary>Snap windows to each other's edges, or stop.</summary>
+	public void ChooseSnapToWindows( bool snap ) => _ = RunAsync( () => Navi.SetSnapToWindows( app, snap ), "snapping to windows" );
+
+	/// <summary>How close an edge has to get to snap, in panel pixels.</summary>
+	public void ChooseSnapDistance( int distance ) => _ = RunAsync( () => Navi.SetSnapDistance( app, distance ), "the snap distance" );
+
 	public void DismissNotice() => Update( uiState => uiState with { Notice = null } );
 
 	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
@@ -104,6 +121,9 @@ public sealed class SettingsViewModel
 	public const string ChooseSchemeAction = "choose-scheme";
 	public const string ChooseBlurAction = "choose-blur";
 	public const string ChooseTransparencyAction = "choose-transparency";
+	public const string ChooseSnapScreenAction = "choose-snap-screen";
+	public const string ChooseSnapWindowsAction = "choose-snap-windows";
+	public const string ChooseSnapDistanceAction = "choose-snap-distance";
 	public const string DismissNoticeAction = "dismiss-notice";
 
 	/// <summary>
@@ -137,6 +157,18 @@ public sealed class SettingsViewModel
 
 			case ChooseTransparencyAction when int.TryParse( arg, out var value ) && value is >= 0 and <= Navi.MaxThemeLevel:
 				ChooseTransparency( value );
+				break;
+
+			case ChooseSnapScreenAction when int.TryParse( arg, out var value ) && value is 0 or 1:
+				ChooseSnapToScreenEdges( value == 1 );
+				break;
+
+			case ChooseSnapWindowsAction when int.TryParse( arg, out var value ) && value is 0 or 1:
+				ChooseSnapToWindows( value == 1 );
+				break;
+
+			case ChooseSnapDistanceAction when int.TryParse( arg, out var value ) && value is >= 1 and <= Navi.MaxSnapDistance:
+				ChooseSnapDistance( value );
 				break;
 
 			case DismissNoticeAction:
@@ -187,6 +219,7 @@ public sealed class SettingsViewModel
 			knownVersion = version;
 			(displayScale, displayScales) = await Navi.GetDisplayScale( app );
 			(theme, scheme, blurLevel, transparencyLevel) = await Navi.GetTheme( app );
+			(snapToScreenEdges, snapToWindows, snapDistance) = await Navi.GetSnapping( app );
 
 			Update( uiState => uiState with
 			{
@@ -196,6 +229,10 @@ public sealed class SettingsViewModel
 				BlurOptions = BuildLevelOptions( blurLevel ),
 				TransparencyOptions = BuildLevelOptions( transparencyLevel ),
 				IsGlass = theme == Navi.Theme.Glass,
+				SnapScreenOptions = BuildOnOffOptions( snapToScreenEdges ),
+				SnapWindowsOptions = BuildOnOffOptions( snapToWindows ),
+				SnapDistanceOptions = BuildSnapDistanceOptions(),
+				SnapsToAnything = snapToScreenEdges || snapToWindows,
 			} );
 		}
 		catch ( System.Exception e )
@@ -225,6 +262,15 @@ public sealed class SettingsViewModel
 
 	static IReadOnlyList<ThemeOption> BuildLevelOptions( int selected ) =>
 		LevelLabels.Select( ( x, i ) => new ThemeOption( i, x, i == selected ) ).ToArray();
+
+	/// <summary>On and Off, sent back as 1 and 0.</summary>
+	static IReadOnlyList<ThemeOption> BuildOnOffOptions( bool on ) => [new( 1, "On", on ), new( 0, "Off", !on )];
+
+	/// <summary>
+	/// The snap distances, plus the current one if it isn't among them (a saved or edited value), so one is always selected.
+	/// </summary>
+	IReadOnlyList<ThemeOption> BuildSnapDistanceOptions() =>
+		SnapDistances.Append( snapDistance ).Distinct().Order().Select( x => new ThemeOption( x, $"{x} px", x == snapDistance ) ).ToArray();
 
 	void Update( System.Func<SettingsUiState, SettingsUiState> change ) =>
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };

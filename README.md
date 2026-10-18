@@ -197,6 +197,8 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
 | `Navi.GetTheme( this )` | The theme, color scheme, blur level and transparency level | |
 | `Navi.SetTheme( this, theme )`, `SetColorScheme`, `SetBlurLevel`, `SetTransparencyLevel` | Change the look. See Theming | `navi.settings.change` |
+| `Navi.GetSnapping( this )` | Whether windows snap to the screen's edges and to each other's, and the distance in panel pixels | |
+| `Navi.SetSnapToScreenEdges( this, on )`, `SetSnapToWindows`, `SetSnapDistance` | Change window snapping | `navi.settings.change` |
 | `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
 
 ## Theming

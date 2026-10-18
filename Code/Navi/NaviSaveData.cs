@@ -18,6 +18,9 @@ public sealed class NaviComputerSave
 	public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;
 	public int BlurLevel { get; set; } = NaviComputer.DefaultBlurLevel;
 	public int TransparencyLevel { get; set; } = NaviComputer.DefaultTransparencyLevel;
+	public bool SnapToScreenEdges { get; set; } = true;
+	public bool SnapToWindows { get; set; } = true;
+	public int SnapDistance { get; set; } = NaviComputer.DefaultSnapDistance;
 	public List<NaviWindowPlacement> WindowPlacements { get; set; } = new();
 }
 

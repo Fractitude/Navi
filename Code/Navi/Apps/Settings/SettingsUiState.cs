@@ -7,6 +7,7 @@ public enum SettingsCategory
 {
 	Display,
 	Theming,
+	Windows,
 }
 
 /// <summary>
@@ -55,6 +56,16 @@ public sealed record SettingsUiState
 
 	/// <summary>Theming: whether the theme in use blurs and is see-through, so the blur and transparency rows apply.</summary>
 	public bool IsGlass { get; init; }
+
+	/// <summary>Windows: whether windows snap to the screen's edges and to each other's, and how close an edge has to get.</summary>
+	public IReadOnlyList<ThemeOption> SnapScreenOptions { get; init; } = [];
+
+	public IReadOnlyList<ThemeOption> SnapWindowsOptions { get; init; } = [];
+
+	public IReadOnlyList<ThemeOption> SnapDistanceOptions { get; init; } = [];
+
+	/// <summary>Windows: whether either kind of snapping is on, so the distance row applies.</summary>
+	public bool SnapsToAnything { get; init; }
 
 	/// <summary>A message about the last change that failed, or null. Clicking it dismisses it.</summary>
 	public string Notice { get; init; }
