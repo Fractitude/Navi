@@ -679,7 +679,10 @@
 
 				if ( dragDirection == Vector2.Zero )
 				{
-					dragging.Position = dragStartPosition + delta;
+					var position = dragStartPosition + delta;
+					position.x += SnapOffset( position.x, position.x + dragStartSize.x, SnapLines( screen, true, position.y, position.y + dragStartSize.y ) );
+					position.y += SnapOffset( position.y, position.y + dragStartSize.y, SnapLines( screen, false, position.x, position.x + dragStartSize.x ) );
+					dragging.Position = position;
 				}
 				else if ( dragging.Info.AspectRatio > 0f )
 				{
@@ -688,8 +691,10 @@
 				}
 				else
 				{
-					var (x, width) = ResizeAxis( dragDirection.x, delta.x, dragStartPosition.x, dragStartSize.x, MinWindowSize.x, bounds.x );
-					var (y, height) = ResizeAxis( dragDirection.y, delta.y, dragStartPosition.y, dragStartSize.y, MinWindowSize.y, bounds.y );
+					var snapX = dragDirection.x == 0 ? null : SnapLines( screen, true, dragStartPosition.y, dragStartPosition.y + dragStartSize.y );
+					var snapY = dragDirection.y == 0 ? null : SnapLines( screen, false, dragStartPosition.x, dragStartPosition.x + dragStartSize.x );
+					var (x, width) = ResizeAxis( dragDirection.x, delta.x, dragStartPosition.x, dragStartSize.x, MinWindowSize.x, bounds.x, snapX );
+					var (y, height) = ResizeAxis( dragDirection.y, delta.y, dragStartPosition.y, dragStartSize.y, MinWindowSize.y, bounds.y, snapY );
 					dragging.Position = new Vector2( x, y );
 					dragging.Size = new Vector2( width, height );
 				}
@@ -841,21 +846,92 @@
 
 	/// <summary>
 	/// Resize along one axis. <paramref name="direction"/> is 1 to move the far edge, -1 to move the near edge, 0 to leave both.
-	/// The moved edge stays inside 0..<paramref name="bound"/> and the size stays at least <paramref name="min"/>.
+	/// The moved edge snaps to <paramref name="snapLines"/> if given, stays inside 0..<paramref name="bound"/> and the size
+	/// stays at least <paramref name="min"/>.
 	/// </summary>
-	static (float Position, float Size) ResizeAxis( float direction, float delta, float position, float size, float min, float bound )
+	(float Position, float Size) ResizeAxis( float direction, float delta, float position, float size, float min, float bound, List<float> snapLines = null )
 	{
 		if ( direction > 0 )
-			return (position, Clamp( size + delta, min, bound - position ));
+		{
+			var edge = position + size + delta;
+			edge += SnapOffset( edge, edge, snapLines );
+			return (position, Clamp( edge - position, min, bound - position ));
+		}
 
 		if ( direction < 0 )
 		{
 			var far = position + size;
-			var near = Clamp( position + delta, 0f, far - min );
+			var edge = position + delta;
+			edge += SnapOffset( edge, edge, snapLines );
+			var near = Clamp( edge, 0f, far - min );
 			return (near, far - near);
 		}
 
 		return (position, size);
+	}
+
+	/// <summary>
+	/// How close, in panel pixels, a dragged window's edge has to get to the screen's edge or another window's edge to snap to it.
+	/// Zero turns snapping off.
+	/// </summary>
+	[Property] public float SnapDistance { get; set; } = 12f;
+
+	/// <summary>
+	/// The positions along one axis that a dragged window's edges snap to: the screen's edges and the edges of the other
+	/// windows. <paramref name="horizontal"/> picks the x axis. A window only counts if it is within <see cref="SnapDistance"/>
+	/// of the dragged one on the other axis, from <paramref name="from"/> to <paramref name="to"/>.
+	/// </summary>
+	List<float> SnapLines( Panel screen, bool horizontal, float from, float to )
+	{
+		var bounds = screen.Box.Rect.Size * screen.ScaleFromScreen;
+		var lines = new List<float> { 0f, horizontal ? bounds.x : bounds.y };
+
+		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ) )
+		{
+			var other = panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Window;
+			if ( other is null || other == dragging || other.IsMaximized || other.IsMinimized || panel.Style.Left is null )
+				continue;
+
+			var position = other.Position;
+			var size = other.Size ?? panel.Box.Rect.Size * panel.ScaleFromScreen;
+			var (near, far) = horizontal ? (position.x, position.x + size.x) : (position.y, position.y + size.y);
+			var (acrossNear, acrossFar) = horizontal ? (position.y, position.y + size.y) : (position.x, position.x + size.x);
+
+			if ( acrossFar + SnapDistance < from || acrossNear - SnapDistance > to )
+				continue;
+
+			lines.Add( near );
+			lines.Add( far );
+		}
+
+		return lines;
+	}
+
+	/// <summary>
+	/// How far to move a window spanning <paramref name="near"/> to <paramref name="far"/> so that the closest of its edges
+	/// lands on one of <paramref name="lines"/>. Zero if none is within <see cref="SnapDistance"/>.
+	/// </summary>
+	float SnapOffset( float near, float far, List<float> lines )
+	{
+		if ( lines is null )
+			return 0f;
+
+		var best = 0f;
+		var bestDistance = SnapDistance;
+
+		foreach ( var line in lines )
+		{
+			foreach ( var offset in new[] { line - near, line - far } )
+			{
+				if ( System.MathF.Abs( offset ) >= bestDistance )
+					continue;
+
+				best = offset;
+				bestDistance = System.MathF.Abs( offset );
+			}
+		}
+
+		return best;
 	}
 
 	/// <summary>
