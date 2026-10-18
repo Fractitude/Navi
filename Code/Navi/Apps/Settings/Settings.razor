@@ -93,6 +93,19 @@
 				</div>
 				break;
 
+			case SettingsCategory.Security:
+				<div class="heading">Security</div>
+
+				<div class="big-item" @onclick=@( () => Navi.OpenLockSetup( this ) )>
+					<i>password</i>
+					<div class="text">
+						<div class="name">Lock-screen password</div>
+						<div class="description">Change how you unlock the screen.</div>
+					</div>
+					<i class="chevron">chevron_right</i>
+				</div>
+				break;
+
 			case SettingsCategory.Theming:
 				<div class="heading">Theming</div>
 

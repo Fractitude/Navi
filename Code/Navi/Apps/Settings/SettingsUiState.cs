@@ -8,6 +8,7 @@ public enum SettingsCategory
 	Display,
 	Theming,
 	Windows,
+	Security,
 }
 
 /// <summary>

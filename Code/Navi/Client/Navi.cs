@@ -387,6 +387,12 @@ public static class Navi
 	public const int MaxActionName = 64, MaxActionArgs = 4096;
 
 	/// <summary>
+	/// Ask the secure layer to show the lock screen's setup dialog (password or pattern) to the player. Only core apps are
+	/// listened to. Call it from a click: the password is typed in the dialog, never in the app.
+	/// </summary>
+	public static void OpenLockSetup( Panel app ) => app.CreateEvent( new PanelEvent( "navi.lock-setup", app ) );
+
+	/// <summary>
 	/// True on a client whose copy of a shared app only draws. It makes no calls, runs no logic, and draws
 	/// <see cref="GetState{T}"/>.
 	/// </summary>

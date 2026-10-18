@@ -105,9 +105,6 @@
 		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.PackagesApp ))>
 			<i>download</i>Get apps
 		</div>
-		<div class="action lock-options" tooltip="Set a password or pattern for the lock screen" @onclick=@(() => OnLockOptions?.Invoke())>
-			<i>password</i>
-		</div>
 		<div class="action lock" @onclick=@(() => OnLock?.Invoke())>
 			<i>lock</i>Lock
 		</div>
@@ -127,11 +124,6 @@
 	/// Called when the player picks Lock, so the desktop can close the menu and lock the computer.
 	/// </summary>
 	public System.Action OnLock { get; set; }
-
-	/// <summary>
-	/// Called when the player picks the lock's options, so the desktop can ask the secure layer for its setup dialog.
-	/// </summary>
-	public System.Action OnLockOptions { get; set; }
 
 	TextEntry Entry;
 

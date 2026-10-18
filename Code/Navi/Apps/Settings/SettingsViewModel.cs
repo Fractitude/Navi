@@ -25,6 +25,7 @@ public sealed class SettingsViewModel
 		(SettingsCategory.Display, "Display", "monitor"),
 		(SettingsCategory.Theming, "Theming", "palette"),
 		(SettingsCategory.Windows, "Windows", "web_asset"),
+		(SettingsCategory.Security, "Security", "shield"),
 	];
 
 	/// <summary>The distances the Windows page offers for snapping, in panel pixels.</summary>

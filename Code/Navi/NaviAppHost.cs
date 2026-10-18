@@ -29,6 +29,11 @@ public static class NaviEvents
 	public const string ViewerClass = "navi-viewer";
 
 	/// <summary>
+	/// The app asks for the lock screen's setup dialog (<c>Navi.OpenLockSetup</c>). Only core apps are listened to.
+	/// </summary>
+	public const string LockSetup = "navi.lock-setup";
+
+	/// <summary>
 	/// The player did something in a shared app (<c>Navi.Act</c>). Bubbles up from the app to its window.
 	/// </summary>
 	public const string Act = "navi.act";
@@ -327,6 +332,15 @@ public sealed class NaviAppHost : Panel
 						Computer.UserAct( id, windowId, act.Item1, act.Item2 );
 					else
 						DeliverAction( act.Item1, act.Item2 );
+
+					e.StopPropagation();
+					return;
+
+				// Settings asks the secure layer for the lock's setup dialog, like the start menu did. Only core apps may, and only
+				// the seated player's client opens it: the password is typed in the secure layer, never in the app.
+				case NaviEvents.LockSetup:
+					if ( Window.App.IsCore && Computer.IsSeated )
+						Computer.LockSetupRequested = true;
 
 					e.StopPropagation();
 					return;

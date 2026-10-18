@@ -93,6 +93,49 @@
 		}
 	}
 
+	// A whole-row button that opens a dialog.
+	.big-item
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 12px;
+		padding: 12px 14px;
+		background-color: $paper-bg;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		> i
+		{
+			font-size: 22px;
+		}
+
+		.text
+		{
+			flex-grow: 1;
+			flex-shrink: 1;
+			flex-direction: column;
+			gap: 2px;
+		}
+
+		.name
+		{
+			font-size: 12px;
+			font-weight: 700;
+		}
+
+		.description
+		{
+			font-size: 10px;
+			opacity: 0.7;
+		}
+
+		&:hover
+		{
+			border-color: $ink-bc;
+		}
+	}
+
 	// A row of choices, one of them picked.
 	.options
 	{

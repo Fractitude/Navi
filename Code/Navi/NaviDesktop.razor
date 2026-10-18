@@ -79,7 +79,7 @@
 
 	@if ( StartOpen )
 	{
-		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart OnLock=@LockFromStart OnLockOptions=@LockOptionsFromStart></NaviStartMenu>
+		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart OnLock=@LockFromStart></NaviStartMenu>
 	}
 
 	<div class="taskbar">
@@ -449,18 +449,6 @@
 	{
 		CloseMenus();
 		Computer.UserLock();
-	}
-
-	/// <summary>
-	/// The player picked the lock's options in the start menu: close the menu and ask the secure layer to set up the lock. The
-	/// password is typed there, never in the desktop or an app.
-	/// </summary>
-	void LockOptionsFromStart()
-	{
-		CloseMenus();
-
-		if ( Computer.IsSeated )
-			Computer.LockSetupRequested = true;
 	}
 
 	void OpenTrayMenu( string id )
