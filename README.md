@@ -330,3 +330,31 @@ How the Store works:
 - Addon code must pass the s&box API whitelist, like all game code.
 - Uninstalling a Store app keeps its code loaded until the game restarts.
 - Each game has its own copy of the library's source. Keep `NaviAppResource`, the `navi.call` methods (`NaviSystemCalls`) and the permission ids stable, or published apps can break. The older `navi.close`, `navi.minimize` and `navi.maximize` events still work.
+
+## Plugins (host only)
+
+A plugin changes how Navi behaves as a whole: the OS, not one computer or one app. It is a plain class plus a `.nplug` manifest (`NaviPluginResource`), published to sbox.game from an addon with its code. Prefix the package ident with `nplug_`, e.g. `fractitude.nplug_themes`.
+
+- **Only the host installs.** Any player can host, so the host decides. A client has no way to install, remove or turn off a plugin. Navi gives players no in-game UI for plugins, and the console commands refuse to run on a client.
+- **Install** from the host's console: `navi_plugin_install fractitude.nplug_themes`. It downloads the package with `Cloud.Load<NaviPluginResource>( ident, withCode: true )`, creates the plugin class and calls its `OnEnable`. `navi_plugin_remove <ident>` takes it off the list, and `navi_plugins` lists what is saved and running. In code: `NaviPluginManager.InstallAsync( ident )`. A panel for the host (a Browse tab on `NaviPluginManager.SearchAsync`) comes later.
+- **Saved and loaded again.** The host's list is `navi/plugins.json` in its local data. Hosting a game loads every plugin on it, so the host's plugins come with them to any game that has the Navi library.
+- **Clients follow the host.** `NaviPluginSystem` (a `GameObjectSystem`, so a game does nothing to set it up) tells each client which plugins run, when it joins and when the host installs one, and the client downloads and activates the same ones.
+- **Global, running until the game ends.** There is one instance of each plugin. It isn't tied to a computer or an app. A plugin can't be unloaded, so removing one only stops it loading next time.
+- **Fully trusted.** A plugin is part of the OS and has no permissions or consent prompt. Installing one is the host's decision. `NaviStore.AllowedOrgs` and `BlacklistApps` don't apply to plugins yet.
+
+### Writing a plugin
+
+An addon can't see Navi's types (an addon sees only its parent game, and a library can't reference another library), so a plugin has no Navi base class or interface. The library loads the plugin and calls it by name:
+
+- The manifest's Plugin Type is any concrete class with a public parameterless constructor, e.g. `NaviThemes.ThemesPlugin`.
+- Navi calls these methods if the class has them, whatever their visibility, and skips the ones it lacks:
+  - `void OnEnable()` or `void OnEnable( IDictionary<string, Delegate> api )`, once, when the plugin starts.
+  - `void OnUpdate()`, every frame of the active scene. If it throws, it isn't called again.
+- `api` holds what Navi offers, under keys that start with `navi.`:
+  - `navi.version`: `Func<int>`, the `NaviPluginManager.ApiVersion` the plugin runs on.
+  - `navi.computers`: `Func<IReadOnlyList<Component>>`, the `NaviComputer`s in the active scene.
+- A plugin hooks into Navi by putting a delegate in `api` under a key that starts with `hook.`. Navi reads the hooks where it can be extended: `NaviPluginManager.Hooks<Func<...>>( "hook.name" )`. No hooks are wired into Navi yet; add one where a real plugin needs it.
+- Everything that crosses between the two sides is a .NET or engine type (delegates, strings, `Panel`, `Vector2`), because that is all both sides can see. Names are matched as strings, so a typo compiles and does nothing: keep the keys in one file.
+- A plugin in the game's own code can also derive from `NaviPlugin`, which has the same two methods.
+
+Tested in the editor: a class that is not tied to Navi was created, its private `OnEnable` and `OnUpdate` were called by name, and a hook it set was read back. Not tested: publishing a plugin to sbox.game and installing it from there, and a plugin addon that has the target game set to `fractitude.omnipresence`.
