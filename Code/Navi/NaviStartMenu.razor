@@ -160,8 +160,8 @@
 	List<NaviAppInfo> recent;
 
 	/// <summary>
-	/// The installed apps that match the search, best first: names that start with it, then names that have it in them,
-	/// then descriptions.
+	/// The installed apps that match the search, best first. The match is fuzzy (<see cref="NaviFuzzy"/>): it forgives typos
+	/// and takes initials or letters in order, and an app's description counts for less than its name.
 	/// </summary>
 	List<NaviAppInfo> Matches => matches ??= Match( Query.Trim() );
 
@@ -169,16 +169,10 @@
 
 	List<NaviAppInfo> Match( string query )
 	{
-		static int Rank( NaviAppInfo app, string query ) =>
-			app.Name.StartsWith( query, System.StringComparison.OrdinalIgnoreCase ) ? 0
-			: app.Name.Contains( query, System.StringComparison.OrdinalIgnoreCase ) ? 1
-			: app.Description?.Contains( query, System.StringComparison.OrdinalIgnoreCase ) == true ? 2
-			: -1;
-
 		return Computer.Installed
-			.Select( x => (App: x, Rank: Rank( x, query )) )
-			.Where( x => x.Rank >= 0 )
-			.OrderBy( x => x.Rank )
+			.Select( x => (App: x, Score: System.Math.Max( NaviFuzzy.ScoreName( query, x.Name ), NaviFuzzy.ScoreText( query, x.Description ) )) )
+			.Where( x => x.Score > 0 )
+			.OrderByDescending( x => x.Score )
 			.ThenBy( x => x.App.Name )
 			.Select( x => x.App )
 			.ToList();
