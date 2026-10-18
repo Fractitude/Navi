@@ -245,6 +245,63 @@ public static class Navi
 	/// </summary>
 	public static Task<bool> SetDisplayScale( Panel app, float scale ) => Call<bool>( app, "display.set-scale", scale );
 
+	/// <summary>
+	/// How the desktop, its windows and the apps in them are drawn.
+	/// </summary>
+	public enum Theme
+	{
+		/// <summary>Flat, opaque, with hard edges and hard shadows.</summary>
+		Paper,
+
+		/// <summary>Rounded, translucent surfaces that blur what is behind them.</summary>
+		Glass,
+	}
+
+	/// <summary>
+	/// Whether a theme is drawn light or dark. Every theme has both.
+	/// </summary>
+	public enum ColorScheme
+	{
+		Light,
+		Dark,
+	}
+
+	/// <summary>
+	/// The highest blur and transparency level. Both go from 0 (none) to this.
+	/// </summary>
+	public const int MaxThemeLevel = 4;
+
+	/// <summary>
+	/// The computer's theme, color scheme, blur level and transparency level.
+	/// </summary>
+	public static async Task<(Theme Theme, ColorScheme Scheme, int Blur, int Transparency)> GetTheme( Panel app )
+	{
+		var (theme, scheme, blur, transparency) = await Call<(int, int, int, int)>( app, "theme.get" );
+		return ((Theme)theme, (ColorScheme)scheme, blur, transparency);
+	}
+
+	/// <summary>
+	/// Draw the computer in a theme. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetTheme( Panel app, Theme theme ) => Call<bool>( app, "theme.set-theme", (int)theme );
+
+	/// <summary>
+	/// Draw the computer light or dark. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetColorScheme( Panel app, ColorScheme scheme ) => Call<bool>( app, "theme.set-scheme", (int)scheme );
+
+	/// <summary>
+	/// How strongly the Glass theme blurs what is behind a surface, 0 to <see cref="MaxThemeLevel"/>. Needs
+	/// <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetBlurLevel( Panel app, int level ) => Call<bool>( app, "theme.set-blur", level );
+
+	/// <summary>
+	/// How much of what is behind a surface shows through it in the Glass theme, 0 (nothing: solid) to
+	/// <see cref="MaxThemeLevel"/>. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetTransparencyLevel( Panel app, int level ) => Call<bool>( app, "theme.set-transparency", level );
+
 	// The Store.
 
 	/// <summary>

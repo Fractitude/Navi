@@ -155,6 +155,25 @@ public static class NaviSystemCalls
 				Require( process, NaviPermissions.ChangeSettings );
 				return computer.SetDisplayScale( Arg<float>( args, 0, method ) );
 
+			case "theme.get":
+				return ((int)computer.Theme, (int)computer.ColorScheme, computer.BlurLevel, computer.TransparencyLevel);
+
+			case "theme.set-theme":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetTheme( (Navi.Theme)Arg<int>( args, 0, method ) );
+
+			case "theme.set-scheme":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetColorScheme( (Navi.ColorScheme)Arg<int>( args, 0, method ) );
+
+			case "theme.set-blur":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetBlurLevel( Arg<int>( args, 0, method ) );
+
+			case "theme.set-transparency":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetTransparencyLevel( Arg<int>( args, 0, method ) );
+
 			// The Store.
 			case "store.search":
 			{

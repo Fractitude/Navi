@@ -1,124 +1,155 @@
-Settings
-{
-	width: 360px;
-	height: 200px;
-	flex-direction: row;
-	color: #2a2840;
-}
+@import "../../Themes/_paper-light.scss";
 
-// The pages, down the left edge.
-.sidebar
+@mixin settings-style
 {
-	width: 100px;
-	flex-shrink: 0;
-	flex-direction: column;
-	gap: 2px;
-	padding: 6px;
-	background-color: #c9c3b0;
-	border-right: 1px solid #8a8472;
-}
-
-.category
-{
-	flex-direction: row;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 6px;
-	font-size: 12px;
-	font-weight: 700;
-	cursor: pointer;
-
-	i
+	Settings
 	{
-		font-size: 14px;
+		width: 440px;
+		height: 300px;
+		flex-direction: row;
+		color: $ink-t;
 	}
 
-	&.active
+	// The pages, down the left edge.
+	.sidebar
 	{
-		color: #f2eee2;
-		background-color: #2a2840;
+		width: 100px;
+		flex-shrink: 0;
+		flex-direction: column;
+		gap: 2px;
+		padding: 6px;
+		background-color: $surface2-bg;
+		border-right: 1px solid $line-bc;
 	}
 
-	&:hover
+	.category
 	{
-		color: #f2eee2;
-		background-color: #4a4638;
-	}
-}
-
-// The open page.
-.page
-{
-	flex-grow: 1;
-	flex-direction: column;
-	gap: 8px;
-	padding: 8px 10px;
-	overflow-y: scroll;
-}
-
-.heading
-{
-	flex-shrink: 0;
-	font-size: 16px;
-	font-weight: 700;
-}
-
-.setting
-{
-	flex-shrink: 0;
-	flex-direction: column;
-	gap: 4px;
-
-	.name
-	{
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 6px;
 		font-size: 12px;
+		font-weight: 700;
+		cursor: pointer;
+
+		i
+		{
+			font-size: 14px;
+		}
+
+		&.active
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+		}
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $deep-bg;
+		}
+	}
+
+	// The open page.
+	.page
+	{
+		flex-grow: 1;
+		flex-direction: column;
+		gap: 8px;
+		padding: 8px 10px;
+		overflow-y: scroll;
+	}
+
+	.heading
+	{
+		flex-shrink: 0;
+		font-size: 16px;
 		font-weight: 700;
 	}
 
-	.description
+	.setting
 	{
+		flex-shrink: 0;
+		flex-direction: column;
+		gap: 4px;
+
+		.name
+		{
+			font-size: 12px;
+			font-weight: 700;
+		}
+
+		.description
+		{
+			font-size: 10px;
+			opacity: 0.7;
+		}
+
+		// A setting the current theme doesn't use.
+		&.unavailable
+		{
+			opacity: 0.4;
+		}
+	}
+
+	// A row of choices, one of them picked.
+	.options
+	{
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 4px;
+		padding-top: 2px;
+	}
+
+	.option
+	{
+		padding: 3px 8px;
+		font-size: 11px;
+		font-weight: 700;
+		background-color: $paper-bg;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		&.active
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
+		}
+
+		&:hover
+		{
+			border-color: $ink-bc;
+		}
+	}
+
+	.notice
+	{
+		flex-shrink: 0;
+		padding: 4px 6px;
 		font-size: 10px;
-		opacity: 0.7;
+		color: $paper-t;
+		background-color: #8a3a3a;
+		cursor: pointer;
 	}
 }
 
-// A row of choices, one of them picked.
-.options
+@include settings-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
 {
-	flex-direction: row;
-	flex-wrap: wrap;
-	gap: 4px;
-	padding-top: 2px;
+	@include settings-style;
 }
 
-.option
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
 {
-	padding: 3px 8px;
-	font-size: 11px;
-	font-weight: 700;
-	background-color: #f2eee2;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&.active
-	{
-		color: #f2eee2;
-		background-color: #2a2840;
-		border-color: #2a2840;
-	}
-
-	&:hover
-	{
-		border-color: #2a2840;
-	}
+	@include settings-style;
 }
 
-.notice
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
 {
-	flex-shrink: 0;
-	padding: 4px 6px;
-	font-size: 10px;
-	color: #f2eee2;
-	background-color: #8a3a3a;
-	cursor: pointer;
+	@include settings-style;
 }

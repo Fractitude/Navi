@@ -1,82 +1,107 @@
-WebBrowser
-{
-	width: 420px;
-	height: 260px;
-	flex-direction: column;
-	padding: 6px;
-	gap: 6px;
-}
+@import "../../Themes/_paper-light.scss";
 
-.toolbar
+@mixin webbrowser-style
 {
-	flex-shrink: 0;
-	flex-direction: row;
-	align-items: center;
-	gap: 4px;
-}
-
-.button
-{
-	width: 20px;
-	height: 20px;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	font-size: 16px;
-	color: #2a2840;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&:hover
+	WebBrowser
 	{
-		color: #f2eee2;
-		background-color: #2a2840;
-		border-color: #2a2840;
+		width: 420px;
+		height: 260px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
 	}
 
-	&.disabled
+	.toolbar
 	{
-		opacity: 0.4;
-		cursor: default;
-		pointer-events: none;
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
 	}
-}
 
-// The address field. The engine's TextEntry is dark; Navi's panels are paper.
-.address
-{
-	flex-grow: 1;
-	min-width: 0;
-
-	.textentry
+	.button
 	{
-		width: 100%;
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		justify-content: center;
+		align-items: center;
+		font-size: 16px;
+		color: $ink-t;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
+		}
+
+		&.disabled
+		{
+			opacity: 0.4;
+			cursor: default;
+			pointer-events: none;
+		}
+	}
+
+	// The address field. The engine's TextEntry is dark; Navi's panels are paper.
+	.address
+	{
+		flex-grow: 1;
 		min-width: 0;
-		padding: 3px 6px;
-		font-size: 11px;
-		color: #2a2840;
-		background-color: #f2eee2;
-		border: 1px solid #8a8472;
+
+		.textentry
+		{
+			width: 100%;
+			min-width: 0;
+			padding: 3px 6px;
+			font-size: 11px;
+			color: $ink-t;
+			background-color: $paper-bg;
+			border: 1px solid $line-bc;
+		}
+	}
+
+	// A message about the last thing tried, e.g. an address that can't be opened. Click to dismiss.
+	.notice
+	{
+		flex-shrink: 0;
+		padding: 4px 6px;
+		font-size: 10px;
+		color: $paper-t;
+		background-color: #8a3a3a;
+		cursor: pointer;
+	}
+
+	// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
+	.page
+	{
+		flex-grow: 1;
+		flex-shrink: 1;
+		min-height: 0;
+		background-color: $white-bg;
+		border: 1px solid $line-bc;
 	}
 }
 
-// A message about the last thing tried, e.g. an address that can't be opened. Click to dismiss.
-.notice
+@include webbrowser-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
 {
-	flex-shrink: 0;
-	padding: 4px 6px;
-	font-size: 10px;
-	color: #f2eee2;
-	background-color: #8a3a3a;
-	cursor: pointer;
+	@include webbrowser-style;
 }
 
-// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
-.page
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
 {
-	flex-grow: 1;
-	flex-shrink: 1;
-	min-height: 0;
-	background-color: #ffffff;
-	border: 1px solid #8a8472;
+	@include webbrowser-style;
+}
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
+{
+	@include webbrowser-style;
 }

@@ -46,6 +46,66 @@
 					</div>
 				</div>
 				break;
+
+			case SettingsCategory.Theming:
+				<div class="heading">Theming</div>
+
+				<div class="setting">
+					<div class="name">Theme</div>
+					<div class="description">How the desktop, windows and apps look.</div>
+					<div class="options">
+						@foreach ( var option in UiState.ThemeOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseThemeAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting">
+					<div class="name">Color scheme</div>
+					<div class="description">Light or dark, in every theme.</div>
+					<div class="options">
+						@foreach ( var option in UiState.SchemeOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseSchemeAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting @( UiState.IsGlass ? "" : "unavailable" )">
+					<div class="name">Blur</div>
+					<div class="description">How much windows and menus blur what is behind them. Glass only.</div>
+					<div class="options">
+						@foreach ( var option in UiState.BlurOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseBlurAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting @( UiState.IsGlass ? "" : "unavailable" )">
+					<div class="name">Transparency</div>
+					<div class="description">How much shows through windows and menus. None is solid. Glass only.</div>
+					<div class="options">
+						@foreach ( var option in UiState.TransparencyOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseTransparencyAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+				break;
 		}
 	</div>
 </root>

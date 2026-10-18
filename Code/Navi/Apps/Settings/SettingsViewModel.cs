@@ -23,12 +23,18 @@ public sealed class SettingsViewModel
 	static (SettingsCategory Key, string Label, string Icon)[] Pages =>
 	[
 		(SettingsCategory.Display, "Display", "monitor"),
+		(SettingsCategory.Theming, "Theming", "palette"),
 	];
 
 	// What the computer said.
 
 	float displayScale = 1f;
 	float[] displayScales = [];
+
+	Navi.Theme theme;
+	Navi.ColorScheme scheme;
+	int blurLevel;
+	int transparencyLevel;
 
 	/// <summary>The computer's version when the settings were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -76,12 +82,28 @@ public sealed class SettingsViewModel
 			_ = SetScaleAsync( scale );
 	}
 
+	/// <summary>Draw the computer in another theme.</summary>
+	public void ChooseTheme( Navi.Theme choice ) => _ = RunAsync( () => Navi.SetTheme( app, choice ), "the theme" );
+
+	/// <summary>Draw the computer light or dark.</summary>
+	public void ChooseScheme( Navi.ColorScheme choice ) => _ = RunAsync( () => Navi.SetColorScheme( app, choice ), "the color scheme" );
+
+	/// <summary>How strongly the Glass theme blurs what is behind a surface.</summary>
+	public void ChooseBlur( int level ) => _ = RunAsync( () => Navi.SetBlurLevel( app, level ), "the blur" );
+
+	/// <summary>How much shows through the Glass theme's surfaces.</summary>
+	public void ChooseTransparency( int level ) => _ = RunAsync( () => Navi.SetTransparencyLevel( app, level ), "the transparency" );
+
 	public void DismissNotice() => Update( uiState => uiState with { Notice = null } );
 
 	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
 
 	public const string OpenCategoryAction = "open-category";
 	public const string ChooseScaleAction = "choose-scale";
+	public const string ChooseThemeAction = "choose-theme";
+	public const string ChooseSchemeAction = "choose-scheme";
+	public const string ChooseBlurAction = "choose-blur";
+	public const string ChooseTransparencyAction = "choose-transparency";
 	public const string DismissNoticeAction = "dismiss-notice";
 
 	/// <summary>
@@ -99,6 +121,22 @@ public sealed class SettingsViewModel
 
 			case ChooseScaleAction when float.TryParse( arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var scale ):
 				ChooseScale( scale );
+				break;
+
+			case ChooseThemeAction when int.TryParse( arg, out var value ) && System.Enum.IsDefined( (Navi.Theme)value ):
+				ChooseTheme( (Navi.Theme)value );
+				break;
+
+			case ChooseSchemeAction when int.TryParse( arg, out var value ) && System.Enum.IsDefined( (Navi.ColorScheme)value ):
+				ChooseScheme( (Navi.ColorScheme)value );
+				break;
+
+			case ChooseBlurAction when int.TryParse( arg, out var value ) && value is >= 0 and <= Navi.MaxThemeLevel:
+				ChooseBlur( value );
+				break;
+
+			case ChooseTransparencyAction when int.TryParse( arg, out var value ) && value is >= 0 and <= Navi.MaxThemeLevel:
+				ChooseTransparency( value );
 				break;
 
 			case DismissNoticeAction:
@@ -122,6 +160,19 @@ public sealed class SettingsViewModel
 		}
 	}
 
+	async Task RunAsync( System.Func<Task<bool>> change, string what )
+	{
+		try
+		{
+			if ( !await change() )
+				Update( uiState => uiState with { Notice = $"The computer can't use that setting for {what}." } );
+		}
+		catch ( System.Exception e )
+		{
+			Update( uiState => uiState with { Notice = $"Couldn't change {what}: {e.Message}" } );
+		}
+	}
+
 	async Task PollAsync()
 	{
 		polling = true;
@@ -135,8 +186,17 @@ public sealed class SettingsViewModel
 
 			knownVersion = version;
 			(displayScale, displayScales) = await Navi.GetDisplayScale( app );
+			(theme, scheme, blurLevel, transparencyLevel) = await Navi.GetTheme( app );
 
-			Update( uiState => uiState with { ScaleOptions = BuildScaleOptions() } );
+			Update( uiState => uiState with
+			{
+				ScaleOptions = BuildScaleOptions(),
+				ThemeOptions = BuildThemeOptions(),
+				SchemeOptions = BuildSchemeOptions(),
+				BlurOptions = BuildLevelOptions( blurLevel ),
+				TransparencyOptions = BuildLevelOptions( transparencyLevel ),
+				IsGlass = theme == Navi.Theme.Glass,
+			} );
 		}
 		catch ( System.Exception e )
 		{
@@ -153,6 +213,18 @@ public sealed class SettingsViewModel
 
 	IReadOnlyList<ScaleOption> BuildScaleOptions() =>
 		displayScales.Select( x => new ScaleOption( x, $"{System.MathF.Round( x * 100 )}%", x == displayScale ) ).ToArray();
+
+	IReadOnlyList<ThemeOption> BuildThemeOptions() =>
+		[new( (int)Navi.Theme.Paper, "Paper", theme == Navi.Theme.Paper ), new( (int)Navi.Theme.Glass, "Glass", theme == Navi.Theme.Glass )];
+
+	IReadOnlyList<ThemeOption> BuildSchemeOptions() =>
+		[new( (int)Navi.ColorScheme.Light, "Light", scheme == Navi.ColorScheme.Light ), new( (int)Navi.ColorScheme.Dark, "Dark", scheme == Navi.ColorScheme.Dark )];
+
+	/// <summary>The labels of the blur and transparency levels, 0 to <see cref="Navi.MaxThemeLevel"/>.</summary>
+	static readonly string[] LevelLabels = ["None", "Low", "Medium", "High", "Max"];
+
+	static IReadOnlyList<ThemeOption> BuildLevelOptions( int selected ) =>
+		LevelLabels.Select( ( x, i ) => new ThemeOption( i, x, i == selected ) ).ToArray();
 
 	void Update( System.Func<SettingsUiState, SettingsUiState> change ) =>
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };

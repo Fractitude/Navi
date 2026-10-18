@@ -1,107 +1,132 @@
-Calculator
-{
-	width: 200px;
-	flex-direction: column;
-	padding: 6px;
-	gap: 6px;
-}
+@import "../../Themes/_paper-light.scss";
 
-.display
+@mixin calculator-style
 {
-	height: 48px;
-	flex-direction: column;
-	justify-content: flex-end;
-	padding: 3px 0;
-	color: #b8f0c0;
-	background-color: #14131f;
-	border: 2px solid #4a4638;
-	font-family: "Roboto Mono";
-	overflow: hidden;
-}
+	Calculator
+	{
+		width: 200px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
+	}
 
-.expression
-{
-	height: 13px;
-	padding: 0 8px;
-	font-size: 10px;
-	text-align: right;
-	opacity: 0.6;
+	.display
+	{
+		height: 48px;
+		flex-direction: column;
+		justify-content: flex-end;
+		padding: 3px 0;
+		color: #b8f0c0;
+		background-color: #14131f;
+		border: 2px solid $deep-bc;
+		font-family: "Roboto Mono";
+		overflow: hidden;
+	}
 
-	> *
+	.expression
+	{
+		height: 13px;
+		padding: 0 8px;
+		font-size: 10px;
+		text-align: right;
+		opacity: 0.6;
+
+		> *
+		{
+			flex-grow: 1;
+		}
+	}
+
+	// A fixed box whose text label fills it, so the label's size (and where the text sits) doesn't depend on the text.
+	.entry
+	{
+		height: 26px;
+		line-height: 26px;
+		// The display's side padding is here, so a drag that starts at the very edge still selects the number.
+		padding: 0 8px;
+		font-size: 22px;
+		text-align: right;
+		white-space: nowrap;
+		cursor: text;
+		pointer-events: all;
+
+		> *
+		{
+			flex-grow: 1;
+		}
+	}
+
+	.keys
+	{
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.row
+	{
+		flex-direction: row;
+		gap: 4px;
+	}
+
+	.key
 	{
 		flex-grow: 1;
+		flex-basis: 0;
+		height: 26px;
+		justify-content: center;
+		align-items: center;
+		font-size: 14px;
+		font-weight: 700;
+		color: $ink-t;
+		background-color: $paper-bg;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		&.operator
+		{
+			background-color: $surface2-bg;
+		}
+
+		&.function
+		{
+			color: $paper-t;
+			background-color: $mid-bg;
+		}
+
+		&.equals
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+		}
+
+		&:hover
+		{
+			border-color: $ink-bc;
+		}
+
+		&:active
+		{
+			background-color: #e0b060;
+		}
 	}
 }
 
-// A fixed box whose text label fills it, so the label's size (and where the text sits) doesn't depend on the text.
-.entry
-{
-	height: 26px;
-	line-height: 26px;
-	// The display's side padding is here, so a drag that starts at the very edge still selects the number.
-	padding: 0 8px;
-	font-size: 22px;
-	text-align: right;
-	white-space: nowrap;
-	cursor: text;
-	pointer-events: all;
+@include calculator-style;
 
-	> *
-	{
-		flex-grow: 1;
-	}
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
+{
+	@include calculator-style;
 }
 
-.keys
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
 {
-	flex-direction: column;
-	gap: 4px;
+	@include calculator-style;
 }
 
-.row
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
 {
-	flex-direction: row;
-	gap: 4px;
-}
-
-.key
-{
-	flex-grow: 1;
-	flex-basis: 0;
-	height: 26px;
-	justify-content: center;
-	align-items: center;
-	font-size: 14px;
-	font-weight: 700;
-	color: #2a2840;
-	background-color: #f2eee2;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&.operator
-	{
-		background-color: #c9c3b0;
-	}
-
-	&.function
-	{
-		color: #f2eee2;
-		background-color: #6e6a5c;
-	}
-
-	&.equals
-	{
-		color: #f2eee2;
-		background-color: #2a2840;
-	}
-
-	&:hover
-	{
-		border-color: #2a2840;
-	}
-
-	&:active
-	{
-		background-color: #e0b060;
-	}
+	@include calculator-style;
 }

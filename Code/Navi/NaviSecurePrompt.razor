@@ -8,7 +8,7 @@
 @* in it only reacts to a real mouse press made after the prompt has been up for a moment. See the Security section *@
 @* of AGENTS.md for what this does and doesn't protect against. *@
 
-<root class="@(Request is null ? "" : "active")"
+<root class="@(Request is null ? "" : "active") @(Computer?.ThemeClasses)"
 	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
 	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
 	@if ( Request is { } request )
@@ -191,5 +191,6 @@
 	}
 
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Request, Armed, Computer?.CanUse, Computer?.IsSeated, Unticked.Count, string.Join( ",", Unticked ) );
+		System.HashCode.Combine( Request, Armed, Computer?.CanUse, Computer?.IsSeated, Unticked.Count, string.Join( ",", Unticked ),
+			Computer?.ThemeClasses );
 }

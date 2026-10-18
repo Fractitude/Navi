@@ -7,500 +7,787 @@ NaviDesktop
 	font-family: Poppins;
 	color: #e8e4d8;
 }
+@import "Themes/_paper-light.scss";
 
-.screen
+@mixin desktop-style
 {
-	position: relative;
-	flex-grow: 1;
-	justify-content: center;
-	align-items: center;
-	overflow: hidden;
-}
-
-// Child selectors (>) only, so these rules don't leak into the apps inside the windows.
-.window
-{
-	// NaviDesktop reveals a window once it has placed and laid it out.
-	opacity: 0;
-	position: absolute;
-	flex-direction: column;
-	min-width: 160px;
-	overflow: hidden;
-	background-color: #dcd6c4;
-	border: 2px solid #8a8472;
-	box-shadow: 4px 4px 0 rgba( 0, 0, 0, 0.35 );
-	pointer-events: all;
-
-	// First in the column, though the body comes first in the markup so this draws after it (see the markup).
-	> .titlebar
+	// Glass's wallpaper: soft colored shapes for the glass to blur. They have no color until a Glass look gives them one.
+	.wallpaper
 	{
-		order: -1;
-		flex-shrink: 0;
-		height: 24px;
-		flex-direction: row;
-		align-items: center;
-		gap: 6px;
-		padding: 0 3px 0 6px;
-		color: #dcd6c4;
-		background-color: #6e6a5c;
-		cursor: move;
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		pointer-events: none;
 
-		> .glyph
+		> .orb
 		{
-			font-size: 14px;
+			position: absolute;
+			border-radius: 999px;
+
+			&.o1 { left: 6%; top: 52%; width: 340px; height: 340px; }
+			&.o2 { left: 58%; top: 6%; width: 420px; height: 420px; }
+			&.o3 { left: 40%; top: 58%; width: 300px; height: 300px; }
 		}
+	}
+	.screen
+	{
+		position: relative;
+		flex-grow: 1;
+		justify-content: center;
+		align-items: center;
+		overflow: hidden;
+	}
 
-		// The app has full system access (root). The tooltip is the one the taskbar uses.
-		> .shield
+	// Child selectors (>) only, so these rules don't leak into the apps inside the windows.
+	.window
+	{
+		// NaviDesktop reveals a window once it has placed and laid it out.
+		opacity: 0;
+		position: absolute;
+		flex-direction: column;
+		min-width: 160px;
+		overflow: hidden;
+		background-color: $surface-bg;
+		border: 2px solid $line-bc;
+		box-shadow: 4px 4px 0 rgba( 0, 0, 0, 0.35 );
+		pointer-events: all;
+
+		// First in the column, though the body comes first in the markup so this draws after it (see the markup).
+		> .titlebar
 		{
-			position: relative;
+			order: -1;
 			flex-shrink: 0;
-			justify-content: center;
+			height: 24px;
+			flex-direction: row;
 			align-items: center;
-			color: #f2d64a;
+			gap: 6px;
+			padding: 0 3px 0 6px;
+			color: $surface-t;
+			background-color: $mid-bg;
+			cursor: move;
 
-			.tooltip
+			> .glyph
 			{
-				position: absolute;
-				top: 100%;
-				right: 0;
-				opacity: 0;
-				pointer-events: none;
-				padding: 3px 6px;
-				font-size: 12px;
-				color: #f2eee2;
-				background-color: #2a2840;
-				border: 1px solid #f2eee2;
-				white-space: nowrap;
+				font-size: 14px;
 			}
 
-			&:hover .tooltip
+			// The app has full system access (root). The tooltip is the one the taskbar uses.
+			> .shield
+			{
+				position: relative;
+				flex-shrink: 0;
+				justify-content: center;
+				align-items: center;
+				color: #f2d64a;
+
+				.tooltip
+				{
+					position: absolute;
+					top: 100%;
+					right: 0;
+					opacity: 0;
+					pointer-events: none;
+					padding: 3px 6px;
+					font-size: 12px;
+					color: $paper-t;
+					background-color: $ink-bg;
+					border: 1px solid $paper-bc;
+					white-space: nowrap;
+				}
+
+				&:hover .tooltip
+				{
+					opacity: 1;
+				}
+			}
+
+			// Doesn't count towards the window's width (basis 0), so a long title is cut short with an ellipsis rather than
+			// making the window wider.
+			> .name
+			{
+				flex-grow: 1;
+				flex-basis: 0;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-size: 13px;
+				font-weight: 700;
+				letter-spacing: 1px;
+			}
+
+			> .button
+			{
+				flex-shrink: 0;
+				width: 18px;
+				height: 18px;
+				justify-content: center;
+				align-items: center;
+				font-size: 13px;
+				color: $ink-t;
+				background-color: $surface2-bg;
+				border: 1px solid $deep-bc;
+				cursor: pointer;
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $mid-bg;
+				}
+
+				&.close:hover
+				{
+					background-color: #a0403a;
+				}
+			}
+		}
+
+		> .body
+		{
+			flex-grow: 1;
+			flex-direction: column;
+			color: $ink-t;
+		}
+
+		// Invisible grab areas over the corners, for resizing.
+		> .corner
+		{
+			position: absolute;
+			width: 10px;
+			height: 10px;
+			z-index: 10;
+
+			&.nw { top: 0; left: 0; cursor: nwse-resize; }
+			&.se { bottom: 0; right: 0; cursor: nwse-resize; }
+			&.ne { top: 0; right: 0; cursor: nesw-resize; }
+			&.sw { bottom: 0; left: 0; cursor: nesw-resize; }
+
+			&:hover
+			{
+				background-color: rgba( 242, 238, 226, 0.5 );
+			}
+		}
+
+		&.minimized
+		{
+			display: none;
+		}
+
+		&.maximized
+		{
+			box-shadow: none;
+		}
+
+		&.focused
+		{
+			border-color: $paper-bc;
+
+			> .titlebar
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+		}
+	}
+
+	.title
+	{
+		font-size: 64px;
+		font-weight: 700;
+		letter-spacing: 12px;
+		opacity: 0.25;
+	}
+
+	.taskbar
+	{
+		height: 48px;
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		padding: 0 8px;
+		gap: 8px;
+		background-color: $surface2-bg;
+		border-top: 2px solid $paper-bc;
+	}
+
+	.start
+	{
+		flex-shrink: 0;
+		pointer-events: all;
+		cursor: pointer;
+		height: 34px;
+		padding: 0 12px;
+		align-items: center;
+		font-size: 16px;
+		font-weight: 700;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $line-bc;
+
+		&:hover
+		{
+			border-color: $paper-bc;
+		}
+	}
+
+	.app
+	{
+		position: relative;
+		width: 34px;
+		height: 34px;
+		flex-shrink: 0;
+		pointer-events: all;
+		cursor: pointer;
+
+		.icon
+		{
+			width: 100%;
+			height: 100%;
+			justify-content: center;
+			align-items: center;
+			font-size: 20px;
+			color: $ink-t;
+			border: 2px solid $deep-bc;
+		}
+
+		// Marker under the icons of open apps.
+		.marker
+		{
+			position: absolute;
+			bottom: -5px;
+			left: 11px;
+			width: 12px;
+			height: 3px;
+			background-color: $ink-bg;
+
+			&.minimized
+			{
+				opacity: 0.35;
+			}
+		}
+
+		// Always laid out (only faded) so NaviDesktop can measure it and keep it on screen.
+		.tooltip
+		{
+			position: absolute;
+			bottom: 44px;
+			left: 0;
+			opacity: 0;
+			pointer-events: none;
+			padding: 3px 6px;
+			font-size: 12px;
+			color: $paper-t;
+			background-color: $ink-bg;
+			border: 1px solid $paper-bc;
+			white-space: nowrap;
+		}
+
+		&:hover
+		{
+			.icon
+			{
+				border-color: $paper-bc;
+			}
+
+			.tooltip
 			{
 				opacity: 1;
 			}
 		}
 
-		// Doesn't count towards the window's width (basis 0), so a long title is cut short with an ellipsis rather than
-		// making the window wider.
-		> .name
+		&.menu-open .tooltip
 		{
-			flex-grow: 1;
-			flex-basis: 0;
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-			font-size: 13px;
-			font-weight: 700;
-			letter-spacing: 1px;
+			display: none;
 		}
 
-		> .button
+		// Right-click menu, above the icon.
+		.menu
 		{
-			flex-shrink: 0;
-			width: 18px;
-			height: 18px;
-			justify-content: center;
-			align-items: center;
-			font-size: 13px;
-			color: #2a2840;
-			background-color: #c9c3b0;
-			border: 1px solid #4a4638;
-			cursor: pointer;
+			position: absolute;
+			bottom: 44px;
+			left: 0;
+			flex-direction: column;
+			padding: 2px;
+			color: $ink-t;
+			background-color: $surface-bg;
+			border: 2px solid $ink-bc;
+			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+			z-index: 100;
 
-			&:hover
+			.item
 			{
-				color: #f2eee2;
-				background-color: #6e6a5c;
-			}
+				flex-direction: row;
+				align-items: center;
+				gap: 6px;
+				padding: 4px 8px;
+				font-size: 12px;
+				font-weight: 700;
+				white-space: nowrap;
+				cursor: pointer;
 
-			&.close:hover
-			{
-				background-color: #a0403a;
+				i
+				{
+					font-size: 14px;
+				}
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+				}
 			}
 		}
 	}
 
-	> .body
+	// An icon being dragged to a new place on the taskbar (NaviDesktop moves it). No tooltips pop up as icons pass under
+	// the mouse.
+	.taskbar.reordering .app
 	{
-		flex-grow: 1;
-		flex-direction: column;
-		color: #2a2840;
+		.tooltip
+		{
+			opacity: 0;
+		}
+
+		&.dragging .icon
+		{
+			border-color: $paper-bc;
+			opacity: 0.85;
+		}
 	}
 
-	// Invisible grab areas over the corners, for resizing.
-	> .corner
+	// The system tray, at the right end of the taskbar.
+	.tray
 	{
-		position: absolute;
-		width: 10px;
-		height: 10px;
-		z-index: 10;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+		margin-left: auto;
+		flex-shrink: 0;
+	}
 
-		&.nw { top: 0; left: 0; cursor: nwse-resize; }
-		&.se { bottom: 0; right: 0; cursor: nwse-resize; }
-		&.ne { top: 0; right: 0; cursor: nesw-resize; }
-		&.sw { bottom: 0; left: 0; cursor: nesw-resize; }
+	.tray-icon
+	{
+		position: relative;
+		width: 26px;
+		height: 26px;
+		justify-content: center;
+		align-items: center;
+		font-size: 16px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $line-bc;
+		pointer-events: all;
+		cursor: pointer;
 
 		&:hover
 		{
-			background-color: rgba( 242, 238, 226, 0.5 );
+			border-color: $paper-bc;
+
+			.tooltip
+			{
+				opacity: 1;
+			}
+		}
+
+		&.menu-open .tooltip
+		{
+			display: none;
+		}
+
+		.tooltip
+		{
+			position: absolute;
+			bottom: 38px;
+			right: 0;
+			opacity: 0;
+			pointer-events: none;
+			padding: 3px 6px;
+			font-size: 12px;
+			color: $paper-t;
+			background-color: $ink-bg;
+			border: 1px solid $paper-bc;
+			white-space: nowrap;
+		}
+
+		// Right-click menu, above the icon. The heading is the app's name, which the desktop writes.
+		.menu
+		{
+			position: absolute;
+			bottom: 38px;
+			right: 0;
+			flex-direction: column;
+			padding: 2px;
+			color: $ink-t;
+			background-color: $surface-bg;
+			border: 2px solid $ink-bc;
+			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+			z-index: 100;
+
+			.heading
+			{
+				padding: 3px 8px;
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: 1px;
+				color: $surface-t;
+				background-color: $mid-bg;
+				white-space: nowrap;
+			}
+
+			.item
+			{
+				flex-direction: row;
+				align-items: center;
+				gap: 6px;
+				padding: 4px 8px;
+				font-size: 12px;
+				font-weight: 700;
+				white-space: nowrap;
+				cursor: pointer;
+
+				i
+				{
+					font-size: 14px;
+				}
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+				}
+
+				&.quit:hover
+				{
+					background-color: #a0403a;
+				}
+			}
 		}
 	}
 
-	&.minimized
+	// Where headless apps' panels run. No size and nothing drawn, but still in the tree, so they tick.
+	.services
 	{
-		display: none;
+		position: absolute;
+		width: 0;
+		height: 0;
+		overflow: hidden;
+		pointer-events: none;
 	}
 
-	&.maximized
+	// Under an open taskbar menu, to close it on a click anywhere else.
+	.menu-backdrop
 	{
-		box-shadow: none;
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		pointer-events: all;
 	}
 
-	&.focused
+	// The seat is free: takes the clicks until the player sits.
+	.sit
 	{
-		border-color: #f2eee2;
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		pointer-events: all;
+	}
+
+	// Another player has the seat: dims the screen a little and takes the clicks.
+	.in-use
+	{
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		pointer-events: all;
+		justify-content: center;
+		align-items: flex-start;
+		padding-top: 8px;
+
+		> .badge
+		{
+			gap: 4px;
+			align-items: center;
+			padding: 2px 8px;
+			border-radius: 8px;
+			background-color: rgba( 20, 18, 36, 0.8 );
+			color: white;
+			font-size: 11px;
+
+			> i
+			{
+				font-size: 14px;
+			}
+		}
+	}
+}
+
+// What each look adds to the desktop's own chrome, which the palette alone doesn't cover: the wallpaper, and Glass's
+// shapes, shadows and light-on-glass title bars. Windows, the taskbar and menus take their fill and blur from the
+// Transparency and Blur settings (the clear-N and blur-N classes), below.
+
+// Glass. Parameters: text, the glass's lit edge, a focused window's edge, a title bar, a focused one, a control on the
+// title bar, the accent, a shadow, a tooltip.
+@mixin glass-chrome( $text, $edge, $edge-focus, $title, $title-focus, $control, $accent, $shadow, $tip )
+{
+	.window
+	{
+		border-radius: 14px;
+		border: 1px solid $edge;
+		box-shadow: 0 12px 36px $shadow;
+
+		&.focused
+		{
+			border-color: $edge-focus;
+		}
+
+		&.maximized
+		{
+			border-radius: 0;
+			box-shadow: none;
+		}
 
 		> .titlebar
 		{
-			color: #f2eee2;
-			background-color: #2a2840;
+			height: 30px;
+			color: $text;
+			background-color: $title;
+
+			> .button
+			{
+				width: 20px;
+				height: 20px;
+				color: $text;
+				background-color: $control;
+				border: 0;
+				border-radius: 7px;
+
+				&:hover
+				{
+					color: #ffffff;
+					background-color: $accent;
+				}
+
+				&.close:hover
+				{
+					background-color: #e5534b;
+				}
+			}
 		}
-	}
-}
 
-.title
-{
-	font-size: 64px;
-	font-weight: 700;
-	letter-spacing: 12px;
-	opacity: 0.25;
-}
-
-.taskbar
-{
-	height: 48px;
-	flex-shrink: 0;
-	flex-direction: row;
-	align-items: center;
-	padding: 0 8px;
-	gap: 8px;
-	background-color: #c9c3b0;
-	border-top: 2px solid #f2eee2;
-}
-
-.start
-{
-	flex-shrink: 0;
-	pointer-events: all;
-	cursor: pointer;
-	height: 34px;
-	padding: 0 12px;
-	align-items: center;
-	font-size: 16px;
-	font-weight: 700;
-	color: #2a2840;
-	background-color: #dcd6c4;
-	border: 2px solid #8a8472;
-
-	&:hover
-	{
-		border-color: #f2eee2;
-	}
-}
-
-.app
-{
-	position: relative;
-	width: 34px;
-	height: 34px;
-	flex-shrink: 0;
-	pointer-events: all;
-	cursor: pointer;
-
-	.icon
-	{
-		width: 100%;
-		height: 100%;
-		justify-content: center;
-		align-items: center;
-		font-size: 20px;
-		color: #2a2840;
-		border: 2px solid #4a4638;
-	}
-
-	// Marker under the icons of open apps.
-	.marker
-	{
-		position: absolute;
-		bottom: -5px;
-		left: 11px;
-		width: 12px;
-		height: 3px;
-		background-color: #2a2840;
-
-		&.minimized
+		&.focused > .titlebar
 		{
-			opacity: 0.35;
+			color: $text;
+			background-color: $title-focus;
 		}
 	}
 
-	// Always laid out (only faded) so NaviDesktop can measure it and keep it on screen.
-	.tooltip
+	.taskbar
 	{
-		position: absolute;
-		bottom: 44px;
-		left: 0;
-		opacity: 0;
-		pointer-events: none;
-		padding: 3px 6px;
-		font-size: 12px;
-		color: #f2eee2;
-		background-color: #2a2840;
-		border: 1px solid #f2eee2;
-		white-space: nowrap;
+		border-top: 1px solid $edge;
 	}
 
-	&:hover
+	.start
+	{
+		color: $text;
+		background-color: $control;
+		border: 1px solid $edge;
+		border-radius: 10px;
+	}
+
+	.app
 	{
 		.icon
 		{
-			border-color: #f2eee2;
+			border: 1px solid $edge;
+			border-radius: 10px;
+		}
+
+		.marker
+		{
+			background-color: $accent;
+			border-radius: 2px;
+		}
+
+		.menu
+		{
+			border: 1px solid $edge;
+			border-radius: 12px;
+			box-shadow: 0 10px 28px $shadow;
 		}
 
 		.tooltip
 		{
-			opacity: 1;
+			color: #ffffff;
+			background-color: $tip;
+			border: 0;
+			border-radius: 8px;
 		}
 	}
 
-	&.menu-open .tooltip
+	.tray-icon
 	{
-		display: none;
-	}
-
-	// Right-click menu, above the icon.
-	.menu
-	{
-		position: absolute;
-		bottom: 44px;
-		left: 0;
-		flex-direction: column;
-		padding: 2px;
-		color: #2a2840;
-		background-color: #dcd6c4;
-		border: 2px solid #2a2840;
-		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
-		z-index: 100;
-
-		.item
-		{
-			flex-direction: row;
-			align-items: center;
-			gap: 6px;
-			padding: 4px 8px;
-			font-size: 12px;
-			font-weight: 700;
-			white-space: nowrap;
-			cursor: pointer;
-
-			i
-			{
-				font-size: 14px;
-			}
-
-			&:hover
-			{
-				color: #f2eee2;
-				background-color: #2a2840;
-			}
-		}
-	}
-}
-
-// An icon being dragged to a new place on the taskbar (NaviDesktop moves it). No tooltips pop up as icons pass under
-// the mouse.
-.taskbar.reordering .app
-{
-	.tooltip
-	{
-		opacity: 0;
-	}
-
-	&.dragging .icon
-	{
-		border-color: #f2eee2;
-		opacity: 0.85;
-	}
-}
-
-// The system tray, at the right end of the taskbar.
-.tray
-{
-	flex-direction: row;
-	align-items: center;
-	gap: 4px;
-	margin-left: auto;
-	flex-shrink: 0;
-}
-
-.tray-icon
-{
-	position: relative;
-	width: 26px;
-	height: 26px;
-	justify-content: center;
-	align-items: center;
-	font-size: 16px;
-	color: #2a2840;
-	background-color: #dcd6c4;
-	border: 2px solid #8a8472;
-	pointer-events: all;
-	cursor: pointer;
-
-	&:hover
-	{
-		border-color: #f2eee2;
+		color: $text;
+		background-color: $control;
+		border: 1px solid $edge;
+		border-radius: 9px;
 
 		.tooltip
 		{
-			opacity: 1;
+			color: #ffffff;
+			background-color: $tip;
+			border: 0;
+			border-radius: 8px;
 		}
-	}
 
-	&.menu-open .tooltip
-	{
-		display: none;
-	}
-
-	.tooltip
-	{
-		position: absolute;
-		bottom: 38px;
-		right: 0;
-		opacity: 0;
-		pointer-events: none;
-		padding: 3px 6px;
-		font-size: 12px;
-		color: #f2eee2;
-		background-color: #2a2840;
-		border: 1px solid #f2eee2;
-		white-space: nowrap;
-	}
-
-	// Right-click menu, above the icon. The heading is the app's name, which the desktop writes.
-	.menu
-	{
-		position: absolute;
-		bottom: 38px;
-		right: 0;
-		flex-direction: column;
-		padding: 2px;
-		color: #2a2840;
-		background-color: #dcd6c4;
-		border: 2px solid #2a2840;
-		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
-		z-index: 100;
-
-		.heading
+		.menu
 		{
-			padding: 3px 8px;
-			font-size: 11px;
-			font-weight: 700;
-			letter-spacing: 1px;
-			color: #dcd6c4;
-			background-color: #6e6a5c;
-			white-space: nowrap;
-		}
+			border: 1px solid $edge;
+			border-radius: 12px;
+			box-shadow: 0 10px 28px $shadow;
 
-		.item
-		{
-			flex-direction: row;
-			align-items: center;
-			gap: 6px;
-			padding: 4px 8px;
-			font-size: 12px;
-			font-weight: 700;
-			white-space: nowrap;
-			cursor: pointer;
-
-			i
+			.heading
 			{
-				font-size: 14px;
-			}
-
-			&:hover
-			{
-				color: #f2eee2;
-				background-color: #2a2840;
-			}
-
-			&.quit:hover
-			{
-				background-color: #a0403a;
+				border-radius: 8px;
 			}
 		}
 	}
-}
 
-// Where headless apps' panels run. No size and nothing drawn, but still in the tree, so they tick.
-.services
-{
-	position: absolute;
-	width: 0;
-	height: 0;
-	overflow: hidden;
-	pointer-events: none;
-}
-
-// Under an open taskbar menu, to close it on a click anywhere else.
-.menu-backdrop
-{
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	pointer-events: all;
-}
-
-// The seat is free: takes the clicks until the player sits.
-.sit
-{
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	pointer-events: all;
-}
-
-// Another player has the seat: dims the screen a little and takes the clicks.
-.in-use
-{
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: 100%;
-	height: 100%;
-	pointer-events: all;
-	justify-content: center;
-	align-items: flex-start;
-	padding-top: 8px;
-
-	> .badge
+	.menu .item
 	{
-		gap: 4px;
-		align-items: center;
-		padding: 2px 8px;
 		border-radius: 8px;
-		background-color: rgba( 20, 18, 36, 0.8 );
-		color: white;
-		font-size: 11px;
+	}
 
-		> i
+	.window > .titlebar > .shield .tooltip
+	{
+		color: #ffffff;
+		background-color: $tip;
+		border: 0;
+		border-radius: 8px;
+	}
+
+	.title
+	{
+		color: #ffffff;
+		opacity: 0.35;
+	}
+}
+
+// Paper dark: the title bars stay dark, as the windows are.
+@mixin paper-dark-chrome
+{
+	.window
+	{
+		&.focused
 		{
-			font-size: 14px;
+			border-color: #8b88ad;
+		}
+
+		> .titlebar
+		{
+			color: #c9c6e0;
+			background-color: #3c3a5a;
+		}
+
+		&.focused > .titlebar
+		{
+			color: #f2eee2;
+			background-color: #55537a;
 		}
 	}
 }
+
+// The Transparency setting: how much of what is behind a window, the taskbar or a menu shows through it, from nothing
+// (clear-0: solid) to a good deal (clear-4). $base is the fill as the level's alpha is applied to it.
+@mixin glass-fill( $fill )
+{
+	.window, .taskbar, .menu
+	{
+		background-color: $fill;
+	}
+}
+
+// The Blur setting: how strongly a window, the taskbar or a menu blurs what is behind it.
+@mixin glass-blur( $radius )
+{
+	.window, .taskbar, .menu
+	{
+		backdrop-filter-blur: $radius;
+	}
+}
+
+@include desktop-style;
+
+@import "Themes/_paper-dark.scss";
+NaviDesktop.theme-paper.scheme-dark
+{
+	background-color: #0f0e1d;
+}
+
+.theme-paper.scheme-dark
+{
+	@include desktop-style;
+	@include paper-dark-chrome;
+}
+
+@import "Themes/_glass-light.scss";
+NaviDesktop.theme-glass.scheme-light
+{
+	color: #1d2233;
+	background-image: linear-gradient( 135deg, #8fb1ff 0%, #b9a2ff 52%, #ffb3d1 100% );
+}
+
+.theme-glass.scheme-light
+{
+	@include desktop-style;
+	@include glass-chrome( #1d2233, rgba( 255, 255, 255, 0.7 ), rgba( 255, 255, 255, 0.95 ), rgba( 255, 255, 255, 0.3 ), rgba( 255, 255, 255, 0.5 ), rgba( 255, 255, 255, 0.55 ), #3b6cf6, rgba( 40, 52, 110, 0.28 ), rgba( 24, 30, 56, 0.88 ) );
+
+	.wallpaper
+	{
+		> .orb.o1 { background-color: rgba( 255, 255, 255, 0.5 ); }
+		> .orb.o2 { background-color: rgba( 80, 120, 255, 0.55 ); }
+		> .orb.o3 { background-color: rgba( 255, 120, 180, 0.55 ); }
+	}
+}
+
+.theme-glass.scheme-light.clear-0 { @include glass-fill( rgba( 244, 247, 255, 1 ) ); }
+.theme-glass.scheme-light.clear-1 { @include glass-fill( rgba( 244, 247, 255, 0.86 ) ); }
+.theme-glass.scheme-light.clear-2 { @include glass-fill( rgba( 244, 247, 255, 0.72 ) ); }
+.theme-glass.scheme-light.clear-3 { @include glass-fill( rgba( 244, 247, 255, 0.56 ) ); }
+.theme-glass.scheme-light.clear-4 { @include glass-fill( rgba( 244, 247, 255, 0.4 ) ); }
+
+@import "Themes/_glass-dark.scss";
+NaviDesktop.theme-glass.scheme-dark
+{
+	color: #eef1fb;
+	background-image: linear-gradient( 135deg, #0a0f2e 0%, #2a1a63 55%, #0c3b5e 100% );
+}
+
+.theme-glass.scheme-dark
+{
+	@include desktop-style;
+	@include glass-chrome( #eef1fb, rgba( 255, 255, 255, 0.16 ), rgba( 255, 255, 255, 0.34 ), rgba( 255, 255, 255, 0.06 ), rgba( 255, 255, 255, 0.1 ), rgba( 255, 255, 255, 0.1 ), #4f7bff, rgba( 0, 0, 0, 0.45 ), rgba( 8, 10, 24, 0.92 ) );
+
+	.wallpaper
+	{
+		> .orb.o1 { background-color: rgba( 120, 80, 255, 0.5 ); }
+		> .orb.o2 { background-color: rgba( 40, 130, 255, 0.45 ); }
+		> .orb.o3 { background-color: rgba( 255, 70, 170, 0.4 ); }
+	}
+}
+
+.theme-glass.scheme-dark.clear-0 { @include glass-fill( rgba( 26, 29, 48, 1 ) ); }
+.theme-glass.scheme-dark.clear-1 { @include glass-fill( rgba( 26, 29, 48, 0.86 ) ); }
+.theme-glass.scheme-dark.clear-2 { @include glass-fill( rgba( 26, 29, 48, 0.72 ) ); }
+.theme-glass.scheme-dark.clear-3 { @include glass-fill( rgba( 26, 29, 48, 0.56 ) ); }
+.theme-glass.scheme-dark.clear-4 { @include glass-fill( rgba( 26, 29, 48, 0.4 ) ); }
+
+.theme-glass.blur-1 { @include glass-blur( 6px ); }
+.theme-glass.blur-2 { @include glass-blur( 14px ); }
+.theme-glass.blur-3 { @include glass-blur( 26px ); }
+.theme-glass.blur-4 { @include glass-blur( 44px ); }

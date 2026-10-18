@@ -195,11 +195,56 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.GetVersion( this )` | Goes up on every change. Poll it to know when to refresh | |
 | `Navi.GetDisplayScale( this )` | The display scale (1 is 100%) and the scales the player can pick | |
 | `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
+| `Navi.GetTheme( this )` | The theme, color scheme, blur level and transparency level | |
+| `Navi.SetTheme( this, theme )`, `SetColorScheme`, `SetBlurLevel`, `SetTransparencyLevel` | Change the look. See Theming | `navi.settings.change` |
 | `Navi.GetPermissions( this )`, `RequestPermissions`, `HasRoot` | See below | |
 
+## Theming
+
+The player picks the look of the whole computer in Settings, under Theming, and apps follow it. There are two system-wide settings and two Glass-only ones:
+
+- **Theme**: `Paper` (flat, opaque, hard edges; the original look) or `Glass` (rounded, translucent surfaces that blur what is behind them, over a colorful wallpaper).
+- **Color scheme**: `Light` or `Dark`, for every theme.
+- **Blur** (Glass): None, Low, Medium, High or Max (levels 0 to 4).
+- **Transparency** (Glass): None is solid, up to Max, which shows the most of what is behind (levels 0 to 4).
+
+All four are saved with the computer and shown to every player at it. Apps keep using the engine's own components; there is nothing to call.
+
+### Make an app follow the theme
+
+The engine's SCSS has no CSS variables and no `.dark &`, so a style sheet is written once, as a mixin, and included once per look under the classes the desktop puts on its root panel (`theme-paper` or `theme-glass`, `scheme-light` or `scheme-dark`, `blur-0` to `blur-4`, `clear-0` to `clear-4`; see `NaviThemeClasses`). Colors are palette variables from `Code/Navi/Themes`, named for the Paper light color they replace (`$ink-t` for text, `$surface-bg` for a fill, `$line-bc` for a border). Look at `Apps/Settings/Settings.razor.scss` for the pattern:
+
+```scss
+@import "../../Themes/_paper-light.scss";
+
+@mixin settings-style
+{
+	Settings
+	{
+		color: $ink-t;
+
+		.sidebar { background-color: $surface2-bg; border-right: 1px solid $line-bc; }
+	}
+}
+
+@include settings-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark { @include settings-style; }
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light { @include settings-style; }
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark { @include settings-style; }
+```
+
+A color that isn't a palette variable (a danger red, a warning yellow) is the same in every look. The palette files are generated: change a color in `tools/generate-theme.ps1`, run it, and commit what it writes. A Store app can't import the library's files, so it styles itself the same way with its own colors under those classes, or leaves its own look alone.
+
+The desktop's own chrome (windows, taskbar, menus, the wallpaper) is in `NaviDesktop.razor.scss`, where Glass also gets its blur (`backdrop-filter-blur`) and its fill transparency from the `blur-N` and `clear-N` classes.
 ## Saving
 
-Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale and the theme, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
 
 - **Windows open where they were.** Like a window manager, the computer remembers each window's position, size and whether it was maximized (`WindowPlacements`, one per window key) when it closes and when the computer saves, and opens it there next time. Apps don't do anything for it and can't set it. What the app's manifest no longer allows (resizing, maximizing) is dropped, and the desktop keeps the window inside the screen. Uninstalling an app forgets its windows. Only the host keeps placements; clients aren't sent them.
 - **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.

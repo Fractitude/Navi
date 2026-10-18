@@ -311,6 +311,94 @@ public sealed partial class NaviComputer : Component
 	static bool IsDisplayScale( float scale ) => DisplayScales.Any( x => System.MathF.Abs( x - scale ) < 0.001f );
 
 	/// <summary>
+	/// The highest blur and transparency level. Both go from 0 (none) to this, in steps the style sheets define.
+	/// </summary>
+	public const int MaxThemeLevel = Navi.MaxThemeLevel;
+
+	public const int DefaultBlurLevel = 2;
+	public const int DefaultTransparencyLevel = 2;
+
+	/// <summary>
+	/// The theme the desktop, its windows and the apps are drawn in.
+	/// </summary>
+	[Property] public Navi.Theme Theme { get; set; } = Navi.Theme.Paper;
+
+	/// <summary>
+	/// Light or dark. Every theme has both.
+	/// </summary>
+	[Property] public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;
+
+	/// <summary>
+	/// How strongly the Glass theme blurs what is behind a surface, 0 (not at all) to <see cref="MaxThemeLevel"/>.
+	/// </summary>
+	[Property, Range( 0, MaxThemeLevel )] public int BlurLevel { get; set; } = DefaultBlurLevel;
+
+	/// <summary>
+	/// How much of what is behind a surface shows through it in the Glass theme, 0 (nothing: solid) to
+	/// <see cref="MaxThemeLevel"/>.
+	/// </summary>
+	[Property, Range( 0, MaxThemeLevel )] public int TransparencyLevel { get; set; } = DefaultTransparencyLevel;
+
+	/// <summary>
+	/// The classes the desktop and the secure layer put on their root panels for the look above, e.g.
+	/// <c>theme-glass scheme-dark blur-2 clear-2</c>. See <see cref="NaviThemeClasses"/>.
+	/// </summary>
+	public string ThemeClasses =>
+		$"{NaviThemeClasses.Of( Theme )} {NaviThemeClasses.Of( ColorScheme )} blur-{BlurLevel} clear-{TransparencyLevel}";
+
+	/// <summary>
+	/// Set <see cref="Theme"/>. Returns false if it isn't a theme.
+	/// </summary>
+	public bool SetTheme( Navi.Theme theme )
+	{
+		if ( !IsAuthority || !System.Enum.IsDefined( theme ) )
+			return false;
+
+		Theme = theme;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Set <see cref="ColorScheme"/>. Returns false if it isn't a scheme.
+	/// </summary>
+	public bool SetColorScheme( Navi.ColorScheme scheme )
+	{
+		if ( !IsAuthority || !System.Enum.IsDefined( scheme ) )
+			return false;
+
+		ColorScheme = scheme;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Set <see cref="BlurLevel"/>. Returns false if it is out of range.
+	/// </summary>
+	public bool SetBlurLevel( int level )
+	{
+		if ( !IsAuthority || level is < 0 or > MaxThemeLevel )
+			return false;
+
+		BlurLevel = level;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Set <see cref="TransparencyLevel"/>. Returns false if it is out of range.
+	/// </summary>
+	public bool SetTransparencyLevel( int level )
+	{
+		if ( !IsAuthority || level is < 0 or > MaxThemeLevel )
+			return false;
+
+		TransparencyLevel = level;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
 	public int Version { get; private set; }
@@ -573,6 +661,10 @@ public sealed partial class NaviComputer : Component
 		RootApps = RootApps?.ToList() ?? new(),
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		DisplayScale = DisplayScale,
+		Theme = Theme,
+		ColorScheme = ColorScheme,
+		BlurLevel = BlurLevel,
+		TransparencyLevel = TransparencyLevel,
 		WindowPlacements = placements ? CapturePlacements() : new(),
 	};
 
@@ -609,6 +701,11 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 
 		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
+
+		Theme = System.Enum.IsDefined( save.Theme ) ? save.Theme : Navi.Theme.Paper;
+		ColorScheme = System.Enum.IsDefined( save.ColorScheme ) ? save.ColorScheme : Navi.ColorScheme.Light;
+		BlurLevel = int.Clamp( save.BlurLevel, 0, MaxThemeLevel );
+		TransparencyLevel = int.Clamp( save.TransparencyLevel, 0, MaxThemeLevel );
 
 		// Whether a window may be maximized or sized is checked when it opens, against its manifest at that time.
 		windowPlacements.Clear();

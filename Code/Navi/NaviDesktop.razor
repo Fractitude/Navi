@@ -2,8 +2,13 @@
 @inherits PanelComponent
 @namespace Sandbox
 
-<root>
+<root class="@Computer.ThemeClasses">
 	<div class="screen">
+		<div class="wallpaper">
+			<div class="orb o1"></div>
+			<div class="orb o2"></div>
+			<div class="orb o3"></div>
+		</div>
 		<div class="title">COPLAND OS</div>
 
 		@* Back to front: panels draw in child order, and s&box ignores z-index for that. *@
@@ -969,5 +974,5 @@
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() =>
 		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, TrayMenuApp, Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated );
+			Computer?.IsSeated, Computer?.ThemeClasses );
 }

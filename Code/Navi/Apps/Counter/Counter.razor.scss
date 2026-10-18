@@ -1,41 +1,66 @@
-Counter
-{
-	width: 180px;
-	height: 120px;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	padding: 8px;
-	gap: 8px;
-}
+@import "../../Themes/_paper-light.scss";
 
-.count
+@mixin counter-style
 {
-	font-size: 40px;
-	font-weight: 700;
-}
-
-.buttons
-{
-	flex-direction: row;
-	gap: 8px;
-}
-
-.button
-{
-	width: 48px;
-	height: 28px;
-	justify-content: center;
-	align-items: center;
-	font-size: 18px;
-	font-weight: 700;
-	color: #f2eee2;
-	background-color: #2a2840;
-	border: 1px solid #4a4638;
-	cursor: pointer;
-
-	&:hover
+	Counter
 	{
-		background-color: #4a4638;
+		width: 180px;
+		height: 120px;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		padding: 8px;
+		gap: 8px;
 	}
+
+	.count
+	{
+		font-size: 40px;
+		font-weight: 700;
+	}
+
+	.buttons
+	{
+		flex-direction: row;
+		gap: 8px;
+	}
+
+	.button
+	{
+		width: 48px;
+		height: 28px;
+		justify-content: center;
+		align-items: center;
+		font-size: 18px;
+		font-weight: 700;
+		color: $paper-t;
+		background-color: $ink-bg;
+		border: 1px solid $deep-bc;
+		cursor: pointer;
+
+		&:hover
+		{
+			background-color: $deep-bg;
+		}
+	}
+}
+
+@include counter-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
+{
+	@include counter-style;
+}
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
+{
+	@include counter-style;
+}
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
+{
+	@include counter-style;
 }

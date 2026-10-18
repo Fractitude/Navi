@@ -1,399 +1,424 @@
-Packages
-{
-	// The filter menu is positioned against this panel, not against the window it sits in.
-	position: relative;
-	width: 320px;
-	height: 200px;
-	flex-direction: column;
-	padding: 6px;
-	gap: 6px;
-}
+@import "../../Themes/_paper-light.scss";
 
-.tabs
+@mixin packages-style
 {
-	flex-shrink: 0;
-	flex-direction: row;
-	align-items: center;
-	gap: 4px;
-}
-
-.tab
-{
-	padding: 3px 10px;
-	font-size: 12px;
-	font-weight: 700;
-	color: #2a2840;
-	background-color: #c9c3b0;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&.active
+	Packages
 	{
-		color: #f2eee2;
-		background-color: #2a2840;
-		border-color: #2a2840;
+		// The filter menu is positioned against this panel, not against the window it sits in.
+		position: relative;
+		width: 320px;
+		height: 200px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
 	}
 
-	&:hover
+	.tabs
 	{
-		border-color: #2a2840;
-	}
-}
-
-.spacer
-{
-	flex-grow: 1;
-}
-
-// The filter button, at the right edge of the tabs row while the Apps tab is up.
-.filter
-{
-	width: 20px;
-	height: 20px;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	font-size: 16px;
-	color: #2a2840;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&:hover
-	{
-		color: #f2eee2;
-		background-color: #2a2840;
-		border-color: #2a2840;
-	}
-}
-
-// The kinds of app the list can show, under the tabs row's right edge: the padding, then the row's height. Last
-// in the panel, so it draws over the list.
-.filter-menu
-{
-	position: absolute;
-	top: 34px;
-	right: 6px;
-	// Grows to fit the longest item.
-	min-width: 120px;
-	flex-direction: column;
-	padding: 2px;
-	color: #2a2840;
-	background-color: #dcd6c4;
-	border: 2px solid #2a2840;
-	box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
-
-	.item
-	{
+		flex-shrink: 0;
 		flex-direction: row;
 		align-items: center;
 		gap: 4px;
-		padding: 4px 12px 4px 6px;
+	}
+
+	.tab
+	{
+		padding: 3px 10px;
 		font-size: 12px;
 		font-weight: 700;
-		white-space: nowrap;
+		color: $ink-t;
+		background-color: $surface2-bg;
+		border: 1px solid $line-bc;
 		cursor: pointer;
 
-		i
+		&.active
 		{
-			width: 14px;
-			flex-shrink: 0;
-			font-size: 14px;
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
 		}
 
 		&:hover
 		{
-			color: #f2eee2;
-			background-color: #2a2840;
+			border-color: $ink-bc;
+		}
+	}
+
+	.spacer
+	{
+		flex-grow: 1;
+	}
+
+	// The filter button, at the right edge of the tabs row while the Apps tab is up.
+	.filter
+	{
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		justify-content: center;
+		align-items: center;
+		font-size: 16px;
+		color: $ink-t;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
+		}
+	}
+
+	// The kinds of app the list can show, under the tabs row's right edge: the padding, then the row's height. Last
+	// in the panel, so it draws over the list.
+	.filter-menu
+	{
+		position: absolute;
+		top: 34px;
+		right: 6px;
+		// Grows to fit the longest item.
+		min-width: 120px;
+		flex-direction: column;
+		padding: 2px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+		.item
+		{
+			flex-direction: row;
+			align-items: center;
+			gap: 4px;
+			padding: 4px 12px 4px 6px;
+			font-size: 12px;
+			font-weight: 700;
+			white-space: nowrap;
+			cursor: pointer;
+
+			i
+			{
+				width: 14px;
+				flex-shrink: 0;
+				font-size: 14px;
+			}
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+		}
+	}
+
+	// Under the filter menu, to close it on a click anywhere else. It starts below the tabs row, so the tabs and the
+	// button above it stay clickable while the menu is up.
+	.filter-backdrop
+	{
+		position: absolute;
+		top: 34px;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		pointer-events: all;
+	}
+
+	// The Store search field. The engine's TextEntry is dark; Navi's panels are paper.
+	.search
+	{
+		flex-shrink: 0;
+
+		.textentry
+		{
+			width: 100%;
+			min-width: 0;
+			padding: 3px 6px;
+			font-size: 11px;
+			color: $ink-t;
+			background-color: $paper-bg;
+			border: 1px solid $line-bc;
+		}
+	}
+
+	// Scrolling is the panel's own styling, like the web: auto puts a bar there only when the entries don't all fit,
+	// and no gutter means no space is kept for it while they do.
+	.list
+	{
+		flex-grow: 1;
+		flex-direction: column;
+		gap: 4px;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: #8a8472 transparent;
+
+		// The engine draws the bar as a pill (a 100px radius, wider than its own track); these panels are square, so
+		// it gets a couple of pixels of rounding, which on a 6px-wide thumb is enough.
+		scrollbar > .thumb
+		{
+			border-radius: 2px;
+		}
+	}
+
+	// Room for the scrollbar, only while the list has one: it is drawn over the content, and a gutter would keep
+	// the same room when there is nothing to scroll.
+	.list.scrolling
+	{
+		padding-right: 10px;
+	}
+
+	// A message about the last action, e.g. a denied permission. Click to dismiss.
+	.notice
+	{
+		flex-shrink: 0;
+		padding: 4px 6px;
+		font-size: 10px;
+		color: $paper-t;
+		background-color: #8a3a3a;
+		cursor: pointer;
+	}
+
+	.status
+	{
+		padding: 12px 4px;
+		justify-content: center;
+		font-size: 11px;
+		opacity: 0.7;
+	}
+
+	// How much of the Store the list holds, and the way to the rest of it.
+	.footer
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+		padding-top: 4px;
+		border-top: 1px solid $line-bc;
+
+		.count
+		{
+			flex-grow: 1;
+			font-size: 10px;
+			opacity: 0.7;
+		}
+	}
+
+	.row
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 8px;
+		padding: 4px;
+		background-color: $surface2-bg;
+		border: 1px solid $line-bc;
+	}
+
+	// A Store entry: the row, and its details when expanded.
+	.entry
+	{
+		flex-shrink: 0;
+		flex-direction: column;
+		background-color: $surface2-bg;
+		border: 1px solid $line-bc;
+
+		> .row
+		{
+			background-color: transparent;
+			border-width: 0;
+		}
+	}
+
+	.expand
+	{
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+		justify-content: center;
+		align-items: center;
+		font-size: 16px;
+		color: $ink-t;
+		border: 1px solid $line-bc;
+		cursor: pointer;
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
+		}
+	}
+
+	.details
+	{
+		flex-direction: column;
+		gap: 6px;
+		margin: 0 4px 4px 4px;
+		padding: 6px 4px 2px 4px;
+		border-top: 1px solid $line-bc;
+	}
+
+	.about
+	{
+		font-size: 10px;
+		white-space: normal;
+	}
+
+	.facts
+	{
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.fact
+	{
+		flex-direction: row;
+		align-items: center;
+		gap: 5px;
+		font-size: 10px;
+
+		i
+		{
+			font-size: 11px;
+			opacity: 0.7;
+		}
+
+		.key
+		{
+			width: 46px;
+			flex-shrink: 0;
+			opacity: 0.7;
+		}
+
+		.value
+		{
+			font-weight: 700;
+		}
+	}
+
+	.icon
+	{
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
+		justify-content: center;
+		align-items: center;
+		font-size: 16px;
+		border: 2px solid $deep-bc;
+	}
+
+	// The package's thumbnail. Scoped to the image: a bare .thumb also styled the scrollbar's thumb, which is a panel
+	// with the same class, and made it wider than its track.
+	img.thumb
+	{
+		width: 28px;
+		height: 28px;
+		flex-shrink: 0;
+		background-color: $ink-bg;
+		border: 2px solid $deep-bc;
+	}
+
+	.info
+	{
+		flex-grow: 1;
+		flex-shrink: 1;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.title-row
+	{
+		flex-direction: row;
+		align-items: center;
+		gap: 5px;
+	}
+
+	// Apps from NaviStore.OfficialOrgs.
+	.official
+	{
+		width: 14px;
+		height: 14px;
+		flex-shrink: 0;
+		justify-content: center;
+		align-items: center;
+		border-radius: 50%;
+		color: $ink-t;
+		background-color: #f2d64a;
+		border: 1px solid $ink-bc;
+
+		i
+		{
+			font-size: 10px;
+		}
+	}
+
+	// A system app, which asks for full system access.
+	.root
+	{
+		flex-shrink: 0;
+		font-size: 12px;
+		color: $ink-t;
+	}
+
+	.name
+	{
+		font-size: 13px;
+		font-weight: 700;
+	}
+
+	.description
+	{
+		font-size: 10px;
+		opacity: 0.7;
+	}
+
+	.button
+	{
+		flex-shrink: 0;
+		padding: 3px 8px;
+		font-size: 11px;
+		font-weight: 700;
+		color: $paper-t;
+		background-color: $mid-bg;
+		border: 1px solid $ink-bc;
+		cursor: pointer;
+
+		&.install
+		{
+			background-color: $ink-bg;
+		}
+
+		&.disabled
+		{
+			opacity: 0.6;
+			cursor: default;
+			pointer-events: none;
+		}
+
+		&:hover
+		{
+			background-color: $deep-bg;
 		}
 	}
 }
 
-// Under the filter menu, to close it on a click anywhere else. It starts below the tabs row, so the tabs and the
-// button above it stay clickable while the menu is up.
-.filter-backdrop
+@include packages-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
 {
-	position: absolute;
-	top: 34px;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	pointer-events: all;
+	@include packages-style;
 }
 
-// The Store search field. The engine's TextEntry is dark; Navi's panels are paper.
-.search
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
 {
-	flex-shrink: 0;
-
-	.textentry
-	{
-		width: 100%;
-		min-width: 0;
-		padding: 3px 6px;
-		font-size: 11px;
-		color: #2a2840;
-		background-color: #f2eee2;
-		border: 1px solid #8a8472;
-	}
+	@include packages-style;
 }
 
-// Scrolling is the panel's own styling, like the web: auto puts a bar there only when the entries don't all fit,
-// and no gutter means no space is kept for it while they do.
-.list
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
 {
-	flex-grow: 1;
-	flex-direction: column;
-	gap: 4px;
-	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: #8a8472 transparent;
-
-	// The engine draws the bar as a pill (a 100px radius, wider than its own track); these panels are square, so
-	// it gets a couple of pixels of rounding, which on a 6px-wide thumb is enough.
-	scrollbar > .thumb
-	{
-		border-radius: 2px;
-	}
-}
-
-// Room for the scrollbar, only while the list has one: it is drawn over the content, and a gutter would keep
-// the same room when there is nothing to scroll.
-.list.scrolling
-{
-	padding-right: 10px;
-}
-
-// A message about the last action, e.g. a denied permission. Click to dismiss.
-.notice
-{
-	flex-shrink: 0;
-	padding: 4px 6px;
-	font-size: 10px;
-	color: #f2eee2;
-	background-color: #8a3a3a;
-	cursor: pointer;
-}
-
-.status
-{
-	padding: 12px 4px;
-	justify-content: center;
-	font-size: 11px;
-	opacity: 0.7;
-}
-
-// How much of the Store the list holds, and the way to the rest of it.
-.footer
-{
-	flex-shrink: 0;
-	flex-direction: row;
-	align-items: center;
-	gap: 4px;
-	padding-top: 4px;
-	border-top: 1px solid #8a8472;
-
-	.count
-	{
-		flex-grow: 1;
-		font-size: 10px;
-		opacity: 0.7;
-	}
-}
-
-.row
-{
-	flex-shrink: 0;
-	flex-direction: row;
-	align-items: center;
-	gap: 8px;
-	padding: 4px;
-	background-color: #c9c3b0;
-	border: 1px solid #8a8472;
-}
-
-// A Store entry: the row, and its details when expanded.
-.entry
-{
-	flex-shrink: 0;
-	flex-direction: column;
-	background-color: #c9c3b0;
-	border: 1px solid #8a8472;
-
-	> .row
-	{
-		background-color: transparent;
-		border-width: 0;
-	}
-}
-
-.expand
-{
-	width: 20px;
-	height: 20px;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	font-size: 16px;
-	color: #2a2840;
-	border: 1px solid #8a8472;
-	cursor: pointer;
-
-	&:hover
-	{
-		color: #f2eee2;
-		background-color: #2a2840;
-		border-color: #2a2840;
-	}
-}
-
-.details
-{
-	flex-direction: column;
-	gap: 6px;
-	margin: 0 4px 4px 4px;
-	padding: 6px 4px 2px 4px;
-	border-top: 1px solid #8a8472;
-}
-
-.about
-{
-	font-size: 10px;
-	white-space: normal;
-}
-
-.facts
-{
-	flex-direction: column;
-	gap: 2px;
-}
-
-.fact
-{
-	flex-direction: row;
-	align-items: center;
-	gap: 5px;
-	font-size: 10px;
-
-	i
-	{
-		font-size: 11px;
-		opacity: 0.7;
-	}
-
-	.key
-	{
-		width: 46px;
-		flex-shrink: 0;
-		opacity: 0.7;
-	}
-
-	.value
-	{
-		font-weight: 700;
-	}
-}
-
-.icon
-{
-	width: 28px;
-	height: 28px;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	font-size: 16px;
-	border: 2px solid #4a4638;
-}
-
-// The package's thumbnail. Scoped to the image: a bare .thumb also styled the scrollbar's thumb, which is a panel
-// with the same class, and made it wider than its track.
-img.thumb
-{
-	width: 28px;
-	height: 28px;
-	flex-shrink: 0;
-	background-color: #2a2840;
-	border: 2px solid #4a4638;
-}
-
-.info
-{
-	flex-grow: 1;
-	flex-shrink: 1;
-	flex-direction: column;
-	overflow: hidden;
-}
-
-.title-row
-{
-	flex-direction: row;
-	align-items: center;
-	gap: 5px;
-}
-
-// Apps from NaviStore.OfficialOrgs.
-.official
-{
-	width: 14px;
-	height: 14px;
-	flex-shrink: 0;
-	justify-content: center;
-	align-items: center;
-	border-radius: 50%;
-	color: #2a2840;
-	background-color: #f2d64a;
-	border: 1px solid #2a2840;
-
-	i
-	{
-		font-size: 10px;
-	}
-}
-
-// A system app, which asks for full system access.
-.root
-{
-	flex-shrink: 0;
-	font-size: 12px;
-	color: #2a2840;
-}
-
-.name
-{
-	font-size: 13px;
-	font-weight: 700;
-}
-
-.description
-{
-	font-size: 10px;
-	opacity: 0.7;
-}
-
-.button
-{
-	flex-shrink: 0;
-	padding: 3px 8px;
-	font-size: 11px;
-	font-weight: 700;
-	color: #f2eee2;
-	background-color: #6e6a5c;
-	border: 1px solid #2a2840;
-	cursor: pointer;
-
-	&.install
-	{
-		background-color: #2a2840;
-	}
-
-	&.disabled
-	{
-		opacity: 0.6;
-		cursor: default;
-		pointer-events: none;
-	}
-
-	&:hover
-	{
-		background-color: #4a4638;
-	}
+	@include packages-style;
 }

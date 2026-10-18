@@ -1,70 +1,95 @@
-Turntable
-{
-	width: 260px;
-	flex-direction: column;
-	padding: 6px;
-	gap: 6px;
-}
+@import "../../Themes/_paper-light.scss";
 
-.view
+@mixin turntable-style
 {
-	height: 200px;
-	border: 2px solid #4a4638;
-}
-
-.controls
-{
-	flex-direction: column;
-	gap: 4px;
-}
-
-.row
-{
-	flex-direction: row;
-	gap: 4px;
-}
-
-.button
-{
-	flex-grow: 1;
-	flex-basis: 0;
-	height: 26px;
-	flex-direction: row;
-	justify-content: center;
-	align-items: center;
-	gap: 4px;
-	font-size: 12px;
-	font-weight: 700;
-	color: #f2eee2;
-	background-color: #2a2840;
-	border: 1px solid #4a4638;
-	cursor: pointer;
-
-	i
+	Turntable
 	{
-		font-size: 16px;
+		width: 260px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
 	}
 
-	&.active
+	.view
 	{
-		color: #2a2840;
-		background-color: #e0b060;
+		height: 200px;
+		border: 2px solid $deep-bc;
 	}
 
-	&.spin, &.tint
+	.controls
 	{
-		flex-grow: 2;
+		flex-direction: column;
+		gap: 4px;
 	}
 
-	&:hover
+	.row
 	{
-		border-color: #f2eee2;
+		flex-direction: row;
+		gap: 4px;
+	}
+
+	.button
+	{
+		flex-grow: 1;
+		flex-basis: 0;
+		height: 26px;
+		flex-direction: row;
+		justify-content: center;
+		align-items: center;
+		gap: 4px;
+		font-size: 12px;
+		font-weight: 700;
+		color: $paper-t;
+		background-color: $ink-bg;
+		border: 1px solid $deep-bc;
+		cursor: pointer;
+
+		i
+		{
+			font-size: 16px;
+		}
+
+		&.active
+		{
+			color: $ink-t;
+			background-color: #e0b060;
+		}
+
+		&.spin, &.tint
+		{
+			flex-grow: 2;
+		}
+
+		&:hover
+		{
+			border-color: $paper-bc;
+		}
+	}
+
+	.swatch
+	{
+		width: 10px;
+		height: 10px;
+		border: 1px solid $paper-bc;
 	}
 }
 
-.swatch
+@include turntable-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
 {
-	width: 10px;
-	height: 10px;
-	border: 1px solid #f2eee2;
+	@include turntable-style;
+}
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
+{
+	@include turntable-style;
+}
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
+{
+	@include turntable-style;
 }
