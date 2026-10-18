@@ -167,6 +167,54 @@
 		}
 	}
 
+	// An app on the Notifications page: its icon and name, then its choices.
+	.app-row
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 8px;
+		padding: 4px 6px;
+		background-color: $paper-bg;
+		border: 1px solid $line-bc;
+
+		.icon
+		{
+			flex-shrink: 0;
+			width: 22px;
+			height: 22px;
+			justify-content: center;
+			align-items: center;
+			font-size: 14px;
+			border: 1px solid $deep-bc;
+		}
+
+		.name
+		{
+			flex-grow: 1;
+			flex-basis: 0;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 12px;
+			font-weight: 700;
+		}
+
+		.options
+		{
+			flex-shrink: 0;
+			padding-top: 0;
+		}
+	}
+
+	.empty
+	{
+		flex-shrink: 0;
+		font-size: 11px;
+		opacity: 0.7;
+	}
+
 	.notice
 	{
 		flex-shrink: 0;

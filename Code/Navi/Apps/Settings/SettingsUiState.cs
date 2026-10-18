@@ -8,6 +8,7 @@ public enum SettingsCategory
 	Display,
 	Theming,
 	Windows,
+	Notifications,
 	Security,
 }
 
@@ -26,6 +27,11 @@ public sealed record ScaleOption( float Scale, string Label, bool Selected );
 /// is what the action sends back, as an integer.
 /// </summary>
 public sealed record ThemeOption( int Value, string Label, bool Selected );
+
+/// <summary>
+/// An app on the Notifications page, with its two choices: On, and Muted.
+/// </summary>
+public sealed record NotificationAppRow( string AppId, string Name, string Icon, string Color, IReadOnlyList<ThemeOption> Options );
 
 /// <summary>
 /// Everything the Settings panel draws. Replaced whole by <see cref="SettingsViewModel"/> on every change.
@@ -70,6 +76,9 @@ public sealed record SettingsUiState
 
 	/// <summary>Windows: whether either kind of snapping is on, so the distance row applies.</summary>
 	public bool SnapsToAnything { get; init; }
+
+	/// <summary>Notifications: the apps that can send them, by name, each with whether it is muted.</summary>
+	public IReadOnlyList<NotificationAppRow> NotificationApps { get; init; } = [];
 
 	/// <summary>A message about the last change that failed, or null. Clicking it dismisses it.</summary>
 	public string Notice { get; init; }

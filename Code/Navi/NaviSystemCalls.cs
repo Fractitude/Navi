@@ -98,6 +98,27 @@ public static class NaviSystemCalls
 			case "tray.set":
 				return computer.SetTray( self, Opt( args, 0, "" ), Opt( args, 1, "" ), Opt<(string, string, string)[]>( args, 2, [] ) );
 
+			// Notifications. The desktop draws them with the app's name and icon, so an app sends them only as itself, and
+			// dismisses only its own.
+			case "notifications.send":
+				Require( process, NaviPermissions.Notify );
+				return computer.Notify( self, Opt( args, 0, "" ), Opt( args, 1, "" ), Opt( args, 2, false ) );
+
+			case "notifications.dismiss":
+				return computer.DismissNotification( Arg<int>( args, 0, method ), self );
+
+			case "notifications.apps":
+				return computer.NotifyingApps.Select( x => (x.Id, computer.IsNotificationsMuted( x.Id )) ).ToArray();
+
+			case "notifications.set-muted":
+			{
+				Require( process, NaviPermissions.ChangeSettings );
+
+				// Muting is the player's word against an app, so no app can take it back for itself.
+				var id = Arg<string>( args, 0, method );
+				return id != self && computer.SetNotificationsMuted( id, Arg<bool>( args, 1, method ) );
+			}
+
 			// Permissions.
 			case "permissions.get":
 				return process.IsRoot ? NaviPermissions.All.Select( x => x.Id ).ToArray() : process.Permissions.ToArray();

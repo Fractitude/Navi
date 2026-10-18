@@ -1,0 +1,102 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace Sandbox
+
+@* One notification, as a banner over the taskbar or in the notification list. The desktop draws all of it: the app's *@
+@* name and icon come from its manifest, never from the app, so a notification can't pass for another app's. Clicking it *@
+@* opens the app; the menu mutes the app's notifications. Its styles are in NaviDesktop.razor.scss. *@
+
+<root class="notification @( Muted ? "muted" : "" )" @onclick=@( () => OnOpen?.Invoke() )>
+	<div class="header">
+		<div class="icon" style="background-color: @( App?.Color ?? "#8a8472" );"><i>@( App?.Icon ?? "apps" )</i></div>
+		<div class="source">@( App?.Name ?? "Unknown app" )</div>
+		@if ( Muted )
+		{
+			<i class="muted-glyph">notifications_off</i>
+		}
+		<div class="age">@Age</div>
+		<div class="button" @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
+		     @onclick=@( ( PanelEvent e ) => Press( e, OnMenu ) )>
+			<i>more_horiz</i>
+		</div>
+		<div class="button close" @onclick=@( ( PanelEvent e ) => Press( e, OnClose ) )><i>close</i></div>
+	</div>
+
+	@if ( !string.IsNullOrEmpty( Notification?.Title ) )
+	{
+		<div class="subject">@Notification.Title</div>
+	}
+
+	@if ( !string.IsNullOrEmpty( Notification?.Text ) )
+	{
+		<div class="text">@Notification.Text</div>
+	}
+
+	@if ( MenuOpen )
+	{
+		<div class="menu" @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )>
+			<div class="item" @onclick=@( ( PanelEvent e ) => Press( e, OnMute ) )>
+				<i>@( Muted ? "notifications" : "notifications_off" )</i>
+				@( Muted ? $"Unmute {AppName}" : $"Mute {AppName}" )
+			</div>
+		</div>
+	}
+</root>
+
+@code
+{
+	public NaviNotification Notification { get; set; }
+
+	/// <summary>
+	/// The app that sent it, or null if this client doesn't have its manifest.
+	/// </summary>
+	public NaviAppInfo App { get; set; }
+
+	/// <summary>
+	/// The player muted the app: the notification came quietly.
+	/// </summary>
+	public bool Muted { get; set; }
+
+	public bool MenuOpen { get; set; }
+
+	/// <summary>The player clicked the notification itself.</summary>
+	public System.Action OnOpen { get; set; }
+
+	/// <summary>The player clicked the close button.</summary>
+	public System.Action OnClose { get; set; }
+
+	/// <summary>The player clicked the menu button.</summary>
+	public System.Action OnMenu { get; set; }
+
+	/// <summary>The player chose Mute or Unmute in the menu.</summary>
+	public System.Action OnMute { get; set; }
+
+	string AppName => App?.Name ?? "this app";
+
+	/// <summary>
+	/// How long ago the computer took it: "now", "5 min", "2 h", "3 d".
+	/// </summary>
+	string Age
+	{
+		get
+		{
+			var seconds = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (Notification?.PostedAt ?? 0);
+			return seconds < 60 ? "now"
+				: seconds < 60 * 60 ? $"{seconds / 60} min"
+				: seconds < 24 * 60 * 60 ? $"{seconds / (60 * 60)} h"
+				: $"{seconds / (24 * 60 * 60)} d";
+		}
+	}
+
+	/// <summary>
+	/// A button inside the notification: it runs, and the click doesn't also open the app.
+	/// </summary>
+	static void Press( PanelEvent e, System.Action action )
+	{
+		e.StopPropagation();
+		action?.Invoke();
+	}
+
+	protected override int BuildHash() =>
+		System.HashCode.Combine( Notification?.Id, App?.Name, App?.Icon, App?.Color, Muted, MenuOpen, Age );
+}

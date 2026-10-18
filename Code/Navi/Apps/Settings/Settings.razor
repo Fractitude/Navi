@@ -93,6 +93,37 @@
 				</div>
 				break;
 
+			case SettingsCategory.Notifications:
+				<div class="heading">Notifications</div>
+
+				<div class="setting">
+					<div class="name">Apps</div>
+					<div class="description">A muted app's notifications go to the list quietly: no sound, no banner.</div>
+				</div>
+
+				@foreach ( var row in UiState.NotificationApps )
+				{
+					<div class="app-row">
+						<div class="icon" style="background-color: @row.Color;"><i>@row.Icon</i></div>
+						<div class="name">@row.Name</div>
+						<div class="options">
+							@foreach ( var option in row.Options )
+							{
+								<div class="option @( option.Selected ? "active" : "" )"
+								     @onclick=@( () => Navi.Act( SettingsViewModel.ChooseMutedAction, row.AppId, option.Value.ToString() ) )>
+									@option.Label
+								</div>
+							}
+						</div>
+					</div>
+				}
+
+				@if ( UiState.NotificationApps.Count == 0 )
+				{
+					<div class="empty">No app here sends notifications.</div>
+				}
+				break;
+
 			case SettingsCategory.Security:
 				<div class="heading">Security</div>
 

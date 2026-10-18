@@ -808,6 +808,277 @@ NaviDesktop
 		}
 	}
 
+	// The unread count on the notification list's button.
+	.tray-icon > .badge
+	{
+		position: absolute;
+		top: -7px;
+		right: -7px;
+		min-width: 15px;
+		height: 15px;
+		padding: 0 3px;
+		justify-content: center;
+		align-items: center;
+		font-size: 9px;
+		font-weight: 700;
+		color: #ffffff;
+		background-color: #b8433b;
+		border-radius: 8px;
+		pointer-events: none;
+	}
+
+	// A notification (NaviNotificationCard), as a banner or in the list.
+	.notification
+	{
+		position: relative;
+		flex-shrink: 0;
+		flex-direction: column;
+		gap: 2px;
+		padding: 5px 6px 7px 8px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $line-bc;
+		pointer-events: all;
+		cursor: pointer;
+
+		&:hover
+		{
+			border-color: $paper-bc;
+		}
+
+		> .header
+		{
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+
+			> .icon
+			{
+				flex-shrink: 0;
+				width: 18px;
+				height: 18px;
+				justify-content: center;
+				align-items: center;
+				font-size: 12px;
+				color: $ink-t;
+				border: 1px solid $deep-bc;
+			}
+
+			// Doesn't count towards the width, so a long name is cut short rather than widening the banner. Not "app" or
+			// "title": the taskbar's icons and the wallpaper's title have those.
+			> .source
+			{
+				flex-grow: 1;
+				flex-basis: 0;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: 1px;
+				opacity: 0.8;
+			}
+
+			> .muted-glyph
+			{
+				flex-shrink: 0;
+				font-size: 12px;
+				opacity: 0.6;
+			}
+
+			> .age
+			{
+				flex-shrink: 0;
+				font-size: 10px;
+				white-space: nowrap;
+				opacity: 0.6;
+			}
+
+			> .button
+			{
+				flex-shrink: 0;
+				width: 18px;
+				height: 18px;
+				justify-content: center;
+				align-items: center;
+				font-size: 13px;
+				opacity: 0.6;
+				cursor: pointer;
+
+				&:hover
+				{
+					opacity: 1;
+					color: $paper-t;
+					background-color: $ink-bg;
+				}
+
+				&.close:hover
+				{
+					background-color: #a0403a;
+				}
+			}
+		}
+
+		> .subject
+		{
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 13px;
+			font-weight: 700;
+		}
+
+		> .text
+		{
+			font-size: 12px;
+			opacity: 0.85;
+		}
+
+		// The menu button's menu, under it.
+		> .menu
+		{
+			position: absolute;
+			top: 26px;
+			right: 4px;
+			flex-direction: column;
+			padding: 2px;
+			color: $ink-t;
+			background-color: $surface-bg;
+			border: 2px solid $ink-bc;
+			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+			z-index: 10;
+
+			.item
+			{
+				flex-direction: row;
+				align-items: center;
+				gap: 6px;
+				padding: 4px 8px;
+				font-size: 12px;
+				font-weight: 700;
+				white-space: nowrap;
+				cursor: pointer;
+
+				i
+				{
+					font-size: 14px;
+				}
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+				}
+			}
+		}
+	}
+
+	// New notifications' banners, over the taskbar's right end, newest at the bottom.
+	.toasts
+	{
+		position: absolute;
+		right: 8px;
+		bottom: 56px;
+		width: 300px;
+		flex-direction: column;
+		gap: 6px;
+		pointer-events: none;
+		z-index: 90;
+
+		> .toast
+		{
+			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+		}
+	}
+
+	// The notification list, above the bell.
+	.notification-center
+	{
+		position: absolute;
+		right: 8px;
+		bottom: 56px;
+		width: 320px;
+		max-height: 80%;
+		flex-direction: column;
+		gap: 6px;
+		padding: 8px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+		pointer-events: all;
+		z-index: 100;
+
+		> .header
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			align-items: center;
+			padding: 0 2px 0 4px;
+
+			> .heading
+			{
+				flex-grow: 1;
+				font-size: 11px;
+				font-weight: 700;
+				letter-spacing: 1px;
+				opacity: 0.7;
+			}
+
+			> .clear
+			{
+				padding: 3px 8px;
+				font-size: 11px;
+				font-weight: 700;
+				border: 1px solid $line-bc;
+				cursor: pointer;
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+					border-color: $ink-bc;
+				}
+			}
+		}
+
+		// Scrolling is the panel's own styling, as in the start menu.
+		> .list
+		{
+			flex-shrink: 1;
+			min-height: 0;
+			flex-direction: column;
+			gap: 6px;
+			padding-right: 6px;
+			overflow-y: auto;
+			scrollbar-width: thin;
+			scrollbar-color: #8a8472 transparent;
+
+			> .notification
+			{
+				background-color: $paper-bg;
+				border-width: 1px;
+			}
+
+			> .empty
+			{
+				flex-direction: row;
+				align-items: center;
+				justify-content: center;
+				gap: 6px;
+				padding: 18px 0;
+				font-size: 12px;
+				opacity: 0.6;
+
+				i
+				{
+					font-size: 16px;
+				}
+			}
+		}
+	}
+
 	// Where headless apps' panels run. No size and nothing drawn, but still in the tree, so they tick.
 	.services
 	{
@@ -1030,6 +1301,67 @@ NaviDesktop
 		}
 	}
 
+	.notification
+	{
+		border: 1px solid $edge;
+		border-radius: 12px;
+
+		> .header
+		{
+			> .icon
+			{
+				border: 1px solid $edge;
+				border-radius: 6px;
+			}
+
+			> .button
+			{
+				border-radius: 6px;
+
+				&:hover
+				{
+					color: #ffffff;
+					background-color: $accent;
+				}
+
+				&.close:hover
+				{
+					background-color: #e5534b;
+				}
+			}
+		}
+
+		> .menu
+		{
+			border: 1px solid $edge;
+			border-radius: 12px;
+			box-shadow: 0 10px 28px $shadow;
+		}
+	}
+
+	.toasts > .toast
+	{
+		box-shadow: 0 10px 28px $shadow;
+	}
+
+	.notification-center
+	{
+		border: 1px solid $edge;
+		border-radius: 16px;
+		box-shadow: 0 10px 28px $shadow;
+
+		> .header > .clear
+		{
+			border: 1px solid $edge;
+			border-radius: 8px;
+		}
+
+		> .list > .notification
+		{
+			background-color: $control;
+		}
+	}
+
 	.menu .item, .start-menu .context .item
 	{
 		border-radius: 8px;
@@ -1078,7 +1410,7 @@ NaviDesktop
 // (clear-0: solid) to a good deal (clear-4). $base is the fill as the level's alpha is applied to it.
 @mixin glass-fill( $fill )
 {
-	.window, .taskbar, .menu, .start-menu
+	.window, .taskbar, .menu, .start-menu, .toast, .notification-center
 	{
 		background-color: $fill;
 	}
@@ -1087,7 +1419,7 @@ NaviDesktop
 // The Blur setting: how strongly a window, the taskbar or a menu blurs what is behind it.
 @mixin glass-blur( $radius )
 {
-	.window, .taskbar, .menu, .start-menu
+	.window, .taskbar, .menu, .start-menu, .toast, .notification-center
 	{
 		backdrop-filter-blur: $radius;
 	}

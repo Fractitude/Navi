@@ -9,6 +9,7 @@
 //
 //     await Navi.Apps.LaunchAsync( "calculator" );
 //     var theme = await Navi.Settings.GetThemeAsync();
+//     await Navi.Notifications.SendAsync( "Download finished", "notes.txt is ready.", sound: true );
 //     Navi.Act( "press", "7" );
 //
 // A view model takes the Navi, not the panel. Calls go up to the computer as a "navi.call" panel event and are
@@ -90,6 +91,7 @@ public sealed class Navi
 		Apps = new AppCalls( this );
 		Settings = new SettingsCalls( this );
 		Store = new StoreCalls( this );
+		Notifications = new NotificationCalls( this );
 		Input = new InputState( this );
 	}
 
@@ -122,6 +124,11 @@ public sealed class Navi
 	/// The Store, where apps are published.
 	/// </summary>
 	public StoreCalls Store { get; }
+
+	/// <summary>
+	/// Notifications the app shows the player.
+	/// </summary>
+	public NotificationCalls Notifications { get; }
 
 	/// <summary>
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
@@ -410,6 +417,11 @@ public sealed class Navi
 		/// Change the computer's settings, such as the display scale.
 		/// </summary>
 		public const string ChangeSettings = "navi.settings.change";
+
+		/// <summary>
+		/// Send the player notifications.
+		/// </summary>
+		public const string Notify = "navi.notifications.post";
 	}
 
 	/// <summary>
@@ -710,6 +722,54 @@ public sealed class Navi
 		/// </summary>
 		public Task<bool> UninstallAsync( string ident ) => navi.CallAsync<bool>( "store.uninstall", ident );
 
+	}
+
+	/// <summary>
+	/// The longest a notification's title and text can be, in characters. More is cut off.
+	/// </summary>
+	public const int MaxNotificationTitle = 64, MaxNotificationText = 280;
+
+	/// <summary>
+	/// An app that can send notifications, and whether the player muted it.
+	/// </summary>
+	public sealed record NotificationApp( string AppId, bool Muted );
+
+	/// <summary>
+	/// Notifications: the computer shows them in a banner, with the app's name and icon, and keeps them in its notification
+	/// list until the player dismisses them. The player can mute an app; its notifications then go to the list quietly.
+	/// </summary>
+	public sealed class NotificationCalls( Navi navi )
+	{
+		/// <summary>
+		/// Show the player a notification, with a title (one line) and text, and the notification sound if
+		/// <paramref name="sound"/>. Needs <see cref="Permission.Notify"/>. Returns its id, for <see cref="DismissAsync"/>,
+		/// or 0 if the computer didn't take it (both title and text were empty). In a shared app only the host's copy
+		/// should call it.
+		/// </summary>
+		public Task<int> SendAsync( string title, string text = "", bool sound = false ) =>
+			navi.CallAsync<int>( "notifications.send", title ?? "", text ?? "", sound );
+
+		/// <summary>
+		/// Take one of this app's notifications out of the list, e.g. once what it said is no longer true. False if it
+		/// isn't there, or isn't this app's.
+		/// </summary>
+		public Task<bool> DismissAsync( int id ) => navi.CallAsync<bool>( "notifications.dismiss", id );
+
+		/// <summary>
+		/// The installed apps that can send notifications, and whether each is muted.
+		/// </summary>
+		public async Task<IReadOnlyList<NotificationApp>> ListAppsAsync()
+		{
+			var apps = await navi.CallAsync<(string, bool)[]>( "notifications.apps" );
+			return apps.Select( x => new NotificationApp( x.Item1, x.Item2 ) ).ToArray();
+		}
+
+		/// <summary>
+		/// Mute another app's notifications, or unmute them. Needs <see cref="Permission.ChangeSettings"/>. False if the app
+		/// isn't installed, or is this one.
+		/// </summary>
+		public Task<bool> SetMutedAsync( string appId, bool muted ) =>
+			navi.CallAsync<bool>( "notifications.set-muted", appId, muted );
 	}
 
 	/// <summary>

@@ -29,6 +29,11 @@ public static class NaviPermissions
 	public const string ChangeSettings = "navi.settings.change";
 
 	/// <summary>
+	/// Send the player notifications.
+	/// </summary>
+	public const string Notify = "navi.notifications.post";
+
+	/// <summary>
 	/// How a permission is shown to the player.
 	/// </summary>
 	public record Info( string Id, string Title, string Description, string Icon );
@@ -39,6 +44,7 @@ public static class NaviPermissions
 		new( InstallFromStore, "Use the Store", "Download apps from the Store and install them.", "cloud_download" ),
 		new( ManageApps, "Manage apps", "Close other apps' windows.", "tab" ),
 		new( ChangeSettings, "Change settings", "Change this computer's settings, such as the display scale.", "settings" ),
+		new( Notify, "Send notifications", "Show you notifications, which can play a sound.", "notifications" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );

@@ -537,6 +537,8 @@ public sealed partial class NaviComputer : Component
 			InstallSceneApps();
 			_ = DownloadInstalledPackagesAsync();
 		}
+
+		hasNotifications = true;
 	}
 
 	/// <summary>
@@ -677,6 +679,7 @@ public sealed partial class NaviComputer : Component
 		UpdateBackPlane();
 		UpdateSolid();
 		UpdateNetwork();
+		UpdateNotificationArrivals();
 
 		if ( !IsAuthority )
 			return;
@@ -771,6 +774,9 @@ public sealed partial class NaviComputer : Component
 			DismissPermissionRequest( request );
 
 		RestoreSave( save );
+
+		// What the save brings didn't arrive just now: no banners, no sound.
+		arrivedUpTo = -1;
 		savedJson = Json.Serialize( CaptureSave() );
 		savedVersion = Version;
 
@@ -802,6 +808,10 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		StartFavorites = StartFavorites?.ToList() ?? new(),
 		InstalledAt = InstalledAt is null ? new() : new( InstalledAt ),
+		Notifications = CaptureNotifications(),
+		MutedNotificationApps = MutedNotificationApps?.ToList() ?? new(),
+		LastNotificationId = LastNotificationId,
+		NotificationsReadUpTo = NotificationsReadUpTo,
 		LockKind = LockKind,
 		LockSalt = LockSalt,
 		LockVerifier = secrets ? lockVerifier : null,
@@ -851,6 +861,7 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
 		InstalledAt = save.InstalledAt is null ? new() : new( save.InstalledAt );
+		ApplyNotifications( save );
 
 		// A lock needs its salt, and on the host its verifier: clients are never sent that one.
 		var hasLock = System.Enum.IsDefined( save.LockKind ) && save.LockKind != NaviLockKind.None
@@ -1244,6 +1255,7 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder?.Remove( id );
 		StartFavorites?.Remove( id );
 		InstalledAt?.Remove( id );
+		ForgetNotifications( id );
 
 		var windowPrefix = id + NaviWindow.KeySeparator;
 		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )

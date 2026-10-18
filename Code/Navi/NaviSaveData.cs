@@ -21,6 +21,14 @@ public sealed class NaviComputerSave
 	public List<string> TaskbarOrder { get; set; } = new();
 	public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
 	public Dictionary<string, long> InstalledAt { get; set; } = new();
+
+	/// <summary>
+	/// The notification list, oldest first. See <see cref="NaviComputer.Notifications"/>.
+	/// </summary>
+	public List<NaviNotification> Notifications { get; set; } = new();
+	public List<string> MutedNotificationApps { get; set; } = new();
+	public int LastNotificationId { get; set; }
+	public int NotificationsReadUpTo { get; set; }
 	public NaviLockKind LockKind { get; set; }
 	public string LockSalt { get; set; }
 

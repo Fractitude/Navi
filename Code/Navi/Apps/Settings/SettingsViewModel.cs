@@ -25,6 +25,7 @@ public sealed class SettingsViewModel
 		(SettingsCategory.Display, "Display", "monitor"),
 		(SettingsCategory.Theming, "Theming", "palette"),
 		(SettingsCategory.Windows, "Windows", "web_asset"),
+		(SettingsCategory.Notifications, "Notifications", "notifications"),
 		(SettingsCategory.Security, "Security", "shield"),
 	];
 
@@ -45,6 +46,9 @@ public sealed class SettingsViewModel
 	bool snapToScreenEdges;
 	bool snapToWindows;
 	int snapDistance;
+
+	IReadOnlyList<Navi.AppInfo> apps = [];
+	IReadOnlyList<Navi.NotificationApp> notificationApps = [];
 
 	/// <summary>The computer's version when the settings were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -116,6 +120,10 @@ public sealed class SettingsViewModel
 	/// <summary>How close an edge has to get to snap, in panel pixels.</summary>
 	public void ChooseSnapDistance( int distance ) => _ = RunAsync( () => navi.Settings.SetSnapDistanceAsync( distance ), "the snap distance" );
 
+	/// <summary>Mute an app's notifications, or let them through again.</summary>
+	public void ChooseMuted( string appId, bool muted ) =>
+		_ = RunAsync( () => navi.Notifications.SetMutedAsync( appId, muted ), "the app's notifications" );
+
 	public void DismissNotice() => Update( uiState => uiState with { Notice = null } );
 
 	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
@@ -130,6 +138,7 @@ public sealed class SettingsViewModel
 	public const string ChooseSnapScreenAction = "choose-snap-screen";
 	public const string ChooseSnapWindowsAction = "choose-snap-windows";
 	public const string ChooseSnapDistanceAction = "choose-snap-distance";
+	public const string ChooseMutedAction = "choose-muted";
 	public const string DismissNoticeAction = "dismiss-notice";
 
 	/// <summary>
@@ -179,6 +188,11 @@ public sealed class SettingsViewModel
 
 			case ChooseSnapDistanceAction when int.TryParse( arg, out var value ) && value is >= 1 and <= Navi.MaxSnapDistance:
 				ChooseSnapDistance( value );
+				break;
+
+			case ChooseMutedAction when args is [{ Length: > 0 } appId, var value] && notificationApps.Any( x => x.AppId == appId )
+				&& int.TryParse( value, out var muted ) && muted is 0 or 1:
+				ChooseMuted( appId, muted == 1 );
 				break;
 
 			case DismissNoticeAction:
@@ -231,6 +245,8 @@ public sealed class SettingsViewModel
 			(theme, scheme, blurLevel, transparencyLevel) = await navi.Settings.GetThemeAsync();
 			wallpaper = await navi.Settings.GetWallpaperAsync();
 			(snapToScreenEdges, snapToWindows, snapDistance) = await navi.Settings.GetSnappingAsync();
+			apps = await navi.Apps.ListAsync();
+			notificationApps = await navi.Notifications.ListAppsAsync();
 
 			Update( uiState => uiState with
 			{
@@ -245,6 +261,7 @@ public sealed class SettingsViewModel
 				SnapWindowsOptions = BuildOnOffOptions( snapToWindows ),
 				SnapDistanceOptions = BuildSnapDistanceOptions(),
 				SnapsToAnything = snapToScreenEdges || snapToWindows,
+				NotificationApps = BuildNotificationApps(),
 			} );
 		}
 		catch ( System.Exception e )
@@ -286,6 +303,17 @@ public sealed class SettingsViewModel
 	/// </summary>
 	IReadOnlyList<ThemeOption> BuildSnapDistanceOptions() =>
 		SnapDistances.Append( snapDistance ).Distinct().Order().Select( x => new ThemeOption( x, $"{x} px", x == snapDistance ) ).ToArray();
+
+	/// <summary>
+	/// The apps that can send notifications, by name. On is sent back as 0 (not muted), Muted as 1.
+	/// </summary>
+	IReadOnlyList<NotificationAppRow> BuildNotificationApps() => notificationApps
+		.Select( x => (Setting: x, App: apps.FirstOrDefault( y => y.Id == x.AppId )) )
+		.Where( x => x.App is not null )
+		.OrderBy( x => x.App.Name, System.StringComparer.OrdinalIgnoreCase )
+		.Select( x => new NotificationAppRow( x.App.Id, x.App.Name, x.App.Icon, x.App.Color,
+			[new( 0, "On", !x.Setting.Muted ), new( 1, "Muted", x.Setting.Muted )] ) )
+		.ToArray();
 
 	void Update( System.Func<SettingsUiState, SettingsUiState> change ) =>
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };

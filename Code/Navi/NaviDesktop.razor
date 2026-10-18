@@ -71,7 +71,7 @@
 		}
 	</div>
 
-	@if ( MenuApp is not null || TrayMenuApp is not null || StartOpen )
+	@if ( MenuApp is not null || TrayMenuApp is not null || StartOpen || NotificationsOpen || NotificationMenu != 0 )
 	{
 		@* Catches clicks outside the menu, to close it. *@
 		<div class="menu-backdrop" @onmousedown=@(() => CloseMenus())></div>
@@ -80,6 +80,64 @@
 	@if ( StartOpen )
 	{
 		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart OnLock=@LockFromStart></NaviStartMenu>
+	}
+
+	@* New notifications, newest at the bottom, over the taskbar's right end. After the backdrop, so a banner's menu can be
+	   used. *@
+	@if ( toasts.Count > 0 )
+	{
+		<div class="toasts">
+			@foreach ( var notification in toasts )
+			{
+				var id = notification.Id;
+
+				<NaviNotificationCard @key=@id class="toast"
+				                      Notification=@notification
+				                      App=@( NaviAppRegistry.Find( notification.AppId ) )
+				                      Muted=@( Computer.IsNotificationsMuted( notification.AppId ) )
+				                      MenuOpen=@( NotificationMenu == id )
+				                      OnOpen=@( () => OpenNotification( id ) )
+				                      OnClose=@( () => HideToast( id ) )
+				                      OnMenu=@( () => ToggleNotificationMenu( id ) )
+				                      OnMute=@( () => ToggleMuted( notification.AppId ) )></NaviNotificationCard>
+			}
+		</div>
+	}
+
+	@* The notification list, above the bell. Every notification stays here until the player dismisses it. *@
+	@if ( NotificationsOpen )
+	{
+		<div class="notification-center" @onmousedown=@( () => NotificationMenu = 0 )>
+			<div class="header">
+				<div class="heading">Notifications</div>
+				@if ( Computer.Notifications.Count > 0 )
+				{
+					<div class="clear" @onclick=@( () => Computer.UserClearNotifications() )>Clear all</div>
+				}
+			</div>
+
+			<div class="list">
+				@foreach ( var notification in Computer.Notifications.OrderByDescending( x => x.Id ) )
+				{
+					var id = notification.Id;
+
+					<NaviNotificationCard @key=@id
+					                      Notification=@notification
+					                      App=@( NaviAppRegistry.Find( notification.AppId ) )
+					                      Muted=@( Computer.IsNotificationsMuted( notification.AppId ) )
+					                      MenuOpen=@( NotificationMenu == id )
+					                      OnOpen=@( () => OpenNotification( id ) )
+					                      OnClose=@( () => Computer.UserDismissNotification( id ) )
+					                      OnMenu=@( () => ToggleNotificationMenu( id ) )
+					                      OnMute=@( () => ToggleMuted( notification.AppId ) )></NaviNotificationCard>
+				}
+
+				@if ( Computer.Notifications.Count == 0 )
+				{
+					<div class="empty"><i>notifications_none</i>No notifications</div>
+				}
+			</div>
+		</div>
 	}
 
 	<div class="taskbar">
@@ -171,6 +229,19 @@
 					}
 				</div>
 			}
+
+			@* The notification list's button, always last. It counts what the player hasn't seen. *@
+			@{
+				var unread = Computer.UnreadNotifications;
+			}
+			<div class="tray-icon bell @( NotificationsOpen ? "menu-open" : "" )" @onclick=@( () => ToggleNotifications() )>
+				<div class="tooltip">Notifications</div>
+				<i>@( unread > 0 ? "notifications_active" : "notifications" )</i>
+				@if ( unread > 0 )
+				{
+					<div class="badge">@( unread > 9 ? "9+" : unread.ToString() )</div>
+				}
+			</div>
 		</div>
 	</div>
 
@@ -384,6 +455,14 @@
 		if ( StartOpen && (MenuApp is not null || TrayMenuApp is not null || !Computer.CanUse || Computer.IsLocked) )
 			StartOpen = false;
 
+		if ( (NotificationsOpen || NotificationMenu != 0) && (!Computer.CanUse || Computer.IsLocked) )
+		{
+			NotificationsOpen = false;
+			NotificationMenu = 0;
+		}
+
+		UpdateToasts();
+
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
 		if ( screen is not null )
 			UpdateWindows( screen );
@@ -435,6 +514,116 @@
 		MenuApp = null;
 		TrayMenuApp = null;
 		StartOpen = false;
+		NotificationsOpen = false;
+		NotificationMenu = 0;
+	}
+
+	// Notifications. The computer keeps them; what is open here is this client's own, like the other menus.
+
+	/// <summary>
+	/// Whether the notification list is open.
+	/// </summary>
+	bool NotificationsOpen;
+
+	/// <summary>
+	/// Id of the notification whose menu is open, or 0.
+	/// </summary>
+	int NotificationMenu;
+
+	/// <summary>
+	/// How long a new notification's banner stays up, in seconds, and how many banners are up at once.
+	/// </summary>
+	const float ToastSeconds = 6f;
+
+	const int MaxToasts = 3;
+
+	/// <summary>
+	/// The banners up now, oldest first. Worked out every frame in <see cref="UpdateToasts"/>, so they come and go without
+	/// anything else changing.
+	/// </summary>
+	List<NaviNotification> toasts = new();
+
+	int toastsHash;
+
+	/// <summary>
+	/// Banners the player closed before their time was up. The notifications stay in the list.
+	/// </summary>
+	readonly HashSet<int> hiddenToasts = new();
+
+	/// <summary>
+	/// The newest notification the list was marked read up to from here, so it is asked once per notification.
+	/// </summary>
+	int markedRead;
+
+	void ToggleNotifications()
+	{
+		var open = !NotificationsOpen;
+		CloseMenus();
+		NotificationsOpen = open;
+	}
+
+	void ToggleNotificationMenu( int id )
+	{
+		var open = NotificationMenu != id;
+		MenuApp = null;
+		TrayMenuApp = null;
+		StartOpen = false;
+		NotificationMenu = open ? id : 0;
+	}
+
+	/// <summary>
+	/// The player clicked a notification: its app opens, and it leaves the list.
+	/// </summary>
+	void OpenNotification( int id )
+	{
+		CloseMenus();
+		Computer.UserOpenNotification( id );
+	}
+
+	void HideToast( int id )
+	{
+		hiddenToasts.Add( id );
+		if ( NotificationMenu == id )
+			NotificationMenu = 0;
+	}
+
+	void ToggleMuted( string appId )
+	{
+		NotificationMenu = 0;
+		Computer.UserSetNotificationsMuted( appId, !Computer.IsNotificationsMuted( appId ) );
+	}
+
+	/// <summary>
+	/// Banners for notifications that arrived in the last <see cref="ToastSeconds"/>, unless their app is muted, the list
+	/// is open, or the player closed them. One whose menu is open stays until the menu closes. While the list is open, what
+	/// arrives is marked read.
+	/// </summary>
+	void UpdateToasts()
+	{
+		if ( NotificationMenu != 0 && Computer.GetNotification( NotificationMenu ) is null )
+			NotificationMenu = 0;
+
+		hiddenToasts.RemoveWhere( x => Computer.GetNotification( x ) is null );
+
+		toasts = NotificationsOpen
+			? new()
+			: Computer.Notifications
+				.Where( x => !hiddenToasts.Contains( x.Id ) && !Computer.IsNotificationsMuted( x.AppId )
+					&& (Computer.ArrivedWithin( x.Id, ToastSeconds ) || x.Id == NotificationMenu) )
+				.TakeLast( MaxToasts )
+				.ToList();
+
+		var hash = new System.HashCode();
+		foreach ( var toast in toasts )
+			hash.Add( toast.Id );
+
+		toastsHash = hash.ToHashCode();
+
+		if ( NotificationsOpen && Computer.CanUse && Computer.UnreadNotifications > 0 && markedRead != Computer.LastNotificationId )
+		{
+			markedRead = Computer.LastNotificationId;
+			Computer.UserMarkNotificationsRead();
+		}
 	}
 
 	/// <summary>
@@ -1145,5 +1334,5 @@
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() =>
 		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated, Computer?.ThemeClasses );
+			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash) );
 }

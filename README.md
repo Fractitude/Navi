@@ -191,7 +191,28 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Settings.SetThemeAsync( theme )`, `SetColorSchemeAsync`, `SetBlurLevelAsync`, `SetTransparencyLevelAsync` | Change the look. See Theming | `navi.settings.change` |
 | `Navi.Settings.GetSnappingAsync()` | Whether windows snap to the screen's edges and to each other's, and the distance in panel pixels | |
 | `Navi.Settings.SetSnapToScreenEdgesAsync( on )`, `SetSnapToWindowsAsync`, `SetSnapDistanceAsync` | Change window snapping | `navi.settings.change` |
+| `Navi.Notifications.SendAsync( title, text, sound )` | Show the player a notification. Returns its id. See "Notifications" | `navi.notifications.post` |
+| `Navi.Notifications.DismissAsync( id )` | Take one of the app's own notifications out of the list | |
+| `Navi.Notifications.ListAppsAsync()` | The installed apps that can send notifications, and whether each is muted | |
+| `Navi.Notifications.SetMutedAsync( appId, muted )` | Mute another app's notifications, or unmute them | `navi.settings.change` |
 | `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
+
+## Notifications
+
+An app tells the player something with a notification, like on Windows or macOS:
+
+```csharp
+var id = await Navi.Notifications.SendAsync( "Download finished", "notes.txt is ready.", sound: true );
+```
+
+- **It needs `navi.notifications.post`.** Declare it in the `.napp` (`Navi.Permission.Notify`). System apps have it with root.
+- **A banner, then the list.** A new notification shows as a banner over the right end of the taskbar for a few seconds (three at most), and stays in the notification list until the player dismisses it. The bell at the end of the tray opens the list and counts what the player hasn't seen. Closing a banner only hides it. Clicking a notification opens its app and dismisses it. "Clear all" empties the list.
+- **The desktop draws it.** The app gives a title (one line, up to 64 characters) and text (up to 280); the app's name and icon come from its manifest, so a notification can't pass for another app's or the system's. Title and text can't both be empty.
+- **Sound is optional.** With `sound`, the computer plays `NaviComputer.NotificationSound` (the engine's message pop if unset) at the screen, at most once a second, so everyone nearby hears it.
+- **Muting.** The player mutes an app in Settings, under Notifications, or from a notification's `...` menu. A muted app's notifications still go to the list, but quietly: no sound, no banner, no unread count. An app can mute or unmute another app with `navi.settings.change`, never itself.
+- **Limits.** The list keeps the newest 50, and 10 per app. An app dismisses only its own (`DismissAsync`). Uninstalling an app forgets its notifications and that it was muted.
+- **Saved and shared.** The list and the muted apps are saved with the computer, and sent to every client with its state. In a shared app only the host's copy should send; a client's own copy of an app that isn't shared sends nothing.
+- **Game code** can send one for any installed app with `NaviComputer.Notify( appId, title, text, sound )`, on the host.
 
 ## Theming
 
@@ -239,7 +260,7 @@ A color that isn't a palette variable (a danger red, a warning yellow) is the sa
 The desktop's own chrome (windows, taskbar, menus, the wallpaper) is in `NaviDesktop.razor.scss`, where Glass also gets its blur (`backdrop-filter-blur`) and its fill transparency from the `blur-N` and `clear-N` classes.
 ## Saving
 
-Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale and the theme, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale and the theme, the notification list and muted apps, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
 
 - **Windows open where they were.** Like a window manager, the computer remembers each window's position, size and whether it was maximized (`WindowPlacements`, one per window key) when it closes and when the computer saves, and opens it there next time. Apps don't do anything for it and can't set it. What the app's manifest no longer allows (resizing, maximizing) is dropped, and the desktop keeps the window inside the screen. Uninstalling an app forgets its windows. Only the host keeps placements; clients aren't sent them.
 - **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.
