@@ -278,6 +278,23 @@ public sealed partial class NaviComputer : Component
 	[Property] public List<string> TaskbarOrder { get; set; } = new();
 
 	/// <summary>
+	/// Ids of the apps the player pinned to the top of the start menu, in the order they put them in. See
+	/// <see cref="StartFavoriteApps"/>.
+	/// </summary>
+	[Property] public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
+
+	/// <summary>
+	/// Ids of the apps installed most recently, newest first, at most <see cref="MaxRecentApps"/>. The start menu lists them
+	/// so they're easy to find. See <see cref="RecentApps"/>.
+	/// </summary>
+	[Property] public List<string> RecentlyInstalled { get; set; } = new();
+
+	/// <summary>
+	/// How many recently installed apps the computer remembers.
+	/// </summary>
+	public const int MaxRecentApps = 4;
+
+	/// <summary>
 	/// Asset folders of this game whose app manifests ship with it, so their system apps are part of the OS: always installed,
 	/// root without asking. Manifests anywhere else (except the library's own <see cref="NaviAppRegistry.BuiltInFolder"/>)
 	/// are normal apps, and a system one asks the player for root. Folders are trusted from when the computer is enabled.
@@ -721,6 +738,8 @@ public sealed partial class NaviComputer : Component
 		ReviewedApps = ReviewedApps?.ToList() ?? new(),
 		RootApps = RootApps?.ToList() ?? new(),
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
+		StartFavorites = StartFavorites?.ToList() ?? new(),
+		RecentlyInstalled = RecentlyInstalled?.ToList() ?? new(),
 		DisplayScale = DisplayScale,
 		Theme = Theme,
 		ColorScheme = ColorScheme,
@@ -763,6 +782,8 @@ public sealed partial class NaviComputer : Component
 		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();
 		RootApps = save.RootApps?.Distinct().ToList() ?? new();
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
+		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
+		RecentlyInstalled = save.RecentlyInstalled?.Distinct().Take( MaxRecentApps ).ToList() ?? new();
 
 		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
 
@@ -865,6 +886,55 @@ public sealed partial class NaviComputer : Component
 		apps.RemoveAt( from );
 		apps.Insert( index, id );
 		TaskbarOrder = apps;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// The apps pinned to the start menu, in the player's order. Ones that aren't installed are left out.
+	/// </summary>
+	public IEnumerable<NaviAppInfo> StartFavoriteApps =>
+		(StartFavorites ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
+
+	/// <summary>
+	/// The apps installed most recently, newest first. Ones that aren't installed any more are left out.
+	/// </summary>
+	public IEnumerable<NaviAppInfo> RecentApps =>
+		(RecentlyInstalled ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
+
+	public bool IsStartFavorite( string id ) => StartFavorites?.Contains( id ) ?? false;
+
+	/// <summary>
+	/// Pin an installed app to the start menu, after the others, or unpin it. Returns false if the app isn't installed.
+	/// </summary>
+	public bool ToggleStartFavorite( string id )
+	{
+		if ( !IsAuthority || !IsInstalled( id ) )
+			return false;
+
+		StartFavorites ??= new();
+		if ( !StartFavorites.Remove( id ) )
+			StartFavorites.Add( id );
+
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Move a pinned app to <paramref name="index"/> among the pinned apps. Returns false if it isn't pinned, the index is
+	/// out of range, or it is already there.
+	/// </summary>
+	public bool MoveStartFavorite( string id, int index )
+	{
+		if ( !IsAuthority || StartFavorites is null )
+			return false;
+
+		var from = StartFavorites.IndexOf( id );
+		if ( from < 0 || index < 0 || index >= StartFavorites.Count || index == from )
+			return false;
+
+		StartFavorites.RemoveAt( from );
+		StartFavorites.Insert( index, id );
 		Version++;
 		return true;
 	}
@@ -984,6 +1054,13 @@ public sealed partial class NaviComputer : Component
 
 		InstalledApps ??= new();
 		InstalledApps.Add( id );
+
+		RecentlyInstalled ??= new();
+		RecentlyInstalled.Remove( id );
+		RecentlyInstalled.Insert( 0, id );
+		if ( RecentlyInstalled.Count > MaxRecentApps )
+			RecentlyInstalled.RemoveRange( MaxRecentApps, RecentlyInstalled.Count - MaxRecentApps );
+
 		Version++;
 		return true;
 	}
@@ -1014,6 +1091,8 @@ public sealed partial class NaviComputer : Component
 		ReviewedApps?.Remove( id );
 		RootApps?.Remove( id );
 		TaskbarOrder?.Remove( id );
+		StartFavorites?.Remove( id );
+		RecentlyInstalled?.Remove( id );
 
 		var windowPrefix = id + NaviWindow.KeySeparator;
 		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )

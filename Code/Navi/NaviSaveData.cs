@@ -13,6 +13,8 @@ public sealed class NaviComputerSave
 	public List<string> ReviewedApps { get; set; } = new();
 	public List<string> RootApps { get; set; } = new();
 	public List<string> TaskbarOrder { get; set; } = new();
+	public List<string> StartFavorites { get; set; } = new() { NaviAppRegistry.PackagesApp, NaviAppRegistry.SettingsApp };
+	public List<string> RecentlyInstalled { get; set; } = new();
 	public float DisplayScale { get; set; } = 1f;
 	public Navi.Theme Theme { get; set; } = Navi.Theme.Paper;
 	public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;

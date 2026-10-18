@@ -627,6 +627,26 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// The user pinned an app to the start menu, or unpinned it. See <see cref="ToggleStartFavorite"/>.
+	/// </summary>
+	[Rpc.Host]
+	public void UserToggleStartFavorite( string id )
+	{
+		if ( Authorize() )
+			ToggleStartFavorite( id );
+	}
+
+	/// <summary>
+	/// The user dragged a pinned app to a new place in the start menu. See <see cref="MoveStartFavorite"/>.
+	/// </summary>
+	[Rpc.Host]
+	public void UserMoveStartFavorite( string id, int index )
+	{
+		if ( Authorize() )
+			MoveStartFavorite( id, index );
+	}
+
+	/// <summary>
 	/// The user moved or resized a window. <paramref name="size"/> is ignored unless <paramref name="sized"/>, for a
 	/// window that fits its app. The desktop keeps it inside the screen.
 	/// </summary>

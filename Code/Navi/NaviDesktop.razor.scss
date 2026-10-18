@@ -339,6 +339,308 @@ NaviDesktop
 		}
 	}
 
+	.start.menu-open
+	{
+		border-color: $paper-bc;
+	}
+
+	// The start menu (NaviStartMenu), above the start button.
+	.start-menu
+	{
+		position: absolute;
+		left: 8px;
+		bottom: 56px;
+		width: 380px;
+		height: 480px;
+		max-height: 88%;
+		flex-direction: column;
+		padding: 8px;
+		gap: 6px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+		pointer-events: all;
+		z-index: 100;
+
+		.search
+		{
+			flex-shrink: 0;
+
+			.textentry
+			{
+				width: 100%;
+				min-width: 0;
+				padding: 5px 8px;
+				font-size: 13px;
+				color: $ink-t;
+				background-color: $paper-bg;
+				border: 1px solid $line-bc;
+			}
+		}
+
+		// Scrolling is the panel's own styling, as in the Packages app.
+		.lists
+		{
+			flex-grow: 1;
+			flex-direction: column;
+			gap: 2px;
+			padding-right: 8px;
+			overflow-y: auto;
+			scrollbar-width: thin;
+			scrollbar-color: #8a8472 transparent;
+
+			scrollbar > .thumb
+			{
+				border-radius: 2px;
+			}
+		}
+
+		.heading
+		{
+			flex-shrink: 0;
+			margin-top: 6px;
+			padding: 0 4px;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 1px;
+			opacity: 0.7;
+		}
+
+		.empty
+		{
+			padding: 6px 4px;
+			font-size: 12px;
+			opacity: 0.7;
+		}
+
+		// A coloured square with the app's icon, wherever an app is listed.
+		.icon
+		{
+			flex-shrink: 0;
+			justify-content: center;
+			align-items: center;
+			color: $ink-t;
+			border: 1px solid $deep-bc;
+		}
+
+		.star
+		{
+			flex-shrink: 0;
+			width: 22px;
+			height: 22px;
+			justify-content: center;
+			align-items: center;
+			font-size: 16px;
+			opacity: 0.3;
+			cursor: pointer;
+
+			&:hover
+			{
+				opacity: 1;
+			}
+
+			&.on
+			{
+				opacity: 1;
+				color: #e0a526;
+			}
+		}
+
+		// Pinned apps: a grid of tiles that can be dragged into a new order.
+		.pinned
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			flex-wrap: wrap;
+
+			.tile
+			{
+				position: relative;
+				width: 25%;
+				flex-direction: column;
+				align-items: center;
+				gap: 4px;
+				padding: 8px 2px 6px 2px;
+				border: 1px solid transparent;
+				cursor: pointer;
+
+				.icon
+				{
+					width: 40px;
+					height: 40px;
+					font-size: 24px;
+				}
+
+				.name
+				{
+					max-width: 100%;
+					font-size: 11px;
+					font-weight: 700;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				}
+
+				// Only on hover, so the grid stays calm.
+				.star
+				{
+					position: absolute;
+					top: 2px;
+					right: 2px;
+					width: 18px;
+					height: 18px;
+					font-size: 13px;
+					opacity: 0;
+				}
+
+				&:hover
+				{
+					background-color: $surface2-bg;
+					border-color: $line-bc;
+
+					.star
+					{
+						opacity: 1;
+					}
+				}
+
+				&.dragging
+				{
+					z-index: 10;
+					opacity: 0.85;
+					background-color: $surface2-bg;
+					border-color: $paper-bc;
+					pointer-events: none;
+				}
+
+				&.drop-target
+				{
+					border-color: $paper-bc;
+					background-color: $surface2-bg;
+				}
+			}
+		}
+
+		// Recently installed apps, two across.
+		.recent
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			flex-wrap: wrap;
+
+			.entry
+			{
+				width: 50%;
+			}
+		}
+
+		.entry
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			align-items: center;
+			gap: 8px;
+			padding: 4px;
+			border: 1px solid transparent;
+			cursor: pointer;
+
+			.icon
+			{
+				width: 26px;
+				height: 26px;
+				font-size: 16px;
+			}
+
+			.text
+			{
+				flex-grow: 1;
+				flex-basis: 0;
+				min-width: 0;
+				flex-direction: column;
+			}
+
+			.name
+			{
+				flex-grow: 1;
+				min-width: 0;
+				font-size: 13px;
+				font-weight: 700;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.description
+			{
+				font-size: 10px;
+				opacity: 0.7;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.badge
+			{
+				flex-shrink: 0;
+				padding: 0 4px;
+				font-size: 9px;
+				font-weight: 700;
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+
+			&:hover
+			{
+				background-color: $surface2-bg;
+				border-color: $line-bc;
+
+				.star
+				{
+					opacity: 0.7;
+
+					&.on
+					{
+						opacity: 1;
+					}
+				}
+			}
+		}
+
+		.footer
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			gap: 6px;
+			padding-top: 6px;
+			border-top: 1px solid $line-bc;
+
+			.action
+			{
+				flex-direction: row;
+				align-items: center;
+				gap: 6px;
+				padding: 5px 10px;
+				font-size: 12px;
+				font-weight: 700;
+				border: 1px solid $line-bc;
+				cursor: pointer;
+
+				i
+				{
+					font-size: 16px;
+				}
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+					border-color: $ink-bc;
+				}
+			}
+		}
+	}
+
 	// An icon being dragged to a new place on the taskbar (NaviDesktop moves it). No tooltips pop up as icons pass under
 	// the mouse.
 	.taskbar.reordering .app
@@ -600,6 +902,41 @@ NaviDesktop
 		border-radius: 10px;
 	}
 
+	.start-menu
+	{
+		border: 1px solid $edge;
+		border-radius: 16px;
+		box-shadow: 0 10px 28px $shadow;
+
+		.search .textentry
+		{
+			border-radius: 10px;
+		}
+
+		.icon
+		{
+			border: 1px solid $edge;
+			border-radius: 9px;
+		}
+
+		.tile, .entry, .footer .action
+		{
+			border-radius: 10px;
+		}
+
+		.footer
+		{
+			border-top-color: $edge;
+		}
+
+		.entry .badge
+		{
+			color: #ffffff;
+			background-color: $accent;
+			border-radius: 6px;
+		}
+	}
+
 	.app
 	{
 		.icon
@@ -706,7 +1043,7 @@ NaviDesktop
 // (clear-0: solid) to a good deal (clear-4). $base is the fill as the level's alpha is applied to it.
 @mixin glass-fill( $fill )
 {
-	.window, .taskbar, .menu
+	.window, .taskbar, .menu, .start-menu
 	{
 		background-color: $fill;
 	}
@@ -715,7 +1052,7 @@ NaviDesktop
 // The Blur setting: how strongly a window, the taskbar or a menu blurs what is behind it.
 @mixin glass-blur( $radius )
 {
-	.window, .taskbar, .menu
+	.window, .taskbar, .menu, .start-menu
 	{
 		backdrop-filter-blur: $radius;
 	}

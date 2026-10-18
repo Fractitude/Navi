@@ -71,14 +71,19 @@
 		}
 	</div>
 
-	@if ( MenuApp is not null || TrayMenuApp is not null )
+	@if ( MenuApp is not null || TrayMenuApp is not null || StartOpen )
 	{
 		@* Catches clicks outside the menu, to close it. *@
 		<div class="menu-backdrop" @onmousedown=@(() => CloseMenus())></div>
 	}
 
+	@if ( StartOpen )
+	{
+		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart></NaviStartMenu>
+	}
+
 	<div class="taskbar">
-		<div class="start" @onclick=@(() => Computer.UserLaunch( NaviAppRegistry.PackagesApp ))>NAVI</div>
+		<div class="start @(StartOpen ? "menu-open" : "")" @onclick=@(() => ToggleStart())>NAVI</div>
 
 		@foreach ( var app in Computer.TaskbarApps )
 		{
@@ -359,6 +364,10 @@
 		if ( TrayMenuApp is not null && Computer.GetProcess( TrayMenuApp )?.Tray is null )
 			TrayMenuApp = null;
 
+		// A taskbar or tray menu opened with the start menu already up, or the player stood up.
+		if ( StartOpen && (MenuApp is not null || TrayMenuApp is not null || !Computer.CanUse) )
+			StartOpen = false;
+
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
 		if ( screen is not null )
 			UpdateWindows( screen );
@@ -409,6 +418,28 @@
 	{
 		MenuApp = null;
 		TrayMenuApp = null;
+		StartOpen = false;
+	}
+
+	/// <summary>
+	/// Whether the start menu is open.
+	/// </summary>
+	bool StartOpen;
+
+	void ToggleStart()
+	{
+		var open = !StartOpen;
+		CloseMenus();
+		StartOpen = open;
+	}
+
+	/// <summary>
+	/// The player picked an app in the start menu: open it and close the menu.
+	/// </summary>
+	void OpenFromStart( NaviAppInfo app )
+	{
+		CloseMenus();
+		OpenApp( app );
 	}
 
 	void OpenTrayMenu( string id )
@@ -1059,6 +1090,6 @@
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, MenuApp, TrayMenuApp, Computer?.CanUse, Computer?.UserId,
+		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
 			Computer?.IsSeated, Computer?.ThemeClasses );
 }

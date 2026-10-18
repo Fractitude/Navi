@@ -1,0 +1,350 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace Sandbox
+
+@* The start menu, above the start button. It lists every installed app for finding one fast: the pinned apps (drag one to *@
+@* put it elsewhere, the star unpins), the ones installed most recently, and all of them by letter. Typing in the search *@
+@* field replaces the lists with the matches; Enter opens the first. The footer has Settings and the Store (Packages). *@
+@* Part of the desktop, so it draws the host's state and sends the player's choices to it, like the taskbar does. *@
+
+<root>
+	<div class="search">
+		<TextEntry @ref="Entry" Icon="search" Placeholder="Search apps" HasClearButton=@true MaxLength=@( 64 )
+		           OnTextEdited=@SearchEdited
+		           onsubmit=@( () => OpenFirst() )/>
+	</div>
+
+	<div class="lists">
+		@if ( Searching )
+		{
+			@if ( Matches.Count == 0 )
+			{
+				<div class="empty">No apps match "@Query".</div>
+			}
+		}
+		else
+		{
+			<div class="heading">Pinned</div>
+
+			@if ( Pinned.Count == 0 )
+			{
+				<div class="empty">Click the star on an app to pin it here.</div>
+			}
+			else
+			{
+				<div class="pinned">
+					@for ( var i = 0; i < Pinned.Count; i++ )
+					{
+						var app = Pinned[i];
+						var index = i;
+
+						<div @key=@app.Id class="tile"
+						     @onmousedown=@( ( PanelEvent e ) => StartDrag( e, index ) )
+						     @onclick=@(() => Open( app ))>
+							<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+							<div class="name">@app.Name</div>
+							<div class="star on"
+							     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
+							     @onclick=@( ( PanelEvent e ) => TogglePin( e, app ) )>
+								<i>star</i>
+							</div>
+						</div>
+					}
+				</div>
+			}
+
+			@if ( Recent.Count > 0 )
+			{
+				<div class="heading">Recently installed</div>
+
+				<div class="recent">
+					@foreach ( var app in Recent )
+					{
+						<div @key=@app.Id class="entry" @onclick=@(() => Open( app ))>
+							<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+							<div class="name">@app.Name</div>
+							<div class="badge">NEW</div>
+						</div>
+					}
+				</div>
+			}
+		}
+
+		@foreach ( var section in Sections )
+		{
+			@if ( section.Heading is not null )
+			{
+				<div class="heading">@section.Heading</div>
+			}
+
+			@foreach ( var app in section.Apps )
+			{
+				<div @key=@app.Id class="entry" @onclick=@(() => Open( app ))>
+					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+					<div class="text">
+						<div class="name">@app.Name</div>
+						@if ( Searching && !string.IsNullOrEmpty( app.Description ) )
+						{
+							<div class="description">@app.Description</div>
+						}
+					</div>
+					<div class="star @( Computer.IsStartFavorite( app.Id ) ? "on" : "" )"
+					     @onclick=@( ( PanelEvent e ) => TogglePin( e, app ) )>
+						<i>star</i>
+					</div>
+				</div>
+			}
+		}
+	</div>
+
+	<div class="footer">
+		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.SettingsApp ))>
+			<i>settings</i>Settings
+		</div>
+		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.PackagesApp ))>
+			<i>download</i>Get apps
+		</div>
+	</div>
+</root>
+
+@code
+{
+	public NaviComputer Computer { get; set; }
+
+	/// <summary>
+	/// Called with the app the player picked, so the desktop can open it and close the menu.
+	/// </summary>
+	public System.Action<NaviAppInfo> OnOpen { get; set; }
+
+	TextEntry Entry;
+
+	string Query = "";
+
+	/// <summary>
+	/// How far the mouse moves, in panel pixels, before pressing a pinned app becomes dragging it.
+	/// </summary>
+	const float DragThreshold = 6f;
+
+	/// <summary>
+	/// For how long after a pinned app is dropped a click is ignored, in seconds. The release that drops it may arrive as a
+	/// click after the drag has ended.
+	/// </summary>
+	const float DropClickTime = 0.2f;
+
+	// The pinned app being dragged. The drag lasts while the mouse button is held on dragHandle, and it only becomes a
+	// drag once the mouse has moved DragThreshold; until then it may still be a click.
+	Panel dragHandle;
+	List<string> dragApps; // The pinned apps' ids, in order, when the button went down.
+	int dragFrom;
+	int dragTarget;
+	Vector2 dragStartMouse;
+	bool dragMoved;
+	RealTimeSince sinceDrop = DropClickTime;
+
+	bool Searching => !string.IsNullOrWhiteSpace( Query );
+
+	List<NaviAppInfo> Pinned => pinned ??= Computer.StartFavoriteApps.ToList();
+	List<NaviAppInfo> Recent => recent ??= Computer.RecentApps.ToList();
+
+	// Worked out once for each time the menu is built.
+	List<NaviAppInfo> pinned;
+	List<NaviAppInfo> recent;
+
+	/// <summary>
+	/// The installed apps that match the search, best first: names that start with it, then names that have it in them,
+	/// then descriptions.
+	/// </summary>
+	List<NaviAppInfo> Matches => matches ??= Match( Query.Trim() );
+
+	List<NaviAppInfo> matches;
+
+	List<NaviAppInfo> Match( string query )
+	{
+		static int Rank( NaviAppInfo app, string query ) =>
+			app.Name.StartsWith( query, System.StringComparison.OrdinalIgnoreCase ) ? 0
+			: app.Name.Contains( query, System.StringComparison.OrdinalIgnoreCase ) ? 1
+			: app.Description?.Contains( query, System.StringComparison.OrdinalIgnoreCase ) == true ? 2
+			: -1;
+
+		return Computer.Installed
+			.Select( x => (App: x, Rank: Rank( x, query )) )
+			.Where( x => x.Rank >= 0 )
+			.OrderBy( x => x.Rank )
+			.ThenBy( x => x.App.Name )
+			.Select( x => x.App )
+			.ToList();
+	}
+
+	/// <summary>
+	/// What the list under the pinned apps shows: the matches while searching, otherwise every installed app under its
+	/// first letter.
+	/// </summary>
+	List<(string Heading, List<NaviAppInfo> Apps)> Sections
+	{
+		get
+		{
+			if ( Searching )
+				return [(null, Matches)];
+
+			return Computer.Installed
+				.GroupBy( x => char.ToUpperInvariant( x.Name.FirstOrDefault( char.IsLetterOrDigit ) ) is var c and not '\0' ? c.ToString() : "#" )
+				.OrderBy( x => x.Key, System.StringComparer.Ordinal )
+				.Select( x => (x.Key, x.OrderBy( y => y.Name ).ToList()) )
+				.ToList();
+		}
+	}
+
+	protected override void OnAfterTreeRender( bool firstTime )
+	{
+		base.OnAfterTreeRender( firstTime );
+
+		if ( firstTime )
+			Entry?.Focus();
+	}
+
+	void SearchEdited( string text )
+	{
+		Query = text ?? "";
+	}
+
+	void OpenFirst()
+	{
+		if ( Searching && Matches.FirstOrDefault() is { } app )
+			Open( app );
+	}
+
+	void Open( NaviAppInfo app )
+	{
+		// Letting go of a dragged app isn't a click on it.
+		if ( dragMoved || sinceDrop < DropClickTime )
+			return;
+
+		OnOpen?.Invoke( app );
+	}
+
+	void OpenBuiltIn( string id )
+	{
+		if ( NaviAppRegistry.Find( id ) is { } app )
+			OnOpen?.Invoke( app );
+	}
+
+	void TogglePin( PanelEvent e, NaviAppInfo app )
+	{
+		e.StopPropagation();
+
+		if ( Computer.CanUse )
+			Computer.UserToggleStartFavorite( app.Id );
+	}
+
+	/// <summary>
+	/// The mouse went down on a pinned app. Moving it far enough drags it; see <see cref="Tick"/>.
+	/// </summary>
+	void StartDrag( PanelEvent e, int index )
+	{
+		if ( !Computer.CanUse || e is not MousePanelEvent { MouseButton: MouseButtons.Left } || Pinned.Count < 2 )
+			return;
+
+		dragHandle = e.This;
+		dragApps = Pinned.Select( x => x.Id ).ToList();
+		dragFrom = index;
+		dragTarget = index;
+		dragStartMouse = MousePosition * ScaleFromScreen;
+		dragMoved = false;
+	}
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		// A new build starts from scratch.
+		pinned = null;
+		recent = null;
+		matches = null;
+
+		if ( dragHandle is not null )
+			UpdateDrag();
+	}
+
+	/// <summary>
+	/// Move the dragged app with the mouse and mark the one it would take the place of. Letting go drops it there and tells
+	/// the host. The drag is called off if the pinned apps change under it.
+	/// </summary>
+	void UpdateDrag()
+	{
+		var tiles = dragHandle.IsValid ? dragHandle.Parent?.Children.Where( x => x.HasClass( "tile" ) ).ToList() : null;
+
+		var unchanged = tiles is not null && Computer.CanUse && tiles.Count == dragApps.Count && tiles[dragFrom] == dragHandle
+			&& Computer.StartFavoriteApps.Select( x => x.Id ).SequenceEqual( dragApps );
+
+		if ( !unchanged )
+		{
+			EndDrag( tiles, dragFrom );
+			return;
+		}
+
+		var delta = MousePosition * ScaleFromScreen - dragStartMouse;
+		var released = !dragHandle.HasActive;
+
+		if ( !dragMoved )
+		{
+			if ( released )
+			{
+				EndDrag( tiles, dragFrom );
+				return;
+			}
+
+			if ( delta.Length < DragThreshold )
+				return;
+
+			dragMoved = true;
+		}
+
+		// The tile under the mouse, among the others: the dragged one is under it all the time.
+		var mouse = dragHandle.Parent.Box.Rect.Position + dragHandle.Parent.MousePosition;
+		var target = tiles.FindIndex( x => x != dragHandle && x.Box.Rect.IsInside( mouse ) );
+		dragTarget = target < 0 ? dragFrom : target;
+
+		if ( released )
+		{
+			EndDrag( tiles, dragTarget );
+			return;
+		}
+
+		for ( var i = 0; i < tiles.Count; i++ )
+		{
+			tiles[i].SetClass( "dragging", i == dragFrom );
+			tiles[i].SetClass( "drop-target", i == dragTarget && i != dragFrom );
+		}
+
+		dragHandle.Style.Left = Length.Pixels( delta.x );
+		dragHandle.Style.Top = Length.Pixels( delta.y );
+	}
+
+	/// <summary>
+	/// Put the tiles back in their places and, if the dragged one was dropped on another, ask the host to move it there.
+	/// The menu is rebuilt in the new order once the host's state comes back.
+	/// </summary>
+	void EndDrag( List<Panel> tiles, int to )
+	{
+		foreach ( var tile in tiles ?? [] )
+		{
+			tile.Style.Left = null;
+			tile.Style.Top = null;
+			tile.SetClass( "dragging", false );
+			tile.SetClass( "drop-target", false );
+		}
+
+		if ( dragMoved )
+			sinceDrop = 0;
+
+		if ( dragMoved && to != dragFrom )
+			Computer.UserMoveStartFavorite( dragApps[dragFrom], to );
+
+		dragHandle = null;
+		dragApps = null;
+		dragMoved = false;
+	}
+
+	protected override int BuildHash() =>
+		System.HashCode.Combine( Computer?.Version, Query, Computer?.CanUse, Computer?.InstalledApps?.Count );
+}

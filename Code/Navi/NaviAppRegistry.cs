@@ -285,6 +285,11 @@ public static class NaviAppRegistry
 	/// </summary>
 	public const string PackagesApp = BuiltInFolder + "packages.napp";
 
+	/// <summary>
+	/// Id of the built-in Settings app, which the start menu has a button for.
+	/// </summary>
+	public const string SettingsApp = BuiltInFolder + "settings.napp";
+
 	static readonly HashSet<string> systemAppFolders = new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder };
 
 	/// <summary>
