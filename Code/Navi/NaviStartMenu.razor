@@ -3,7 +3,7 @@
 @namespace Sandbox
 
 @* The start menu, above the start button. It lists every installed app for finding one fast: the pinned apps (drag one to *@
-@* put it elsewhere, the star unpins), the ones installed most recently, and all of them by letter. Typing in the search *@
+@* put it elsewhere, the star unpins), the ones installed most recently, and all of them by name. Typing in the search *@
 @* field replaces the lists with the matches; Enter opens the first. The footer has Settings, the Store (Packages) and *@
 @* Lock, which locks the screen. *@
 @* Part of the desktop, so it draws the host's state and sends the player's choices to it, like the taskbar does. *@
@@ -198,8 +198,8 @@
 	}
 
 	/// <summary>
-	/// What the list under the pinned apps shows: the matches while searching, otherwise every installed app under its
-	/// first letter.
+	/// What the list under the pinned apps shows: the matches while searching, otherwise every installed app under "All apps",
+	/// by name.
 	/// </summary>
 	List<(string Heading, List<NaviAppInfo> Apps)> Sections
 	{
@@ -208,11 +208,7 @@
 			if ( Searching )
 				return [(null, Matches)];
 
-			return Computer.Installed
-				.GroupBy( x => char.ToUpperInvariant( x.Name.FirstOrDefault( char.IsLetterOrDigit ) ) is var c and not '\0' ? c.ToString() : "#" )
-				.OrderBy( x => x.Key, System.StringComparer.Ordinal )
-				.Select( x => (x.Key, x.OrderBy( y => y.Name ).ToList()) )
-				.ToList();
+			return [("All apps", Computer.Installed.OrderBy( x => x.Name ).ToList())];
 		}
 	}
 
