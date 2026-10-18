@@ -255,9 +255,11 @@
 	{
 		e.StopPropagation();
 
-		var mode = e is MousePanelEvent { HasCtrl: true } ? FilesViewModel.ToggleMode
-			: e is MousePanelEvent { HasShift: true } ? FilesViewModel.RangeMode
-			: "";
+		// A click on a world panel (WorldInput) comes without the modifier keys (HasCtrl and HasShift are always false
+		// there), so the keyboard is asked too.
+		var ctrl = e is MousePanelEvent { HasCtrl: true } || Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" );
+		var shift = e is MousePanelEvent { HasShift: true } || Input.Keyboard.Down( "SHIFT" ) || Input.Keyboard.Down( "RSHIFT" );
+		var mode = ctrl ? FilesViewModel.ToggleMode : shift ? FilesViewModel.RangeMode : "";
 
 		Navi.Act( FilesViewModel.SelectAction, path, mode );
 	}
