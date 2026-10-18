@@ -51,13 +51,15 @@ public sealed class CalculatorViewModel
 	/// </summary>
 	public void Press( string key )
 	{
-		if ( hasError && key != "←" )
+		if ( hasError && key != "⌫" )
 			Clear();
 
 		switch ( key )
 		{
 			case "C": Clear(); break;
-			case "←": Backspace(); break;
+			case "⌫": Backspace(); break;
+			case "±": Negate(); break;
+			case "%": Percent(); break;
 			case ".": Decimal(); break;
 			case "=": Calculate(); break;
 			case "+" or "−" or "×" or "÷": Operator( key ); break;
@@ -81,7 +83,12 @@ public sealed class CalculatorViewModel
 		}
 		else if ( entry.Count( char.IsDigit ) < MaxDigits )
 		{
-			entry = entry == "0" ? digit : entry + digit;
+			entry = entry switch
+			{
+				"0" => digit,
+				"-0" => "-" + digit,
+				_ => entry + digit,
+			};
 		}
 	}
 
@@ -106,6 +113,35 @@ public sealed class CalculatorViewModel
 		entry = entry[..^1];
 		if ( entry is "" or "-" )
 			entry = "0";
+	}
+
+	void Negate()
+	{
+		// Right after an operator the entry still shows the left-hand side, so start the right-hand one as -0.
+		if ( startNewEntry && pendingOperator is not null )
+		{
+			entry = "0";
+			startNewEntry = false;
+		}
+
+		entry = entry.StartsWith( '-' ) ? entry[1..] : "-" + entry;
+	}
+
+	/// <summary>
+	/// Turn the entry into a percentage, as the iPhone and Windows calculators do: of the left-hand side when adding or
+	/// subtracting (100 + 50 % is 100 + 50), of one otherwise (100 × 50 % is 100 × 0.5).
+	/// </summary>
+	void Percent()
+	{
+		var value = Parse( entry ) / 100;
+		if ( pendingOperator is "+" or "−" )
+			value *= accumulator ?? 0;
+
+		entry = Format( value );
+
+		// The percentage is the right-hand side, even if pressed right after the operator.
+		if ( pendingOperator is not null )
+			startNewEntry = false;
 	}
 
 	void Operator( string op )

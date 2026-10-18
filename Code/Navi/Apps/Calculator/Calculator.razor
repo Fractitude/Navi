@@ -8,7 +8,8 @@
 <root>
 	<div class="display">
 		<div class="expression">@UiState.Expression</div>
-		<div class="entry">@UiState.Entry</div>
+		@* Its text can be drag-selected and copied: a panel only selects text in its children. *@
+		<div class="entry" AllowChildSelection=@true AcceptsFocus=@true>@UiState.Entry</div>
 	</div>
 
 	<div class="keys">

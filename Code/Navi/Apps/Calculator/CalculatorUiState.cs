@@ -18,11 +18,11 @@ public sealed record CalculatorUiState
 	/// </summary>
 	public static IReadOnlyList<IReadOnlyList<CalculatorKey>> Keys { get; } =
 	[
-		[new( "C", "function" ), new( "←", "function" )],
-		[new( "7", "" ), new( "8", "" ), new( "9", "" ), new( "÷", "operator" )],
-		[new( "4", "" ), new( "5", "" ), new( "6", "" ), new( "×", "operator" )],
-		[new( "1", "" ), new( "2", "" ), new( "3", "" ), new( "−", "operator" )],
-		[new( "0", "" ), new( ".", "" ), new( "=", "equals" ), new( "+", "operator" )],
+		[new( "C", "function" ), new( "±", "function" ), new( "%", "function" ), new( "÷", "operator" )],
+		[new( "7", "" ), new( "8", "" ), new( "9", "" ), new( "×", "operator" )],
+		[new( "4", "" ), new( "5", "" ), new( "6", "" ), new( "−", "operator" )],
+		[new( "1", "" ), new( "2", "" ), new( "3", "" ), new( "+", "operator" )],
+		[new( "⌫", "function" ), new( "0", "" ), new( ".", "" ), new( "=", "equals" )],
 	];
 
 	/// <summary>Goes up whenever anything else here changes. The panel's BuildHash is this.</summary>
