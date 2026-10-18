@@ -196,6 +196,7 @@
 	Vector2 dragStartMouse;
 	Vector2 dragStartPosition;
 	Vector2 dragStartSize;
+	Vector2 dragChrome; // Title bar and borders: the window's size less its content's.
 
 	// Windows that were maximized last frame. Their measured size is still the maximized one, so they skip clamping for a frame.
 	readonly HashSet<NaviWindow> wasMaximized = new();
@@ -463,6 +464,7 @@
 		dragStartMouse = MousePosition( screen );
 		dragStartPosition = window.Position;
 		dragStartSize = window.Size ?? panel.Box.Rect.Size * panel.ScaleFromScreen;
+		dragChrome = Chrome( panel ) ?? Vector2.Zero;
 	}
 
 	/// <summary>
@@ -487,6 +489,11 @@
 				if ( dragDirection == Vector2.Zero )
 				{
 					dragging.Position = dragStartPosition + delta;
+				}
+				else if ( dragging.Info.AspectRatio > 0f )
+				{
+					(dragging.Position, var size) = ResizeKeepingRatio( delta, bounds, dragging.Info.AspectRatio );
+					dragging.Size = size;
 				}
 				else
 				{
@@ -522,11 +529,17 @@
 
 			var layoutIsCurrent = !wasMaximized.Remove( window );
 
-			if ( window.Size is { } size )
+			// A window that keeps its shape gets the height that goes with its width, whatever it was given: by a saved
+			// layout, the host or a client.
+			if ( window.Size is { } size && window.Info.AspectRatio > 0f && Chrome( panel ) is { } chrome )
+			{
+				window.Size = FitRatio( size.x - chrome.x, window.Info.AspectRatio, chrome, MinWindowSize, bounds );
+			}
+			else if ( window.Size is { } other )
 			{
 				window.Size = new Vector2(
-					Clamp( size.x, MinWindowSize.x, bounds.x ),
-					Clamp( size.y, MinWindowSize.y, bounds.y ) );
+					Clamp( other.x, MinWindowSize.x, bounds.x ),
+					Clamp( other.y, MinWindowSize.y, bounds.y ) );
 			}
 
 			// A window bigger than the screen is pinned to the top left.
@@ -632,6 +645,55 @@
 		}
 
 		return (position, size);
+	}
+
+	/// <summary>
+	/// Resize from the dragged corner, keeping the window's content at <paramref name="ratio"/>, width over height. The
+	/// content follows whichever edge the mouse pulled further, and the opposite corner stays where it is. The window
+	/// stays inside the screen and at least <see cref="MinWindowSize"/>.
+	/// </summary>
+	(Vector2 Position, Vector2 Size) ResizeKeepingRatio( Vector2 delta, Vector2 bounds, float ratio )
+	{
+		var content = dragStartSize + delta * dragDirection - dragChrome;
+		var width = System.MathF.Max( content.x, content.y * ratio );
+
+		// The room from the corner that stays to the edges of the screen the dragged corner moves towards.
+		var far = dragStartPosition + dragStartSize;
+		var room = new Vector2(
+			dragDirection.x > 0 ? bounds.x - dragStartPosition.x : far.x,
+			dragDirection.y > 0 ? bounds.y - dragStartPosition.y : far.y );
+
+		var size = FitRatio( width, ratio, dragChrome, MinWindowSize, room );
+		var position = new Vector2(
+			dragDirection.x < 0 ? far.x - size.x : dragStartPosition.x,
+			dragDirection.y < 0 ? far.y - size.y : dragStartPosition.y );
+
+		return (position, size);
+	}
+
+	/// <summary>
+	/// The size of a window whose content is <paramref name="width"/> wide and <paramref name="ratio"/> (width over height)
+	/// in shape, plus <paramref name="chrome"/>. Grown to at least <paramref name="min"/>, then shrunk to fit in
+	/// <paramref name="max"/>, which wins: a window can't keep its shape outside the screen.
+	/// </summary>
+	static Vector2 FitRatio( float width, float ratio, Vector2 chrome, Vector2 min, Vector2 max )
+	{
+		width = System.MathF.Max( width, System.MathF.Max( min.x - chrome.x, (min.y - chrome.y) * ratio ) );
+		width = System.MathF.Min( width, System.MathF.Min( max.x - chrome.x, (max.y - chrome.y) * ratio ) );
+		width = System.MathF.Max( width, 1f );
+		return new Vector2( width, width / ratio ) + chrome;
+	}
+
+	/// <summary>
+	/// The window's title bar and borders, in panel pixels: its size less its content's. Null until it has been laid out.
+	/// </summary>
+	static Vector2? Chrome( Panel window )
+	{
+		var body = window.Children.OfType<NaviAppHost>().FirstOrDefault();
+		if ( body is null || body.Box.Rect.Width <= 0f )
+			return null;
+
+		return (window.Box.Rect.Size - body.Box.Rect.Size) * window.ScaleFromScreen;
 	}
 
 	/// <summary>

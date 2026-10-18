@@ -21,6 +21,12 @@ public sealed class NaviWindowInfo
 	public bool CanMaximize { get; init; }
 	public bool CanResize { get; init; }
 
+	/// <summary>
+	/// Width over height that the window's content keeps when resized, or 0 for any shape. See
+	/// <see cref="NaviAppResource.AspectRatio"/>.
+	/// </summary>
+	public float AspectRatio { get; init; }
+
 	public TypeDescription PanelType { get; init; }
 
 	/// <summary>
@@ -34,6 +40,17 @@ public sealed class NaviWindowInfo
 	public static bool IsValidId( string id ) =>
 		id is { Length: >= 1 and <= 32 } && id.All( x => x is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_' );
 
+	/// <summary>
+	/// The aspect ratio a manifest gives as width and height, as width over height. 0 for none, or for one so extreme that
+	/// it can't be a window.
+	/// </summary>
+	internal static float RatioOf( Vector2 size ) => size.x > 0f && size.y > 0f ? CleanRatio( size.x / size.y ) : 0f;
+
+	/// <summary>
+	/// <paramref name="ratio"/> if it is a usable width over height, between 1:10 and 10:1, else 0.
+	/// </summary>
+	internal static float CleanRatio( float ratio ) => float.IsFinite( ratio ) && ratio is >= 0.1f and <= 10f ? ratio : 0f;
+
 	internal NaviWindowDefinitionSnapshot ToSnapshot() => new()
 	{
 		Id = Id,
@@ -41,6 +58,7 @@ public sealed class NaviWindowInfo
 		CanMinimize = CanMinimize,
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
+		AspectRatio = AspectRatio,
 		PanelType = PanelType.FullName,
 	};
 }
@@ -58,6 +76,11 @@ public sealed class NaviAppInfo
 	public bool CanMinimize { get; init; }
 	public bool CanMaximize { get; init; }
 	public bool CanResize { get; init; }
+
+	/// <summary>
+	/// Width over height that the main window's content keeps when resized, or 0 for any shape.
+	/// </summary>
+	public float AspectRatio { get; init; }
 
 	/// <summary>
 	/// Starts without a window, in the system tray. See <see cref="NaviAppResource.Headless"/>.
@@ -109,6 +132,7 @@ public sealed class NaviAppInfo
 		CanMinimize = CanMinimize,
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
+		AspectRatio = AspectRatio,
 		PanelType = PanelType,
 	};
 
@@ -144,8 +168,11 @@ public sealed class NaviAppInfo
 			CanMinimize = resource.CanMinimize,
 			CanMaximize = resource.CanMaximize,
 			CanResize = resource.CanResize,
+			AspectRatio = NaviWindowInfo.RatioOf( resource.AspectRatio ),
 			Headless = resource.Headless,
-			Windows = ReadWindows( resource.Windows?.Select( x => (x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true) ) ),
+			Windows = ReadWindows( resource.Windows?.Select( x =>
+				(x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true,
+					NaviWindowInfo.RatioOf( x?.AspectRatio ?? default )) ) ),
 			Shared = resource.Shared,
 			IsPrepackaged = prepackaged,
 			IsSystem = resource.IsSystem,
@@ -158,7 +185,8 @@ public sealed class NaviAppInfo
 	/// <summary>
 	/// The windows a manifest lists. One with a bad or repeated id, or a panel class that isn't loaded, is left out.
 	/// </summary>
-	static NaviWindowInfo[] ReadWindows( IEnumerable<(string Id, string Title, string PanelType, bool CanMinimize, bool CanMaximize, bool CanResize)> windows )
+	static NaviWindowInfo[] ReadWindows(
+		IEnumerable<(string Id, string Title, string PanelType, bool CanMinimize, bool CanMaximize, bool CanResize, float AspectRatio)> windows )
 	{
 		var found = new List<NaviWindowInfo>();
 
@@ -174,6 +202,7 @@ public sealed class NaviAppInfo
 				CanMinimize = window.CanMinimize,
 				CanMaximize = window.CanMaximize,
 				CanResize = window.CanResize,
+				AspectRatio = NaviWindowInfo.CleanRatio( window.AspectRatio ),
 				PanelType = panel,
 			} );
 		}
@@ -194,6 +223,7 @@ public sealed class NaviAppInfo
 		CanMinimize = CanMinimize,
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
+		AspectRatio = AspectRatio,
 		Headless = Headless,
 		Windows = Windows.Select( x => x.ToSnapshot() ).ToList(),
 		Shared = Shared,
@@ -226,8 +256,10 @@ public sealed class NaviAppInfo
 			CanMinimize = app.CanMinimize,
 			CanMaximize = app.CanMaximize,
 			CanResize = app.CanResize,
+			AspectRatio = NaviWindowInfo.CleanRatio( app.AspectRatio ),
 			Headless = app.Headless,
-			Windows = ReadWindows( app.Windows?.Select( x => (x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true) ) ),
+			Windows = ReadWindows( app.Windows?.Select( x =>
+				(x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true, x?.AspectRatio ?? 0f) ) ),
 			Shared = app.Shared,
 			IsPrepackaged = app.IsPrepackaged,
 			IsSystem = app.IsSystem,

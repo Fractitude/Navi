@@ -24,6 +24,12 @@ public sealed class NaviWindowResource
 	[Property] public bool CanMinimize { get; set; } = true;
 	[Property] public bool CanMaximize { get; set; } = true;
 	[Property] public bool CanResize { get; set; } = true;
+
+	/// <summary>
+	/// Shape the window's content keeps when it is resized, as width and height, e.g. 4 by 3. Zero for any shape.
+	/// See <see cref="NaviAppResource.AspectRatio"/>.
+	/// </summary>
+	[Property] public Vector2 AspectRatio { get; set; }
 }
 
 /// <summary>
@@ -88,6 +94,14 @@ public sealed class NaviAppResource : GameResource
 	/// Can be resized by its corners.
 	/// </summary>
 	[Property] public bool CanResize { get; set; } = true;
+
+	/// <summary>
+	/// Shape the window's content (below the title bar) keeps when the player resizes it, as width and height, e.g. 4 by 3
+	/// or the app's own size in pixels. Zero for any shape. The desktop holds it while a corner is dragged, as macOS does
+	/// with a window's content aspect ratio, so the app doesn't fight the drag. The app still scales what it draws to fill
+	/// its window, and centers it when the shape can't be kept, as when maximized.
+	/// </summary>
+	[Property] public Vector2 AspectRatio { get; set; }
 
 	/// <summary>
 	/// In multiplayer, every player sees the same app: it runs on the host, and other clients only draw what it publishes.

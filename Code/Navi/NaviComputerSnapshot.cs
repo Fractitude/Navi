@@ -64,6 +64,7 @@ public sealed class NaviAppSnapshot
 	public bool CanMinimize { get; set; }
 	public bool CanMaximize { get; set; }
 	public bool CanResize { get; set; }
+	public float AspectRatio { get; set; }
 	public bool Headless { get; set; }
 	public List<NaviWindowDefinitionSnapshot> Windows { get; set; } = new();
 	public bool Shared { get; set; }
@@ -83,6 +84,7 @@ public sealed class NaviWindowDefinitionSnapshot
 	public bool CanMinimize { get; set; }
 	public bool CanMaximize { get; set; }
 	public bool CanResize { get; set; }
+	public float AspectRatio { get; set; }
 	public string PanelType { get; set; }
 }
 

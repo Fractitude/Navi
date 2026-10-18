@@ -95,10 +95,11 @@ The full contract — where each kind of rule goes, async and threads, the optio
 | `Color` | Icon background, as a CSS color. |
 | `PanelType` | Full name of the app's panel class. |
 | `Headless` | The app starts with no window, in the system tray. `PanelType` is then its service: a panel that runs while the app does and is never drawn. See "Headless apps and more windows". Default `false`. |
-| `Windows` | More windows the app can open, each with an `Id`, an optional `Title`, a `PanelType` and its own `CanMinimize` / `CanMaximize` / `CanResize`. |
+| `Windows` | More windows the app can open, each with an `Id`, an optional `Title`, a `PanelType` and its own `CanMinimize` / `CanMaximize` / `CanResize` / `AspectRatio`. |
 | `CanMinimize` | Has a minimize button. Default `true`. |
 | `CanMaximize` | Has a maximize button and maximizes on title bar double-click. Default `true`. |
 | `CanResize` | Can be resized by its corners. Default `true`. |
+| `AspectRatio` | Shape the content (below the title bar) keeps while resized, as width and height, e.g. `4,3` or the app's own size in pixels. Zero for any shape. The desktop holds it during the drag, like macOS's content aspect ratio; the app scales what it draws to fill the window, and centers it when maximized. |
 | `Shared` | In multiplayer every player sees the same app: the host runs it, the others draw it. The app must be written for it. See "Multiplayer". Default `false`. |
 | `Permissions` | The permissions the app may have. It is never granted others. See below. |
 | `IsSystem` | A system app: it asks for full system access (root), which allows everything. See "System apps" below. |
