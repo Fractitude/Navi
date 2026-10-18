@@ -81,6 +81,26 @@ public sealed partial class NaviComputer
 	public bool LockSetupRequested { get; set; }
 
 	/// <summary>
+	/// The player in the seat has the dialog that sets or changes the lock open. Sent to everyone, and nothing of what is
+	/// entered in it, so players watching the screen see that something is going on instead of an empty screen. Cleared when
+	/// the seat changes or the screen locks.
+	/// </summary>
+	public bool IsLockSetupOpen { get; private set; }
+
+	/// <summary>
+	/// The user opened or closed the dialog that sets the lock (<see cref="IsLockSetupOpen"/>), only so others can be told.
+	/// </summary>
+	[Rpc.Host]
+	public void UserLockSetupOpen( bool open )
+	{
+		if ( !Authorize() || IsLockSetupOpen == open )
+			return;
+
+		IsLockSetupOpen = open;
+		Version++;
+	}
+
+	/// <summary>
 	/// On this client only, never sent: the secure layer is taking a password or pattern. The player's keys aren't forwarded
 	/// to any app meanwhile (<see cref="InputCapture"/>), so they can't reach the host that way either.
 	/// </summary>

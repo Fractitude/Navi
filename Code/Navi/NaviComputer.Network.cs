@@ -196,6 +196,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			User = snapshot.User,
 			Locked = IsLocked,
 			LockOwner = LockOwner,
+			LockSetupOpen = IsLockSetupOpen,
 			FailedAttempts = FailedAttempts,
 			RetryAt = RetryAt.Ticks,
 		} );
@@ -336,6 +337,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		User = UserId,
 		Locked = IsLocked,
 		LockOwner = LockOwner,
+		LockSetupOpen = IsLockSetupOpen,
 		FailedAttempts = FailedAttempts,
 		RetryAt = RetryAt.Ticks,
 	};
@@ -363,6 +365,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 				User = session.User,
 				Locked = session.Locked,
 				LockOwner = session.LockOwner,
+				LockSetupOpen = session.LockSetupOpen,
 				FailedAttempts = session.FailedAttempts,
 				RetryAt = session.RetryAt,
 			};
@@ -384,6 +387,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		UserId = snapshot.User;
 		IsLocked = snapshot.Locked;
 		LockOwner = snapshot.LockOwner;
+		IsLockSetupOpen = snapshot.LockSetupOpen;
 		seenFailed = snapshot.FailedAttempts;
 		seenRetryAt = snapshot.RetryAt > 0 ? new System.DateTime( snapshot.RetryAt, System.DateTimeKind.Utc ) : default;
 
@@ -519,6 +523,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	{
 		sinceUserActed = 0;
 		userInput.Clear();
+		IsLockSetupOpen = false;
 
 		foreach ( var request in permissionRequests.ToList() )
 			DismissPermissionRequest( request );
@@ -756,6 +761,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return false;
 
 		IsLocked = true;
+		IsLockSetupOpen = false;
 		LockOwner = Networking.IsActive ? UserId : default;
 		Version++;
 		return true;

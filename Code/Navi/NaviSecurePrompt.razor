@@ -11,7 +11,7 @@
 @* the password or pattern is typed or drawn here (NaviLockEntry), made into a proof on this client and only that is sent: *@
 @* see NaviLockCrypto. The dialog that sets or changes the lock is here for the same reason, so no app sees either. *@
 
-<root class="@(Locked ? "active locked" : Request is null && setup == SetupStep.None ? "" : "active") @(Computer?.ThemeClasses)"
+<root class="@(Locked ? "active locked" : Request is null && setup == SetupStep.None && !Watching ? "" : "active") @(Computer?.ThemeClasses)"
 	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
 	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
 	@if ( Locked )
@@ -140,6 +140,17 @@
 			</div>
 		</div>
 	}
+	else if ( Watching )
+	{
+		@* The user's dialog is private to their client, so everyone else sees only that it is open. *@
+		<div class="dialog">
+			<div class="dialog-title">
+				<div class="heading">Lock screen</div>
+				<i class="lock" tooltip="Navi is asking this, not an app">lock</i>
+			</div>
+			<div class="dialog-text">@($"{Computer.User?.DisplayName ?? "The player at the screen"} is setting the lock screen.")</div>
+		</div>
+	}
 	else if ( Request is { } request )
 	{
 		var heading = request.IsRoot
@@ -230,6 +241,14 @@
 	/// The screen is locked (<see cref="NaviComputer.IsLocked"/>). The lock screen shows instead of any prompt, which waits.
 	/// </summary>
 	bool Locked => Computer.IsValid() && Computer.IsLocked;
+
+	/// <summary>
+	/// Another player has the lock setup dialog open. It never reaches this client, so a notice stands in for it.
+	/// </summary>
+	bool Watching => Computer.IsValid() && Computer.IsLockSetupOpen && !Computer.IsSeated && !Locked;
+
+	// Whether the host was told the setup dialog is open.
+	bool setupAnnounced;
 
 	void Unlock()
 	{
@@ -407,6 +426,12 @@
 		if ( setup != SetupStep.None && !wanted )
 			EndSetup();
 
+		if ( (setup != SetupStep.None) != setupAnnounced )
+		{
+			setupAnnounced = setup != SetupStep.None;
+			Computer.UserLockSetupOpen( setupAnnounced );
+		}
+
 		Computer.SecureEntryActive = seated && ((Locked && Computer.HasLockCredential) || setup != SetupStep.None);
 
 		if ( unlockPending )
@@ -573,6 +598,6 @@
 
 	protected override int BuildHash() =>
 		System.HashCode.Combine( (Request, Armed, Computer?.CanUse, Computer?.IsSeated), Unticked.Count, string.Join( ",", Unticked ),
-			Computer?.ThemeClasses, (Locked, Computer?.LockOwner, System.DateTime.Now.Minute),
+			Computer?.ThemeClasses, (Locked, Computer?.LockOwner, System.DateTime.Now.Minute, Watching, Computer?.User),
 			(setup, newKind, SetupMessage, SavingStatus, saveDone), (UnlockMessage, Computer?.HasLockCredential, Computer?.LockKind) );
 }
