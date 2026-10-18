@@ -215,6 +215,10 @@ public static class NaviSystemCalls
 			case "store.install":
 				Require( process, NaviPermissions.InstallFromStore );
 				return await computer.InstallPackageAsync( Arg<string>( args, 0, method ) );
+
+			case "store.uninstall":
+				Require( process, NaviPermissions.InstallApps );
+				return computer.UninstallPackage( Arg<string>( args, 0, method ) );
 		}
 
 		throw new System.NotSupportedException( $"Navi has no call '{method}'." );

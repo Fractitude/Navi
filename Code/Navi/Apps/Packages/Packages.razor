@@ -89,6 +89,13 @@
 							{
 								<div class="button disabled">Installed</div>
 							}
+							else if ( entry.Action == PackageAction.Missing )
+							{
+								<div class="button" tooltip="Installed, but its app didn't load. Remove it, then install it again."
+								     @onclick=@( () => Navi.Act( PackagesViewModel.UninstallPackageAction, entry.Ident ) )>
+									Remove
+								</div>
+							}
 							else if ( entry.Action == PackageAction.Blacklisted )
 							{
 								<div class="button disabled" tooltip="This game blocks this app">Blacklisted</div>
@@ -136,29 +143,54 @@
 
 			@foreach ( var app in UiState.AppRows )
 			{
-				<div class="row">
-					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
-					<div class="info">
-						<div class="title-row">
-							<div class="name">@app.Name</div>
-							@if ( app.Shield )
-							{
-								<div class="root" tooltip=@app.ShieldTooltip><i>shield</i></div>
-							}
+				<div class="entry">
+					<div class="row">
+						<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
+						<div class="info">
+							<div class="title-row">
+								<div class="name">@app.Name</div>
+								@if ( app.Shield )
+								{
+									<div class="root" tooltip=@app.ShieldTooltip><i>shield</i></div>
+								}
+							</div>
+							<div class="description">@app.Description</div>
 						</div>
-						<div class="description">@app.Description</div>
+
+						@if ( app.Action == AppAction.Uninstall )
+						{
+							<div class="button" @onclick=@( () => Navi.Act( PackagesViewModel.UninstallAppAction, app.Id ) )>
+								Uninstall
+							</div>
+						}
+						else if ( app.Action == AppAction.Install )
+						{
+							<div class="button install" @onclick=@( () => Navi.Act( PackagesViewModel.InstallAppAction, app.Id ) )>
+								Install
+							</div>
+						}
+
+						<div class="expand" tooltip=@( app.Expanded ? "Less" : "More" )
+						     @onclick=@( () => Navi.Act( PackagesViewModel.ToggleAppDetailsAction, app.Id ) )>
+							<i>@( app.Expanded ? "expand_less" : "expand_more" )</i>
+						</div>
 					</div>
 
-					@if ( app.Action == AppAction.Uninstall )
+					@if ( app.Expanded )
 					{
-						<div class="button" @onclick=@( () => Navi.Act( PackagesViewModel.UninstallAppAction, app.Id ) )>
-							Uninstall
-						</div>
-					}
-					else if ( app.Action == AppAction.Install )
-					{
-						<div class="button install" @onclick=@( () => Navi.Act( PackagesViewModel.InstallAppAction, app.Id ) )>
-							Install
+						<div class="details">
+							<div class="about">@app.About</div>
+
+							<div class="facts">
+								@foreach ( var fact in app.Facts )
+								{
+									<div class="fact">
+										<i>@fact.Icon</i>
+										<div class="key">@fact.Key</div>
+										<div class="value">@fact.Value</div>
+									</div>
+								}
+							</div>
 						</div>
 					}
 				</div>

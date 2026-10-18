@@ -99,6 +99,16 @@ public static class NaviStore
 	public static string PackageOf( NaviAppResource resource ) =>
 		resource?.ResourcePath is { } path && downloaded.TryGetValue( path, out var ident ) ? ident : null;
 
+	/// <summary>
+	/// The version of each package, by ident, that the package cache had when the app was downloaded.
+	/// </summary>
+	static readonly Dictionary<string, string> installedVersions = new( System.StringComparer.OrdinalIgnoreCase );
+
+	/// <summary>
+	/// The version of a Store package this game downloaded, or null if it hasn't (this session) or it isn't known.
+	/// </summary>
+	public static string InstalledVersion( string ident ) => installedVersions.GetValueOrDefault( ident );
+
 	const string IdentPattern = @"^[a-z0-9_\-]+\.[a-z0-9_\-]+$";
 
 	/// <summary>
@@ -189,6 +199,9 @@ public static class NaviStore
 		}
 
 		downloaded[resource.ResourcePath] = ident;
+
+		if ( Package.TryGetCached( ident, out var cached, false ) )
+			installedVersions[ident] = cached.Revision?.VersionId.ToString();
 
 		var app = NaviAppRegistry.Find( ident );
 		if ( app is null )

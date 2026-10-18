@@ -1101,6 +1101,26 @@ public sealed partial class NaviComputer : Component
 		return true;
 	}
 
+	/// <summary>
+	/// Forget a Store package, and uninstall its app if it is installed. For a package whose app didn't load (the
+	/// download failed), which has no app to uninstall. Returns false if the package wasn't installed.
+	/// </summary>
+	public bool UninstallPackage( string packageIdent )
+	{
+		if ( !IsAuthority || InstalledPackages is null )
+			return false;
+
+		var id = appPackages.FirstOrDefault( x => x.Value == packageIdent ).Key;
+		if ( id is not null && Uninstall( id ) )
+			return true;
+
+		if ( !InstalledPackages.Remove( packageIdent ) )
+			return false;
+
+		Version++;
+		return true;
+	}
+
 	async Task<NaviAppInfo> DownloadPackageAsync( string packageIdent )
 	{
 		downloading.Add( packageIdent );

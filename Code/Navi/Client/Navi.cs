@@ -705,6 +705,11 @@ public sealed class Navi
 		/// </summary>
 		public Task<bool> InstallAsync( string ident ) => navi.CallAsync<bool>( "store.install", ident );
 
+		/// <summary>
+		/// Remove an installed Store package, even one whose app didn't load. Needs <see cref="Permission.InstallApps"/>.
+		/// </summary>
+		public Task<bool> UninstallAsync( string ident ) => navi.CallAsync<bool>( "store.uninstall", ident );
+
 	}
 
 	/// <summary>

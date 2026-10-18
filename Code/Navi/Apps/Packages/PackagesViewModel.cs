@@ -86,6 +86,15 @@ public sealed class PackagesViewModel
 	/// <summary>Idents of the Store entries showing their details.</summary>
 	readonly HashSet<string> expanded = new();
 
+	/// <summary>Ids of the Apps entries showing their details.</summary>
+	readonly HashSet<string> expandedApps = new();
+
+	/// <summary>
+	/// The version of each Store package this computer has installed, by ident, as the engine remembers it. Null when it
+	/// doesn't know. Read when an entry is opened, to set against the latest one.
+	/// </summary>
+	readonly Dictionary<string, string> installedVersions = new();
+
 	/// <summary>Full package info by ident. Search results leave some of it out, like the revision, so it's fetched when an entry is expanded.</summary>
 	readonly Dictionary<string, Package> details = new();
 
@@ -193,11 +202,27 @@ public sealed class PackagesViewModel
 			_ = FetchDetailsAsync( ident );
 	}
 
+	/// <summary>Show or hide an Apps entry's details. A Store app's are fetched the first time it is opened.</summary>
+	public void ToggleAppDetails( string id )
+	{
+		var opened = expandedApps.Add( id );
+		if ( !opened )
+			expandedApps.Remove( id );
+
+		Update( uiState => uiState with { AppRows = BuildAppRows() } );
+
+		if ( opened && storeAppIds.Contains( id ) )
+			_ = FetchDetailsAsync( id );
+	}
+
 	/// <summary>Download and install a Store app.</summary>
 	public void InstallPackage( string ident ) => Run( "install this app", () => navi.Store.InstallAsync( ident ) );
 
 	/// <summary>Install an app that ships with the game or a library.</summary>
 	public void InstallApp( string id ) => Run( "install apps", () => navi.Apps.InstallAsync( id ) );
+
+	/// <summary>Remove an installed Store package, including one whose app didn't load.</summary>
+	public void UninstallPackage( string ident ) => Run( "uninstall apps", () => navi.Store.UninstallAsync( ident ) );
 
 	/// <summary>Uninstall an app.</summary>
 	public void UninstallApp( string id ) => Run( "uninstall apps", () => navi.Apps.UninstallAsync( id ) );
@@ -214,9 +239,11 @@ public sealed class PackagesViewModel
 	public const string SubmitSearchAction = "submit-search";
 	public const string LoadMoreAction = "load-more";
 	public const string ToggleDetailsAction = "toggle-details";
+	public const string ToggleAppDetailsAction = "toggle-app-details";
 	public const string InstallPackageAction = "install-package";
 	public const string InstallAppAction = "install-app";
 	public const string UninstallAppAction = "uninstall-app";
+	public const string UninstallPackageAction = "uninstall-package";
 
 	/// <summary>
 	/// Run an action from the panel. One that is missing its argument is ignored, like a click on nothing. Installing
@@ -238,9 +265,11 @@ public sealed class PackagesViewModel
 			case SubmitSearchAction: SubmitSearch(); break;
 			case LoadMoreAction: LoadMore(); break;
 			case ToggleDetailsAction when !string.IsNullOrEmpty( arg ): ToggleDetails( arg ); break;
+			case ToggleAppDetailsAction when !string.IsNullOrEmpty( arg ): ToggleAppDetails( arg ); break;
 			case InstallPackageAction when !string.IsNullOrEmpty( arg ): InstallPackage( arg ); break;
 			case InstallAppAction when !string.IsNullOrEmpty( arg ): InstallApp( arg ); break;
 			case UninstallAppAction when !string.IsNullOrEmpty( arg ): UninstallApp( arg ); break;
+			case UninstallPackageAction when !string.IsNullOrEmpty( arg ): UninstallPackage( arg ); break;
 		}
 	}
 
@@ -349,6 +378,9 @@ public sealed class PackagesViewModel
 	{
 		try
 		{
+			// What was installed when the app was downloaded, before the backend's word on the latest.
+			installedVersions[ident] = NaviStore.InstalledVersion( ident );
+
 			if ( await Package.FetchAsync( ident, false ) is { } full )
 				details[ident] = full;
 		}
@@ -357,7 +389,7 @@ public sealed class PackagesViewModel
 			Log.Warning( e, $"Packages: couldn't fetch {ident}: {e.Message}" );
 		}
 
-		Update( uiState => uiState with { StoreRows = BuildStoreRows() } );
+		Update( uiState => uiState with { StoreRows = BuildStoreRows(), AppRows = BuildAppRows() } );
 	}
 
 	/// <summary>
@@ -417,7 +449,7 @@ public sealed class PackagesViewModel
 			Thumb = package.Thumb,
 			Official = official,
 			Action = installingPackages.Contains( ident ) ? PackageAction.Installing
-				: installedPackages.Contains( ident ) ? PackageAction.Installed
+				: installedPackages.Contains( ident ) ? (storeAppIds.Contains( ident ) ? PackageAction.Installed : PackageAction.Missing)
 				: blacklistedPackages.Contains( ident ) ? PackageAction.Blacklisted
 				: PackageAction.Install,
 			Expanded = isExpanded,
@@ -433,13 +465,17 @@ public sealed class PackagesViewModel
 		return apps
 			.Select( x => (App: x, FromStore: storeAppIds.Contains( x.Id )) )
 			.Where( x => Matches( kind, x.App.Installed, x.App.Kind, x.FromStore ) )
-			.Select( x => BuildAppRow( x.App ) )
+			.Select( x => BuildAppRow( x.App, x.FromStore ) )
 			.ToArray();
 	}
 
-	static AppRow BuildAppRow( Navi.AppInfo app )
+	AppRow BuildAppRow( Navi.AppInfo app, bool fromStore )
 	{
 		var shielded = app.Kind is Navi.AppKind.Core or Navi.AppKind.System;
+		var isExpanded = expandedApps.Contains( app.Id );
+
+		// A Store app's id is its package ident, so the same details as the Store tab's are there for it.
+		var full = fromStore ? details.GetValueOrDefault( app.Id ) : null;
 
 		return new AppRow
 		{
@@ -453,6 +489,9 @@ public sealed class PackagesViewModel
 			Action = app.Kind == Navi.AppKind.Core ? AppAction.None
 				: app.Installed ? AppAction.Uninstall
 				: AppAction.Install,
+			Expanded = isExpanded,
+			About = isExpanded ? (full is not null ? About( full ) : app.Description) : "",
+			Facts = isExpanded ? AppFacts( app, fromStore, full ) : [],
 		};
 	}
 
@@ -514,6 +553,49 @@ public sealed class PackagesViewModel
 		new("sell", "Version", package.Revision?.VersionId.ToString() ?? "..."),
 		new("save", "Size", Size( package )),
 	];
+
+	/// <summary>
+	/// The facts of an Apps entry. A Store app gets the Store's, with the version it has installed beside the latest
+	/// one, so an update that hasn't arrived shows. The others get what the computer knows.
+	/// </summary>
+	IReadOnlyList<PackageFact> AppFacts( Navi.AppInfo app, bool fromStore, Package full )
+	{
+		var kind = app.Kind switch
+		{
+			Navi.AppKind.Core => "Core app: part of the OS",
+			Navi.AppKind.System => "System app: full system access",
+			_ => fromStore ? "Store app" : "Comes with the game",
+		};
+
+		var facts = new List<PackageFact>
+		{
+			new("category", "Kind", kind),
+			new("tag", "Id", app.Id),
+			new("download_done", "Status", app.Installed ? "Installed" : "Not installed"),
+		};
+
+		if ( !fromStore )
+			return facts;
+
+		var installed = installedVersions.GetValueOrDefault( app.Id );
+		var latest = full?.Revision?.VersionId.ToString();
+
+		facts.Add( new("sell", "Installed version", installed ?? (installedVersions.ContainsKey( app.Id ) ? "Unknown" : "...") ) );
+		facts.Add( new("new_releases", "Latest version", latest ?? "...") );
+
+		if ( installed is not null && latest is not null && installed != latest )
+			facts.Add( new("warning", "Update", "A newer version is published. Restart the game to get it.") );
+
+		if ( full is null )
+			return facts;
+
+		facts.Add( new("person", "Author", full.Org?.Title ?? "Unknown") );
+		facts.Add( new("thumb_up", "Rating", Rating( full )) );
+		facts.Add( new("group", "Players", full.Usage.Total.Users.ToString( "N0" )) );
+		facts.Add( new("update", "Updated", full.Updated.ToLocalTime().ToString( "d MMM yyyy" )) );
+		facts.Add( new("save", "Size", Size( full )) );
+		return facts;
+	}
 
 	static string Rating( Package package )
 	{

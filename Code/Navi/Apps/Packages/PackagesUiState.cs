@@ -16,6 +16,9 @@ public enum PackageAction
 	/// <summary>On this computer: the row says Installed.</summary>
 	Installed,
 
+	/// <summary>Installed, but its app didn't load, so the Apps tab has nothing to uninstall: the row offers Remove.</summary>
+	Missing,
+
 	/// <summary>The game blocks it: the row says Blacklisted, and it can't be installed.</summary>
 	Blacklisted,
 }
@@ -85,6 +88,15 @@ public sealed record AppRow
 	public string ShieldTooltip { get; init; }
 
 	public AppAction Action { get; init; }
+
+	/// <summary>Its details are showing.</summary>
+	public bool Expanded { get; init; }
+
+	/// <summary>The long description. Empty unless <see cref="Expanded"/>.</summary>
+	public string About { get; init; }
+
+	/// <summary>The facts under the description. Empty unless <see cref="Expanded"/>.</summary>
+	public IReadOnlyList<PackageFact> Facts { get; init; } = [];
 }
 
 /// <summary>
