@@ -25,6 +25,7 @@ public sealed class NaviComputerSave
 	public float DisplayScale { get; set; } = 1f;
 	public Navi.Theme Theme { get; set; } = Navi.Theme.Paper;
 	public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;
+	public Navi.Wallpaper Wallpaper { get; set; } = Navi.Wallpaper.Paper;
 	public int BlurLevel { get; set; } = NaviComputer.DefaultBlurLevel;
 	public int TransparencyLevel { get; set; } = NaviComputer.DefaultTransparencyLevel;
 	public bool SnapToScreenEdges { get; set; } = true;

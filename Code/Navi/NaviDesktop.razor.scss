@@ -1079,7 +1079,7 @@ NaviDesktop
 @include desktop-style;
 
 @import "Themes/_paper-dark.scss";
-NaviDesktop.theme-paper.scheme-dark
+NaviDesktop.wallpaper-paper.scheme-dark
 {
 	background-color: #0f0e1d;
 }
@@ -1094,20 +1094,24 @@ NaviDesktop.theme-paper.scheme-dark
 NaviDesktop.theme-glass.scheme-light
 {
 	color: #1d2233;
+}
+
+NaviDesktop.wallpaper-glass.scheme-light
+{
 	background-image: linear-gradient( 135deg, #8fb1ff 0%, #b9a2ff 52%, #ffb3d1 100% );
+}
+
+.wallpaper-glass.scheme-light .wallpaper
+{
+	> .orb.o1 { background-color: rgba( 255, 255, 255, 0.5 ); }
+	> .orb.o2 { background-color: rgba( 80, 120, 255, 0.55 ); }
+	> .orb.o3 { background-color: rgba( 255, 120, 180, 0.55 ); }
 }
 
 .theme-glass.scheme-light
 {
 	@include desktop-style;
 	@include glass-chrome( #1d2233, rgba( 255, 255, 255, 0.7 ), rgba( 255, 255, 255, 0.95 ), rgba( 255, 255, 255, 0.3 ), rgba( 255, 255, 255, 0.5 ), rgba( 255, 255, 255, 0.55 ), #3b6cf6, rgba( 40, 52, 110, 0.28 ), rgba( 24, 30, 56, 0.88 ) );
-
-	.wallpaper
-	{
-		> .orb.o1 { background-color: rgba( 255, 255, 255, 0.5 ); }
-		> .orb.o2 { background-color: rgba( 80, 120, 255, 0.55 ); }
-		> .orb.o3 { background-color: rgba( 255, 120, 180, 0.55 ); }
-	}
 }
 
 .theme-glass.scheme-light.clear-0 { @include glass-fill( rgba( 244, 247, 255, 1 ) ); }
@@ -1120,20 +1124,24 @@ NaviDesktop.theme-glass.scheme-light
 NaviDesktop.theme-glass.scheme-dark
 {
 	color: #eef1fb;
+}
+
+NaviDesktop.wallpaper-glass.scheme-dark
+{
 	background-image: linear-gradient( 135deg, #0a0f2e 0%, #2a1a63 55%, #0c3b5e 100% );
+}
+
+.wallpaper-glass.scheme-dark .wallpaper
+{
+	> .orb.o1 { background-color: rgba( 120, 80, 255, 0.5 ); }
+	> .orb.o2 { background-color: rgba( 40, 130, 255, 0.45 ); }
+	> .orb.o3 { background-color: rgba( 255, 70, 170, 0.4 ); }
 }
 
 .theme-glass.scheme-dark
 {
 	@include desktop-style;
 	@include glass-chrome( #eef1fb, rgba( 255, 255, 255, 0.16 ), rgba( 255, 255, 255, 0.34 ), rgba( 255, 255, 255, 0.06 ), rgba( 255, 255, 255, 0.1 ), rgba( 255, 255, 255, 0.1 ), #4f7bff, rgba( 0, 0, 0, 0.45 ), rgba( 8, 10, 24, 0.92 ) );
-
-	.wallpaper
-	{
-		> .orb.o1 { background-color: rgba( 120, 80, 255, 0.5 ); }
-		> .orb.o2 { background-color: rgba( 40, 130, 255, 0.45 ); }
-		> .orb.o3 { background-color: rgba( 255, 70, 170, 0.4 ); }
-	}
 }
 
 .theme-glass.scheme-dark.clear-0 { @include glass-fill( rgba( 26, 29, 48, 1 ) ); }

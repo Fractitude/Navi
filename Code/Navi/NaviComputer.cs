@@ -346,6 +346,11 @@ public sealed partial class NaviComputer : Component
 	[Property] public Navi.ColorScheme ColorScheme { get; set; } = Navi.ColorScheme.Light;
 
 	/// <summary>
+	/// The picture behind the windows. Not tied to the theme: any wallpaper goes with any theme.
+	/// </summary>
+	[Property] public Navi.Wallpaper Wallpaper { get; set; } = Navi.Wallpaper.Paper;
+
+	/// <summary>
 	/// How strongly the Glass theme blurs what is behind a surface, 0 (not at all) to <see cref="MaxThemeLevel"/>.
 	/// </summary>
 	[Property, Range( 0, MaxThemeLevel )] public int BlurLevel { get; set; } = DefaultBlurLevel;
@@ -358,10 +363,23 @@ public sealed partial class NaviComputer : Component
 
 	/// <summary>
 	/// The classes the desktop and the secure layer put on their root panels for the look above, e.g.
-	/// <c>theme-glass scheme-dark blur-2 clear-2</c>. See <see cref="NaviThemeClasses"/>.
+	/// <c>theme-glass scheme-dark wallpaper-paper blur-2 clear-2</c>. See <see cref="NaviThemeClasses"/>.
 	/// </summary>
 	public string ThemeClasses =>
-		$"{NaviThemeClasses.Of( Theme )} {NaviThemeClasses.Of( ColorScheme )} blur-{BlurLevel} clear-{TransparencyLevel}";
+		$"{NaviThemeClasses.Of( Theme )} {NaviThemeClasses.Of( ColorScheme )} {NaviThemeClasses.Of( Wallpaper )} blur-{BlurLevel} clear-{TransparencyLevel}";
+
+	/// <summary>
+	/// Set <see cref="Wallpaper"/>. Returns false if it isn't a wallpaper.
+	/// </summary>
+	public bool SetWallpaper( Navi.Wallpaper wallpaper )
+	{
+		if ( !IsAuthority || !System.Enum.IsDefined( wallpaper ) )
+			return false;
+
+		Wallpaper = wallpaper;
+		Version++;
+		return true;
+	}
 
 	/// <summary>
 	/// Set <see cref="Theme"/>. Returns false if it isn't a theme.
@@ -747,6 +765,7 @@ public sealed partial class NaviComputer : Component
 		DisplayScale = DisplayScale,
 		Theme = Theme,
 		ColorScheme = ColorScheme,
+		Wallpaper = Wallpaper,
 		BlurLevel = BlurLevel,
 		TransparencyLevel = TransparencyLevel,
 		SnapToScreenEdges = SnapToScreenEdges,
@@ -801,6 +820,7 @@ public sealed partial class NaviComputer : Component
 
 		Theme = System.Enum.IsDefined( save.Theme ) ? save.Theme : Navi.Theme.Paper;
 		ColorScheme = System.Enum.IsDefined( save.ColorScheme ) ? save.ColorScheme : Navi.ColorScheme.Light;
+		Wallpaper = System.Enum.IsDefined( save.Wallpaper ) ? save.Wallpaper : Navi.Wallpaper.Paper;
 		BlurLevel = int.Clamp( save.BlurLevel, 0, MaxThemeLevel );
 		TransparencyLevel = int.Clamp( save.TransparencyLevel, 0, MaxThemeLevel );
 

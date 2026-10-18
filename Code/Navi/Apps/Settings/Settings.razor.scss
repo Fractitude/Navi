@@ -13,7 +13,7 @@
 	// The pages, down the left edge.
 	.sidebar
 	{
-		width: 100px;
+		min-width: 100px;
 		flex-shrink: 0;
 		flex-direction: column;
 		gap: 2px;
@@ -30,6 +30,7 @@
 		padding: 4px 6px;
 		font-size: 12px;
 		font-weight: 700;
+		white-space: nowrap;
 		cursor: pointer;
 
 		i

@@ -48,6 +48,9 @@ public sealed record SettingsUiState
 	/// <summary>Theming: the themes, the color schemes, and the blur and transparency levels, each with the current one selected.</summary>
 	public IReadOnlyList<ThemeOption> ThemeOptions { get; init; } = [];
 
+	/// <summary>Theming: the wallpapers, with the current one selected.</summary>
+	public IReadOnlyList<ThemeOption> WallpaperOptions { get; init; } = [];
+
 	public IReadOnlyList<ThemeOption> SchemeOptions { get; init; } = [];
 
 	public IReadOnlyList<ThemeOption> BlurOptions { get; init; } = [];

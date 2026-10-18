@@ -196,6 +196,7 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 | `Navi.GetDisplayScale( this )` | The display scale (1 is 100%) and the scales the player can pick | |
 | `Navi.SetDisplayScale( this, scale )` | Draw the desktop at one of those scales | `navi.settings.change` |
 | `Navi.GetTheme( this )` | The theme, color scheme, blur level and transparency level | |
+| `Navi.GetWallpaper( this )`, `SetWallpaper( this, wallpaper )` | The wallpaper (`Paper` or `Glass`), independent of the theme | `navi.settings.change` (set) |
 | `Navi.SetTheme( this, theme )`, `SetColorScheme`, `SetBlurLevel`, `SetTransparencyLevel` | Change the look. See Theming | `navi.settings.change` |
 | `Navi.GetSnapping( this )` | Whether windows snap to the screen's edges and to each other's, and the distance in panel pixels | |
 | `Navi.SetSnapToScreenEdges( this, on )`, `SetSnapToWindows`, `SetSnapDistance` | Change window snapping | `navi.settings.change` |
@@ -203,14 +204,15 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 
 ## Theming
 
-The player picks the look of the whole computer in Settings, under Theming, and apps follow it. There are two system-wide settings and two Glass-only ones:
+The player picks the look of the whole computer in Settings, under Theming, and apps follow it. There are three system-wide settings and two Glass-only ones:
 
-- **Theme**: `Paper` (flat, opaque, hard edges; the original look) or `Glass` (rounded, translucent surfaces that blur what is behind them, over a colorful wallpaper).
+- **Theme**: `Paper` (flat, opaque, hard edges; the original look) or `Glass` (rounded, translucent surfaces that blur what is behind them).
+- **Wallpaper**: `Paper` (flat dark) or `Glass` (colorful, soft shapes for translucent surfaces to blur). Any wallpaper goes with any theme.
 - **Color scheme**: `Light` or `Dark`, for every theme.
 - **Blur** (Glass): None, Low, Medium, High or Max (levels 0 to 4).
 - **Transparency** (Glass): None is solid, up to Max, which shows the most of what is behind (levels 0 to 4).
 
-All four are saved with the computer and shown to every player at it. Apps keep using the engine's own components; there is nothing to call.
+All five are saved with the computer and shown to every player at it. Apps keep using the engine's own components; there is nothing to call.
 
 ### Make an app follow the theme
 

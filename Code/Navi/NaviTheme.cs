@@ -17,4 +17,9 @@ public static class NaviThemeClasses
 	/// <c>scheme-light</c> or <c>scheme-dark</c>.
 	/// </summary>
 	public static string Of( Navi.ColorScheme scheme ) => scheme == Navi.ColorScheme.Dark ? "scheme-dark" : "scheme-light";
+
+	/// <summary>
+	/// <c>wallpaper-paper</c> or <c>wallpaper-glass</c>.
+	/// </summary>
+	public static string Of( Navi.Wallpaper wallpaper ) => wallpaper == Navi.Wallpaper.Glass ? "wallpaper-glass" : "wallpaper-paper";
 }

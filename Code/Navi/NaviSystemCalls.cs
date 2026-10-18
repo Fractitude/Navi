@@ -174,6 +174,13 @@ public static class NaviSystemCalls
 				Require( process, NaviPermissions.ChangeSettings );
 				return computer.SetTransparencyLevel( Arg<int>( args, 0, method ) );
 
+			case "wallpaper.get":
+				return (int)computer.Wallpaper;
+
+			case "wallpaper.set":
+				Require( process, NaviPermissions.ChangeSettings );
+				return computer.SetWallpaper( (Navi.Wallpaper)Arg<int>( args, 0, method ) );
+
 			case "snap.get":
 				return (computer.SnapToScreenEdges, computer.SnapToWindows, computer.SnapDistance);
 

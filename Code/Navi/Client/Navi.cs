@@ -258,6 +258,28 @@ public static class Navi
 	}
 
 	/// <summary>
+	/// The picture behind the windows. Independent of the theme; each is drawn for both color schemes.
+	/// </summary>
+	public enum Wallpaper
+	{
+		/// <summary>A flat, dark color.</summary>
+		Paper,
+
+		/// <summary>A gradient with soft colored shapes, for Glass surfaces to blur.</summary>
+		Glass,
+	}
+
+	/// <summary>
+	/// The computer's wallpaper.
+	/// </summary>
+	public static async Task<Wallpaper> GetWallpaper( Panel app ) => (Wallpaper)await Call<int>( app, "wallpaper.get" );
+
+	/// <summary>
+	/// Draw a wallpaper behind the windows. Needs <see cref="Permission.ChangeSettings"/>.
+	/// </summary>
+	public static Task<bool> SetWallpaper( Panel app, Wallpaper wallpaper ) => Call<bool>( app, "wallpaper.set", (int)wallpaper );
+
+	/// <summary>
 	/// Whether a theme is drawn light or dark. Every theme has both.
 	/// </summary>
 	public enum ColorScheme

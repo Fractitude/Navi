@@ -97,6 +97,20 @@
 				<div class="heading">Theming</div>
 
 				<div class="setting">
+					<div class="name">Wallpaper</div>
+					<div class="description">The picture behind the windows.</div>
+					<div class="options">
+						@foreach ( var option in UiState.WallpaperOptions )
+						{
+							<div class="option @( option.Selected ? "active" : "" )"
+							     @onclick=@( () => Navi.Act( this, SettingsViewModel.ChooseWallpaperAction, option.Value.ToString() ) )>
+								@option.Label
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting">
 					<div class="name">Theme</div>
 					<div class="description">How the desktop, windows and apps look.</div>
 					<div class="options">

@@ -37,6 +37,7 @@ public sealed class SettingsViewModel
 
 	Navi.Theme theme;
 	Navi.ColorScheme scheme;
+	Navi.Wallpaper wallpaper;
 	int blurLevel;
 	int transparencyLevel;
 
@@ -90,6 +91,9 @@ public sealed class SettingsViewModel
 			_ = SetScaleAsync( scale );
 	}
 
+	/// <summary>Put another wallpaper behind the windows.</summary>
+	public void ChooseWallpaper( Navi.Wallpaper choice ) => _ = RunAsync( () => Navi.SetWallpaper( app, choice ), "the wallpaper" );
+
 	/// <summary>Draw the computer in another theme.</summary>
 	public void ChooseTheme( Navi.Theme choice ) => _ = RunAsync( () => Navi.SetTheme( app, choice ), "the theme" );
 
@@ -117,6 +121,7 @@ public sealed class SettingsViewModel
 
 	public const string OpenCategoryAction = "open-category";
 	public const string ChooseScaleAction = "choose-scale";
+	public const string ChooseWallpaperAction = "choose-wallpaper";
 	public const string ChooseThemeAction = "choose-theme";
 	public const string ChooseSchemeAction = "choose-scheme";
 	public const string ChooseBlurAction = "choose-blur";
@@ -141,6 +146,10 @@ public sealed class SettingsViewModel
 
 			case ChooseScaleAction when float.TryParse( arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var scale ):
 				ChooseScale( scale );
+				break;
+
+			case ChooseWallpaperAction when int.TryParse( arg, out var value ) && System.Enum.IsDefined( (Navi.Wallpaper)value ):
+				ChooseWallpaper( (Navi.Wallpaper)value );
 				break;
 
 			case ChooseThemeAction when int.TryParse( arg, out var value ) && System.Enum.IsDefined( (Navi.Theme)value ):
@@ -219,11 +228,13 @@ public sealed class SettingsViewModel
 			knownVersion = version;
 			(displayScale, displayScales) = await Navi.GetDisplayScale( app );
 			(theme, scheme, blurLevel, transparencyLevel) = await Navi.GetTheme( app );
+			wallpaper = await Navi.GetWallpaper( app );
 			(snapToScreenEdges, snapToWindows, snapDistance) = await Navi.GetSnapping( app );
 
 			Update( uiState => uiState with
 			{
 				ScaleOptions = BuildScaleOptions(),
+				WallpaperOptions = BuildWallpaperOptions(),
 				ThemeOptions = BuildThemeOptions(),
 				SchemeOptions = BuildSchemeOptions(),
 				BlurOptions = BuildLevelOptions( blurLevel ),
@@ -250,6 +261,9 @@ public sealed class SettingsViewModel
 
 	IReadOnlyList<ScaleOption> BuildScaleOptions() =>
 		displayScales.Select( x => new ScaleOption( x, $"{System.MathF.Round( x * 100 )}%", x == displayScale ) ).ToArray();
+
+	IReadOnlyList<ThemeOption> BuildWallpaperOptions() =>
+		[new( (int)Navi.Wallpaper.Paper, "Paper", wallpaper == Navi.Wallpaper.Paper ), new( (int)Navi.Wallpaper.Glass, "Glass", wallpaper == Navi.Wallpaper.Glass )];
 
 	IReadOnlyList<ThemeOption> BuildThemeOptions() =>
 		[new( (int)Navi.Theme.Paper, "Paper", theme == Navi.Theme.Paper ), new( (int)Navi.Theme.Glass, "Glass", theme == Navi.Theme.Glass )];
