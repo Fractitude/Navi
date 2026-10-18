@@ -199,8 +199,9 @@ Apps call the static `Navi` class with their own panel. Calls are async: they tr
 
 ## Saving
 
-Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, and settings such as the display scale. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
 
+- **Windows open where they were.** Like a window manager, the computer remembers each window's position, size and whether it was maximized (`WindowPlacements`, one per window key) when it closes and when the computer saves, and opens it there next time. Apps don't do anything for it and can't set it. What the app's manifest no longer allows (resizing, maximizing) is dropped, and the desktop keeps the window inside the screen. Uninstalling an app forgets its windows. Only the host keeps placements; clients aren't sent them.
 - **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.
 - **One file per computer.** `SaveId` names the file. Left empty, it is the GameObject's id, which stays the same for an object saved in a scene. Set it on computers that are spawned at runtime.
 - **Save slots.** A game with its own saves sets `NaviSaveData.Slot`, then calls `NaviSaveData.LoadAll( Scene )` when the player loads a save. Loading closes every window. `SaveAll`, and a computer's own `Save` and `Load`, are there for games that turn `AutoSave` off.

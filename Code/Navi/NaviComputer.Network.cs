@@ -248,7 +248,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	NaviComputerSnapshot CaptureSnapshot() => new()
 	{
-		State = CaptureSave(),
+		// Only the host opens windows, so clients don't need where they were. It would change with every drag.
+		State = CaptureSave( placements: false ),
 		Apps = Installed
 			.Concat( running.Select( x => x.App ) )
 			.Concat( permissionRequests.Select( x => x.App ) )

@@ -2,7 +2,8 @@ namespace Sandbox;
 
 /// <summary>
 /// What a <see cref="NaviComputer"/> remembers between game launches: everything the player changed on it. Open windows
-/// aren't in it; a loaded computer starts at an empty desktop.
+/// aren't in it; a loaded computer starts at an empty desktop. Where each window was is
+/// (<see cref="WindowPlacements"/>), so it opens there again.
 /// </summary>
 public sealed class NaviComputerSave
 {
@@ -13,6 +14,39 @@ public sealed class NaviComputerSave
 	public List<string> RootApps { get; set; } = new();
 	public List<string> TaskbarOrder { get; set; } = new();
 	public float DisplayScale { get; set; } = 1f;
+	public List<NaviWindowPlacement> WindowPlacements { get; set; } = new();
+}
+
+/// <summary>
+/// Where a window was when it last closed, or when the computer was last saved, so it opens there again. The window
+/// manager keeps one per window (<see cref="NaviWindow.Key"/>) from what the player did; apps can't set it.
+/// </summary>
+public sealed class NaviWindowPlacement
+{
+	/// <summary>
+	/// The window's <see cref="NaviWindow.Key"/>.
+	/// </summary>
+	public string Window { get; set; }
+
+	/// <summary>
+	/// Position when not maximized, in panel pixels.
+	/// </summary>
+	public Vector2 Position { get; set; }
+
+	/// <summary>
+	/// Size when not maximized, in panel pixels, or null to fit the app's content.
+	/// </summary>
+	public Vector2? Size { get; set; }
+
+	public bool IsMaximized { get; set; }
+
+	internal static NaviWindowPlacement Of( NaviWindow window ) => new()
+	{
+		Window = window.Key,
+		Position = window.Position,
+		Size = window.Size,
+		IsMaximized = window.IsMaximized,
+	};
 }
 
 /// <summary>

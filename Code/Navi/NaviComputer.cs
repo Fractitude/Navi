@@ -481,7 +481,8 @@ public sealed partial class NaviComputer : Component
 		if ( IsAuthority )
 			DestroyStandIn();
 
-		if ( AutoSave && IsAuthority && savedVersion != Version )
+		// Moving a window doesn't change Version; Save skips the write if nothing changed.
+		if ( AutoSave && IsAuthority )
 			Save();
 	}
 
@@ -557,7 +558,13 @@ public sealed partial class NaviComputer : Component
 	/// <summary>
 	/// What the player changed on this computer, as it would be saved.
 	/// </summary>
-	public NaviComputerSave CaptureSave() => new()
+	public NaviComputerSave CaptureSave() => CaptureSave( placements: true );
+
+	/// <summary>
+	/// What the player changed on this computer. Without <paramref name="placements"/>, it leaves out where windows
+	/// were, which only the host needs.
+	/// </summary>
+	NaviComputerSave CaptureSave( bool placements ) => new()
 	{
 		InstalledApps = InstalledApps?.ToList() ?? new(),
 		InstalledPackages = InstalledPackages?.ToList() ?? new(),
@@ -566,7 +573,21 @@ public sealed partial class NaviComputer : Component
 		RootApps = RootApps?.ToList() ?? new(),
 		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
 		DisplayScale = DisplayScale,
+		WindowPlacements = placements ? CapturePlacements() : new(),
 	};
+
+	/// <summary>
+	/// Where each window was when it last closed, and where the open ones are now. Sorted, so the same layout is the
+	/// same JSON.
+	/// </summary>
+	List<NaviWindowPlacement> CapturePlacements()
+	{
+		var all = new Dictionary<string, NaviWindowPlacement>( windowPlacements );
+		foreach ( var window in Windows.Where( x => !x.IsService ) )
+			all[window.Key] = NaviWindowPlacement.Of( window );
+
+		return all.Values.OrderBy( x => x.Window, System.StringComparer.Ordinal ).ToList();
+	}
 
 	/// <summary>
 	/// Take on a save's state. Unknown permissions and display scales are dropped; the rest is checked where it is used,
@@ -588,6 +609,17 @@ public sealed partial class NaviComputer : Component
 		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
 
 		DisplayScale = IsDisplayScale( save.DisplayScale ) ? save.DisplayScale : 1f;
+
+		// Whether a window may be maximized or sized is checked when it opens, against its manifest at that time.
+		windowPlacements.Clear();
+		foreach ( var placement in save.WindowPlacements ?? [] )
+		{
+			if ( placement is null || string.IsNullOrEmpty( placement.Window ) || !IsPlausible( placement.Position )
+				|| (placement.Size is { } size && (!IsPlausible( size ) || size.x <= 0f || size.y <= 0f)) )
+				continue;
+
+			windowPlacements[placement.Window] = placement;
+		}
 
 		Version++;
 	}
@@ -817,6 +849,11 @@ public sealed partial class NaviComputer : Component
 		ReviewedApps?.Remove( id );
 		RootApps?.Remove( id );
 		TaskbarOrder?.Remove( id );
+
+		var windowPrefix = id + NaviWindow.KeySeparator;
+		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )
+			windowPlacements.Remove( key );
+
 		Version++;
 		return true;
 	}
@@ -882,16 +919,38 @@ public sealed partial class NaviComputer : Component
 
 	NaviWindow NewWindow( NaviProcess process, NaviWindowInfo info )
 	{
-		// Cascade new windows so they don't cover each other exactly.
-		var offset = (Windows.Count() % 6) * 16f;
-
-		return new NaviWindow
+		var window = new NaviWindow
 		{
 			Process = process,
 			Info = info,
-			Position = new Vector2( 16f + offset, 8f + offset ),
 			ZIndex = ++topZIndex,
 		};
+
+		// A window opens where it was last time, as far as its app allows now. The desktop keeps it inside the screen.
+		if ( !window.IsService && windowPlacements.TryGetValue( window.Key, out var placement ) )
+		{
+			window.Position = placement.Position;
+			window.Size = info.CanResize ? placement.Size : null;
+			window.IsMaximized = info.CanMaximize && placement.IsMaximized;
+			return window;
+		}
+
+		// Cascade new windows so they don't cover each other exactly.
+		var offset = (Windows.Count() % 6) * 16f;
+		window.Position = new Vector2( 16f + offset, 8f + offset );
+		return window;
+	}
+
+	/// <summary>
+	/// Window key (<see cref="NaviWindow.Key"/>) to where the window was when it last closed. The window manager keeps
+	/// them; apps can't set them. Saved with the computer, on the host only.
+	/// </summary>
+	readonly Dictionary<string, NaviWindowPlacement> windowPlacements = new();
+
+	void RememberPlacement( NaviWindow window )
+	{
+		if ( !window.IsService )
+			windowPlacements[window.Key] = NaviWindowPlacement.Of( window );
 	}
 
 	/// <summary>
@@ -899,8 +958,13 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void Close( string id )
 	{
-		if ( !IsAuthority || running.RemoveAll( x => x.App.Id == id ) == 0 )
+		if ( !IsAuthority || GetProcess( id ) is not { } process )
 			return;
+
+		foreach ( var window in process.Windows )
+			RememberPlacement( window );
+
+		running.RemoveAll( x => x.App.Id == id );
 
 		// Nobody is left to answer these.
 		foreach ( var request in permissionRequests.Where( x => x.App.Id == id && !x.IsReview ).ToList() )
@@ -946,6 +1010,7 @@ public sealed partial class NaviComputer : Component
 			return true;
 		}
 
+		RememberPlacement( window );
 		window.Process.WindowList.Remove( window );
 		Version++;
 		return true;
