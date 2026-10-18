@@ -23,7 +23,7 @@ A computer for s&box games: a desktop with windows, a taskbar, and apps that can
 - Drag the title bar to move a window. Windows can't leave the screen.
 - Drag a corner to resize. Double-click the title bar, or use its button, to maximize.
 - Minimize hides the window and keeps the app running. Click the taskbar icon to bring it back. Clicking the icon of the window in front minimizes it.
-- Right-click a taskbar icon for its menu: Open, Permissions..., Close.
+- The taskbar shows the apps the player pinned and the apps that are open. Nothing is pinned by default. Right-click an app in the start menu and choose Pin to taskbar; right-click a taskbar icon for its menu: Open, Permissions..., Pin to taskbar or Unpin from taskbar, Close.
 - A shield in a window's title bar means the app has full system access (root). Nothing else shows it.
 - An app can have more than one window, and a headless app has none at first, only an icon in the system tray. See "Headless apps and more windows".
 - A title bar always starts with the app's name; a window's own title (if the manifest gives one) comes after it. The exception is a pre-packaged app, which is part of the OS: its window's own title stands alone (the Web Browser shows the page's title), and the app's name shows while there is none.
@@ -57,7 +57,7 @@ Every app is made the same way, whether it is built in, part of a game, or publi
    ```
 
 3. In `Assets/`, create a Navi App asset (`.napp`). Set Title and Panel Type (the panel's full class name, e.g. `NotesApp.Notes`), and fill in the rest of the manifest below.
-4. Save. The app is now in Packages. Click Install, then click its taskbar icon.
+4. Save. The app is now in Packages. Click Install, then open it from the start menu.
 
 The desktop panel is 640 x 360 logical pixels and the area above the taskbar is 312 high, so keep apps small.
 

@@ -272,8 +272,8 @@ public sealed partial class NaviComputer : Component
 	[Property] public List<string> RootApps { get; set; } = new();
 
 	/// <summary>
-	/// Ids of apps in the order the player put their taskbar icons in. Installed apps that aren't listed come after them,
-	/// in the registry's order. See <see cref="TaskbarApps"/>.
+	/// Ids of the apps the player pinned to the taskbar, in the order they put them in. Nothing is pinned by default, not
+	/// even core apps. See <see cref="TaskbarApps"/>.
 	/// </summary>
 	[Property] public List<string> TaskbarOrder { get; set; } = new();
 
@@ -890,20 +890,45 @@ public sealed partial class NaviComputer : Component
 	public IEnumerable<NaviAppInfo> Installed => NaviAppRegistry.All.Where( IsInstalled );
 
 	/// <summary>
-	/// Installed apps in taskbar order: those in <see cref="TaskbarOrder"/> first, as listed, then the rest.
+	/// The apps on the taskbar: the pinned ones in the player's order, then the running ones that have a window and aren't
+	/// pinned, in the order they were opened.
 	/// </summary>
 	public IEnumerable<NaviAppInfo> TaskbarApps
 	{
 		get
 		{
-			var order = TaskbarOrder ?? [];
-			return Installed.OrderBy( x => order.IndexOf( x.Id ) is var i and >= 0 ? i : int.MaxValue );
+			var pinned = (TaskbarOrder ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
+			var open = Running.Where( x => x.Windows.Any( y => !y.IsService ) ).Select( x => x.App );
+
+			return pinned.Concat( open ).DistinctBy( x => x.Id );
 		}
 	}
 
 	/// <summary>
-	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Returns false if the app isn't
-	/// installed, the index is out of range, or the icon is already there.
+	/// Whether an app is pinned to the taskbar.
+	/// </summary>
+	public bool IsTaskbarPinned( string id ) => TaskbarOrder?.Contains( id ) == true;
+
+	/// <summary>
+	/// Pin an installed app to the taskbar, after the others, or unpin it. Returns false if the app isn't installed.
+	/// </summary>
+	public bool ToggleTaskbarPin( string id )
+	{
+		if ( !IsAuthority || !IsInstalled( id ) )
+			return false;
+
+		TaskbarOrder ??= new();
+		if ( !TaskbarOrder.Remove( id ) )
+			TaskbarOrder.Add( id );
+
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Only the pinned apps keep the
+	/// order: an app that isn't pinned goes back after them when it closes. Returns false if the app isn't on the taskbar,
+	/// the index is out of range, or the icon is already there.
 	/// </summary>
 	public bool MoveTaskbarApp( string id, int index )
 	{
@@ -917,7 +942,7 @@ public sealed partial class NaviComputer : Component
 
 		apps.RemoveAt( from );
 		apps.Insert( index, id );
-		TaskbarOrder = apps;
+		TaskbarOrder = apps.Where( IsTaskbarPinned ).ToList();
 		Version++;
 		return true;
 	}

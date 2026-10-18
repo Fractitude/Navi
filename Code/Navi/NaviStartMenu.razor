@@ -8,7 +8,7 @@
 @* Lock, which locks the screen. *@
 @* Part of the desktop, so it draws the host's state and sends the player's choices to it, like the taskbar does. *@
 
-<root>
+<root @onmousedown=@(() => ContextApp = null)>
 	<div class="search">
 		<TextEntry @ref="Entry" Icon="search" Placeholder="Search apps" HasClearButton=@true MaxLength=@( 64 )
 		           OnTextEdited=@SearchEdited
@@ -41,7 +41,8 @@
 
 						<div @key=@app.Id class="tile"
 						     @onmousedown=@( ( PanelEvent e ) => StartDrag( e, index ) )
-						     @onclick=@(() => Open( app ))>
+						     @onclick=@(() => Open( app ))
+						     @onrightclick=@(() => OpenContext( app ))>
 							<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 							<div class="name">@app.Name</div>
 							<div class="star on"
@@ -61,7 +62,7 @@
 				<div class="recent">
 					@foreach ( var app in Recent )
 					{
-						<div @key=@app.Id class="entry" @onclick=@(() => Open( app ))>
+						<div @key=@app.Id class="entry" @onclick=@(() => Open( app )) @onrightclick=@(() => OpenContext( app ))>
 							<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 							<div class="name">@app.Name</div>
 							<div class="badge">NEW</div>
@@ -80,7 +81,7 @@
 
 			@foreach ( var app in section.Apps )
 			{
-				<div @key=@app.Id class="entry" @onclick=@(() => Open( app ))>
+				<div @key=@app.Id class="entry" @onclick=@(() => Open( app )) @onrightclick=@(() => OpenContext( app ))>
 					<div class="icon" style="background-color: @app.Color;"><i>@app.Icon</i></div>
 					<div class="text">
 						<div class="name">@app.Name</div>
@@ -97,6 +98,20 @@
 			}
 		}
 	</div>
+
+	@if ( ContextApp is not null )
+	{
+		var pinnedToTaskbar = Computer.IsTaskbarPinned( ContextApp.Id );
+
+		@* Right-click menu, where the mouse was. *@
+		<div class="context" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;">
+			<div class="item"
+			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
+			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )>
+				<i>keep</i>@(pinnedToTaskbar ? "Unpin from taskbar" : "Pin to taskbar")
+			</div>
+		</div>
+	}
 
 	<div class="footer">
 		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.SettingsApp ))>
@@ -149,6 +164,10 @@
 	Vector2 dragStartMouse;
 	bool dragMoved;
 	RealTimeSince sinceDrop = DropClickTime;
+
+	// The app whose right-click menu is open, and where it opened.
+	NaviAppInfo ContextApp;
+	Vector2 ContextPosition;
 
 	bool Searching => !string.IsNullOrWhiteSpace( Query );
 
@@ -216,8 +235,25 @@
 			Open( app );
 	}
 
+	void OpenContext( NaviAppInfo app )
+	{
+		ContextApp = app;
+		ContextPosition = MousePosition * ScaleFromScreen;
+	}
+
+	void ToggleTaskbarPin( PanelEvent e, NaviAppInfo app )
+	{
+		e.StopPropagation();
+		ContextApp = null;
+
+		if ( Computer.CanUse )
+			Computer.UserToggleTaskbarPin( app.Id );
+	}
+
 	void Open( NaviAppInfo app )
 	{
+		ContextApp = null;
+
 		// Letting go of a dragged app isn't a click on it.
 		if ( dragMoved || sinceDrop < DropClickTime )
 			return;
@@ -349,5 +385,5 @@
 	}
 
 	protected override int BuildHash() =>
-		System.HashCode.Combine( Computer?.Version, Query, Computer?.CanUse, Computer?.InstalledApps?.Count );
+		System.HashCode.Combine( Computer?.Version, Query, Computer?.CanUse, Computer?.InstalledApps?.Count, ContextApp?.Id, ContextPosition );
 }

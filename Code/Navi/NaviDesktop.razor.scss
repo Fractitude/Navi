@@ -363,6 +363,42 @@ NaviDesktop
 		pointer-events: all;
 		z-index: 100;
 
+		// Right-click menu on an app, where the mouse was.
+		.context
+		{
+			position: absolute;
+			flex-direction: column;
+			padding: 2px;
+			color: $ink-t;
+			background-color: $surface-bg;
+			border: 2px solid $ink-bc;
+			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+			z-index: 10;
+
+			.item
+			{
+				flex-direction: row;
+				align-items: center;
+				gap: 6px;
+				padding: 4px 8px;
+				font-size: 12px;
+				font-weight: 700;
+				white-space: nowrap;
+				cursor: pointer;
+
+				i
+				{
+					font-size: 14px;
+				}
+
+				&:hover
+				{
+					color: $paper-t;
+					background-color: $ink-bg;
+				}
+			}
+		}
+
 		.search
 		{
 			flex-shrink: 0;
@@ -1001,7 +1037,7 @@ NaviDesktop
 		}
 	}
 
-	.menu .item
+	.menu .item, .start-menu .context .item
 	{
 		border-radius: 8px;
 	}

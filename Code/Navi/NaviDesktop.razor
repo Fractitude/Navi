@@ -112,6 +112,10 @@
 							</div>
 						}
 
+						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserToggleTaskbarPin( app.Id ) ))>
+							<i>keep</i>@(Computer.IsTaskbarPinned( app.Id ) ? "Unpin from taskbar" : "Pin to taskbar")
+						</div>
+
 						@if ( process is not null )
 						{
 							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserClose( app.Id ) ))><i>close</i>Close</div>
@@ -358,7 +362,8 @@
 		UpdateDrawing();
 		KeepSeat();
 
-		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
+		// The menu's icon goes when its app is uninstalled, or closed without being pinned.
+		if ( MenuApp is not null && Computer.TaskbarApps.All( x => x.Id != MenuApp ) )
 			MenuApp = null;
 
 		if ( TrayMenuApp is not null && Computer.GetProcess( TrayMenuApp )?.Tray is null )

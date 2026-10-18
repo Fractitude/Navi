@@ -674,6 +674,16 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// The user pinned an app to the taskbar, or unpinned it. See <see cref="ToggleTaskbarPin"/>.
+	/// </summary>
+	[Rpc.Host]
+	public void UserToggleTaskbarPin( string id )
+	{
+		if ( Authorize() )
+			ToggleTaskbarPin( id );
+	}
+
+	/// <summary>
 	/// The user pinned an app to the start menu, or unpinned it. See <see cref="ToggleStartFavorite"/>.
 	/// </summary>
 	[Rpc.Host]
