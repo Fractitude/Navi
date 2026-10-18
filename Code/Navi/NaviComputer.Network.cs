@@ -125,6 +125,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			WarnIfNotNetworked();
 			UpdateTransmit();
 			UpdateStandIn();
+			UpdateOutOfRange();
 			UpdateSeat();
 
 			if ( sinceSnapshot > SnapshotInterval )
@@ -200,6 +201,21 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return true;
 
 		return connection.DistanceSquared( WorldPosition ) <= NetworkRange * NetworkRange;
+	}
+
+	/// <summary>
+	/// On the host: the host's camera is out of <see cref="NetworkRange"/>, and it isn't the user. The host still runs the
+	/// computer, but draws the stand-in (<see cref="NaviScreenStandIn"/>) in place of the screen, as players out of range
+	/// see it. Always false on clients: the engine turns the computer off for them.
+	/// </summary>
+	public bool IsOutOfRange { get; private set; }
+
+	void UpdateOutOfRange()
+	{
+		IsOutOfRange = standIn.IsValid()
+			&& !IsUser
+			&& Scene.Camera is { } camera
+			&& camera.WorldPosition.DistanceSquared( WorldPosition ) > NetworkRange * NetworkRange;
 	}
 
 	/// <summary>

@@ -277,9 +277,34 @@
 			baseScale = Unscaled( screen.Scale );
 		}
 
-		var prompt = layer.Components.Create<NaviSecurePrompt>( false );
-		prompt.Computer = Computer;
-		prompt.Enabled = true;
+		securePrompt = layer.Components.Create<NaviSecurePrompt>( false );
+		securePrompt.Computer = Computer;
+		securePrompt.Enabled = true;
+	}
+
+	NaviSecurePrompt securePrompt;
+
+	/// <summary>
+	/// Draw neither the desktop nor the secure layer while the computer is out of range of the host's camera
+	/// (<see cref="NaviComputer.IsOutOfRange"/>): the stand-in shows instead. Only the drawing stops. The panels keep
+	/// running, and the apps in them.
+	/// </summary>
+	void UpdateDrawing()
+	{
+		var show = !Computer.IsOutOfRange;
+		SetDrawing( this, show );
+		SetDrawing( securePrompt, show );
+	}
+
+	// The engine skips drawing a fully transparent root panel. Null gives the opacity back to the style sheets. Only
+	// world panels: a ScreenPanel sets its root's opacity itself, and a computer drawn on one has no stand-in.
+	static void SetDrawing( PanelComponent component, bool show )
+	{
+		float? opacity = show ? null : 0f;
+		if ( component.IsValid()
+			&& component.Panel?.FindRootPanel() is Sandbox.UI.WorldPanel root
+			&& root.Style.Opacity != opacity )
+			root.Style.Opacity = opacity;
 	}
 
 	// The desktop's panel and the secure layer's, which are scaled together, and the scale they started with: 100%.
@@ -320,6 +345,7 @@
 	protected override void OnUpdate()
 	{
 		ApplyDisplayScale();
+		UpdateDrawing();
 		KeepSeat();
 
 		if ( MenuApp is not null && !Computer.IsInstalled( MenuApp ) )
