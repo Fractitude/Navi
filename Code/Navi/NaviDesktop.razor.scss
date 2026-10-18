@@ -233,6 +233,7 @@ NaviDesktop
 	// Between the pinned apps and the ones that are only open.
 	.taskbar .divider
 	{
+		position: relative; // So NaviDesktop can move it while an icon is dragged.
 		width: 2px;
 		height: 24px;
 		flex-shrink: 0;

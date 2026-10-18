@@ -585,7 +585,9 @@
 		taskbarDragHandle = e.This;
 		taskbarDragApps = Computer.TaskbarApps.Take( icons.Count ).Select( x => x.Id ).ToList();
 		taskbarDragFrom = from;
-		taskbarDragSlot = (icons[1].Box.Rect.Left - icons[0].Box.Rect.Left) * taskbar.ScaleFromScreen;
+		// The divider is between two of the icons, so the slot is the smallest step from one to the next.
+		taskbarDragSlot = Enumerable.Range( 0, icons.Count - 1 )
+			.Min( i => icons[i + 1].Box.Rect.Left - icons[i].Box.Rect.Left ) * taskbar.ScaleFromScreen;
 		taskbarDragStartMouse = MousePosition( taskbar ).x;
 		taskbarDragMoved = false;
 	}
@@ -630,8 +632,12 @@
 			CloseMenus();
 		}
 
+		// A pinned icon stays among the pinned ones. The others can go anywhere: in among the pinned ones pins them.
+		var pinnedCount = taskbarDragApps.Count( Computer.IsTaskbarPinned );
+		var last = from < pinnedCount ? pinnedCount - 1 : icons.Count - 1;
+
 		var slot = taskbarDragSlot;
-		var offset = Clamp( delta, -from * slot, (icons.Count - 1 - from) * slot );
+		var offset = Clamp( delta, -from * slot, (last - from) * slot );
 		var to = slot > 0f ? from + (int)System.MathF.Round( offset / slot ) : from;
 
 		if ( released )
@@ -652,6 +658,10 @@
 			icons[i].Style.Left = Length.Pixels( shift );
 			icons[i].SetClass( "dragging", i == from );
 		}
+
+		// The divider moves one slot when an icon is dragged in among the pinned ones, where it becomes pinned.
+		if ( taskbar.Children.FirstOrDefault( x => x.HasClass( "divider" ) ) is { } divider )
+			divider.Style.Left = Length.Pixels( from >= pinnedCount && to < pinnedCount ? slot : 0f );
 	}
 
 	/// <summary>
@@ -667,6 +677,9 @@
 		}
 
 		taskbarDragHandle?.Parent?.SetClass( "reordering", false );
+
+		if ( taskbarDragHandle?.Parent?.Children.FirstOrDefault( x => x.HasClass( "divider" ) ) is { } divider )
+			divider.Style.Left = null;
 
 		if ( taskbarDragMoved )
 			sinceTaskbarDrag = 0;

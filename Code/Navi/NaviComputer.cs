@@ -932,8 +932,9 @@ public sealed partial class NaviComputer : Component
 
 	/// <summary>
 	/// Move an app's taskbar icon to <paramref name="index"/> in <see cref="TaskbarApps"/>. Moving an app that isn't pinned
-	/// pins it, where it was put. Returns false if the app isn't on the taskbar, the index is out of range, or the icon is
-	/// already there.
+	/// in among the pinned ones pins it there; moving it among the apps that are only open reorders those, and pins nothing.
+	/// A pinned app stays among the pinned ones. Returns false if the app isn't on the taskbar, the index is out of range,
+	/// or the icon is already there.
 	/// </summary>
 	public bool MoveTaskbarApp( string id, int index )
 	{
@@ -945,11 +946,29 @@ public sealed partial class NaviComputer : Component
 		if ( from < 0 || index < 0 || index >= apps.Count || index == from )
 			return false;
 
+		var pinnedCount = apps.Count( IsTaskbarPinned );
+		var wasPinned = IsTaskbarPinned( id );
+
 		apps.RemoveAt( from );
 		apps.Insert( index, id );
-		var pinned = TaskbarOrder?.ToHashSet() ?? [];
-		pinned.Add( id );
-		TaskbarOrder = apps.Where( pinned.Contains ).ToList();
+
+		if ( wasPinned || index < pinnedCount )
+		{
+			var pinned = TaskbarOrder?.ToHashSet() ?? [];
+			pinned.Add( id );
+			TaskbarOrder = apps.Where( pinned.Contains ).ToList();
+		}
+		else
+		{
+			// Open apps are in the order they were opened, so the new order goes into the slots they have in it.
+			var order = apps.Where( x => !IsTaskbarPinned( x ) ).ToList();
+			var slots = Enumerable.Range( 0, running.Count ).Where( i => order.Contains( running[i].App.Id ) ).ToList();
+			var moved = slots.Select( i => running[i] ).OrderBy( x => order.IndexOf( x.App.Id ) ).ToList();
+
+			for ( var i = 0; i < slots.Count; i++ )
+				running[slots[i]] = moved[i];
+		}
+
 		Version++;
 		return true;
 	}
