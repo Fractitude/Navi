@@ -46,7 +46,7 @@ public sealed class PackagesViewModel
 	static (string Key, string Name)[] Kinds =>
 	[
 		("installed", "Installed"),
-		("store", "Store"),
+		("store", "From Store"),
 		("core", "Core"),
 		("system", "System"),
 		("prepackaged", "Pre-packaged"),

@@ -73,7 +73,8 @@ Packages
 	position: absolute;
 	top: 34px;
 	right: 6px;
-	width: 120px;
+	// Grows to fit the longest item.
+	min-width: 120px;
 	flex-direction: column;
 	padding: 2px;
 	color: #2a2840;
@@ -86,7 +87,7 @@ Packages
 		flex-direction: row;
 		align-items: center;
 		gap: 4px;
-		padding: 4px 6px;
+		padding: 4px 12px 4px 6px;
 		font-size: 12px;
 		font-weight: 700;
 		white-space: nowrap;
