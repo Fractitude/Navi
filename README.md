@@ -82,6 +82,8 @@ An app is three parts, and the panel is only the third:
 
 One place changes the state, the panel never decides, not every change is worth a redraw, and what the panel must do to its own tree stays in the panel.
 
+To check an app without clicking through it (compile, play, press its buttons and keys from a script, screenshot it), see [`docs/driving-navi.md`](docs/driving-navi.md).
+
 The full contract — where each kind of rule goes, async and threads, the optional `Changed` event, and a Kotlin-to-C# translation — is in [`docs/app-architecture.md`](docs/app-architecture.md). `Packages` is the reference implementation: `Code/Navi/Apps/Packages/`. Store apps split the same way. A view model is plain C# that takes the panel's `Navi`, never the panel.
 
 ### The manifest (`.napp`)
@@ -202,6 +204,15 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Files.GetAppFolderAsync()`, `GetDrivesAsync()`, `GetVersionAsync()`, `GetTrashPathAsync()` | The app's own folder, the drives, a version to poll | |
 | `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
 
+## Keyboard shortcuts
+
+An app gets the player's keyboard shortcuts in `NaviApp.OnShortcut( string keys )` while its window is in front and the player sits at the computer: `"ctrl+c"`, `"delete"`, `"f2"`, `"shift+down"`.
+
+- **The keys.** "ctrl+", "shift+" and "alt+" in that order, then the key: a letter or digit, `enter`, `backspace`, `delete`, `tab`, `space`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `f1` to `f12` (`NaviInputCapture.ShortcutKeys`). Escape is never one: it stands the player up.
+- **Not while typing.** While a `TextEntry` has the keys, no shortcuts are sent, so typing in a field doesn't trigger them.
+- **Where they go.** A shared app gets them on the host's copy, from whichever client the player is on (`NaviComputer.UserShortcut`, which checks the caller is the user and the window is the one in front). Any other app gets them on the player's own copy, like its clicks.
+- **Not tested with a real keyboard** in this version: the delivery was tested with `UserShortcut`, and the key names were checked against the engine's.
+
 ## Notifications
 
 An app tells the player something with a notification, like on Windows or macOS:
@@ -230,6 +241,7 @@ Each computer has its own files, laid out like macOS and Linux rather than Windo
 - **Symlinks** (`CreateSymlinkAsync`) point at a path, absolute or relative to the link's folder, like on Unix. Paths go through them, so a link to a folder acts as that folder. They break when the target moves. A path through more than 16 links is taken for a loop.
 - **Aliases** (`CreateAliasAsync`) point at the entry itself, like macOS aliases and Windows shortcuts, so they keep finding it after a move or rename on its drive. Paths don't go through them: an app calls `ResolveAliasAsync` (Files does on a double-click). If the target's drive is out, or the target was moved to another drive (which copies it), the alias falls back to the path it was made with. Shortcuts point at files and folders only, never at apps.
 - **Trash.** `TrashAsync` moves an entry to its drive's `.Trash` and remembers where it was; `RestoreAsync` puts it back. `DeleteAsync` deletes for good.
+- **The Files app** has a right-click menu that fits what was clicked: one entry (open, rename, links, copy, cut, trash; eject for a drive), several (with how many), or the empty list (new folder or file, paste, select all, hidden files); in the trash, put back and delete for good, or empty the trash. Right-clicking an entry that isn't selected selects it first. It selects several entries: Ctrl+click adds or removes one, Shift+click selects a range, a click on the empty list clears the selection. Copy, cut, paste, trash, restore and making links work on all of them; rename on one. Its shortcuts, as in Windows' File Explorer: arrows (with Shift to extend), Home, End, Ctrl+A, Enter opens, F2 renames, Delete trashes (deletes for good in the trash), Ctrl+C, Ctrl+X, Ctrl+V, Backspace or Alt+Up goes up, Alt+Left and Alt+Right go back and forward, Ctrl+Shift+N makes a folder, Ctrl+H shows hidden files. After going up, the folders below stay in the path, grayed out, until the player opens a folder off it.
 - **Errors.** A failed call throws `Navi.FileException`, whose `Error` says why (`NotFound`, `AlreadyExists`, `NoSpace`, `Protected`...). A missing permission throws `MissingPermissionException` as usual.
 - **Permissions.** Every app has a folder of its own, `/Library/Apps/{app id}` with the id's `/` written as `:` (`GetAppFolderAsync`). It needs no permission there. Anything else needs `navi.files.access`. A path is checked as the app wrote it and again where it leads, so a symlink in the app's folder can't reach out of it, and `..` can't either. Uninstalling an app deletes its folder.
 - **Saved by the host.** Each drive is saved apart from its computer, in `navi/saves/{slot}/drives/{drive id}.json` (the inside drive's id is the computer's `SaveKey`), a second after its files last change. Removable drives keep their own id, so their files go with them. Files aren't sent to clients.

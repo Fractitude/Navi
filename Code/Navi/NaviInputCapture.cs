@@ -41,6 +41,61 @@ public sealed class NaviInputCapture : Component
 	};
 
 	/// <summary>
+	/// The keys an app gets as keyboard shortcuts (<c>NaviApp.OnShortcut</c>) while it is in front: the engine's key name,
+	/// and the name the app gets. Ctrl, Shift and Alt held with one go before it, e.g. "ctrl+shift+n". Escape isn't one: it
+	/// stands the player up.
+	/// </summary>
+	public static IReadOnlyList<(string Key, string Name)> ShortcutKeys { get; } =
+	[
+		.."abcdefghijklmnopqrstuvwxyz0123456789".Select( x => (x.ToString(), x.ToString()) ),
+		("ENTER", "enter"), ("BACKSPACE", "backspace"), ("DEL", "delete"), ("TAB", "tab"), ("SPACE", "space"),
+		("UPARROW", "up"), ("DOWNARROW", "down"), ("LEFTARROW", "left"), ("RIGHTARROW", "right"),
+		("HOME", "home"), ("END", "end"), ("PGUP", "pageup"), ("PGDN", "pagedown"),
+		.."123456789".Select( x => ("F" + x, "f" + x) ),
+		("F10", "f10"), ("F11", "f11"), ("F12", "f12"),
+	];
+
+	static readonly HashSet<string> shortcutNames = ShortcutKeys.Select( x => x.Name ).ToHashSet();
+
+	/// <summary>
+	/// Is <paramref name="keys"/> a shortcut as apps get them: "ctrl+", "shift+", "alt+" in that order, then a key name?
+	/// </summary>
+	public static bool IsShortcut( string keys )
+	{
+		if ( string.IsNullOrEmpty( keys ) || keys.Length > 32 )
+			return false;
+
+		var rest = keys;
+		foreach ( var modifier in new[] { "ctrl+", "shift+", "alt+" } )
+		{
+			if ( rest.StartsWith( modifier, System.StringComparison.Ordinal ) )
+				rest = rest[modifier.Length..];
+		}
+
+		return shortcutNames.Contains( rest );
+	}
+
+	/// <summary>
+	/// Send the shortcuts the player pressed this frame to the app in front, once the screen fills the view. Not while a
+	/// text field has the keys: there they are typing.
+	/// </summary>
+	void ForwardShortcuts()
+	{
+		if ( state != State.Captured || Computer.InputCapture is not { } window || Sandbox.UI.InputFocus.Current is Sandbox.UI.TextEntry )
+			return;
+
+		var modifiers = (Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" ) ? "ctrl+" : "")
+			+ (Input.Keyboard.Down( "SHIFT" ) || Input.Keyboard.Down( "RSHIFT" ) ? "shift+" : "")
+			+ (Input.Keyboard.Down( "ALT" ) || Input.Keyboard.Down( "RALT" ) ? "alt+" : "");
+
+		foreach ( var (key, name) in ShortcutKeys )
+		{
+			if ( Input.Keyboard.Pressed( key ) )
+				Computer.SendShortcut( window, modifiers + name );
+		}
+	}
+
+	/// <summary>
 	/// What was last sent to the host, sorted and joined, so it is only sent again when it changes.
 	/// </summary>
 	string sentInput;
@@ -101,6 +156,7 @@ public sealed class NaviInputCapture : Component
 
 		UpdateLeave();
 		ForwardInput();
+		ForwardShortcuts();
 
 		foreach ( var c in controllers )
 		{

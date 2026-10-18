@@ -937,6 +937,32 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// The user pressed a keyboard shortcut (<see cref="NaviInputCapture.ShortcutKeys"/>) while <paramref name="window"/> was
+	/// in front. A shared app gets it on the host, as an RPC; any other app on this client, where its clicks go too.
+	/// </summary>
+	internal void SendShortcut( NaviWindow window, string keys )
+	{
+		if ( window.App.Shared )
+			UserShortcut( window.App.Id, window.Id, keys );
+		else if ( appHosts.TryGetValue( window.Key, out var host ) )
+			host.DeliverShortcut( keys );
+	}
+
+	/// <summary>
+	/// The user pressed a keyboard shortcut in a shared app. Delivered to the host's copy only, and only if that window is
+	/// the one in front, so a shortcut goes where the player's keys go.
+	/// </summary>
+	[Rpc.Host]
+	public void UserShortcut( string id, string windowId, string keys )
+	{
+		if ( !Authorize() || GetWindow( id, windowId ) is not { App.Shared: true } window || InputCapture != window
+			|| !NaviInputCapture.IsShortcut( keys ) || !appHosts.TryGetValue( window.Key, out var host ) )
+			return;
+
+		host.DeliverShortcut( keys );
+	}
+
+	/// <summary>
 	/// On the host: the input actions the user holds while they sit at the computer (<see cref="NaviInputCapture"/>).
 	/// </summary>
 	readonly HashSet<string> userInput = new();

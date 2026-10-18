@@ -54,9 +54,10 @@
 				{
 					@if ( crumb.Path != "/" )
 					{
-						<div class="separator">/</div>
+						<div class="separator @( crumb.Ahead ? "ahead" : "" )">/</div>
 					}
-					<div class="crumb" @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, crumb.Path ) )>@crumb.Label</div>
+					<div class="crumb @( crumb.Ahead ? "ahead" : "" )"
+					     @onclick=@( () => Navi.Act( FilesViewModel.OpenPathAction, crumb.Path ) )>@crumb.Label</div>
 				}
 			</div>
 		</div>
@@ -68,7 +69,7 @@
 				     @onclick=@( () => Navi.Act( FilesViewModel.RestoreAction ) )>
 					<i>restore_from_trash</i>
 				</div>
-				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Delete for good"
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Delete for good (Delete)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.TrashAction ) )>
 					<i>delete_forever</i>
 				</div>
@@ -79,14 +80,14 @@
 			}
 			else
 			{
-				<div class="tool" tooltip="New folder" @onclick=@( () => Navi.Act( FilesViewModel.NewFolderAction ) )>
+				<div class="tool" tooltip="New folder (Ctrl+Shift+N)" @onclick=@( () => Navi.Act( FilesViewModel.NewFolderAction ) )>
 					<i>create_new_folder</i>
 				</div>
 				<div class="tool" tooltip="New text file" @onclick=@( () => Navi.Act( FilesViewModel.NewFileAction ) )>
 					<i>note_add</i>
 				</div>
 				<div class="divider"></div>
-				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Rename"
+				<div class="tool @( UiState.CanRename ? "" : "disabled" )" tooltip="Rename (F2)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.StartRenameAction ) )>
 					<i>edit</i>
 				</div>
@@ -99,20 +100,20 @@
 					<i>link</i>
 				</div>
 				<div class="divider"></div>
-				<div class="tool @( UiState.HasSelection ? "" : "disabled" )" tooltip="Copy"
+				<div class="tool @( UiState.HasSelection ? "" : "disabled" )" tooltip="Copy (Ctrl+C)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.CopyAction ) )>
 					<i>content_copy</i>
 				</div>
-				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Cut"
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Cut (Ctrl+X)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.CutAction ) )>
 					<i>content_cut</i>
 				</div>
-				<div class="tool @( UiState.CanPaste ? "" : "disabled" )" tooltip="Paste"
+				<div class="tool @( UiState.CanPaste ? "" : "disabled" )" tooltip="Paste (Ctrl+V)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.PasteAction ) )>
 					<i>content_paste</i>
 				</div>
 				<div class="divider"></div>
-				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Move to trash"
+				<div class="tool @( UiState.CanChange ? "" : "disabled" )" tooltip="Move to trash (Delete)"
 				     @onclick=@( () => Navi.Act( FilesViewModel.TrashAction ) )>
 					<i>delete</i>
 				</div>
@@ -121,7 +122,7 @@
 			<div class="spacer"></div>
 
 			<div class="tool @( UiState.ShowHidden ? "active" : "" )"
-			     tooltip=@( UiState.ShowHidden ? "Hide hidden files" : "Show hidden files" )
+			     tooltip=@( UiState.ShowHidden ? "Hide hidden files (Ctrl+H)" : "Show hidden files (Ctrl+H)" )
 			     @onclick=@( () => Navi.Act( FilesViewModel.ToggleHiddenAction ) )>
 				<i>@( UiState.ShowHidden ? "visibility" : "visibility_off" )</i>
 			</div>
@@ -150,7 +151,9 @@
 			</div>
 		}
 
-		<div class="list">
+		@* A click on the list itself, not on an entry, clears the selection; a right-click there opens the folder's menu. *@
+		<div class="list" @onclick=@( () => Navi.Act( FilesViewModel.SelectAction ) )
+		     @onrightclick=@( ( PanelEvent e ) => RightClick( null, e ) )>
 			@if ( UiState.ListEmpty )
 			{
 				<div class="empty">@UiState.EmptyText</div>
@@ -158,8 +161,9 @@
 
 			@foreach ( var row in UiState.Rows )
 			{
-				<div class="row @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" )"
-				     @onclick=@( () => Navi.Act( FilesViewModel.SelectAction, row.Path ) )
+				<div class="row @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" ) @( row.Cursor ? "cursor" : "" )"
+				     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
+				     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
 				     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
 					<i class="icon">@row.Icon</i>
 					<div class="name">@row.Name</div>
@@ -175,6 +179,34 @@
 
 		<div class="status">@UiState.Status</div>
 	</div>
+
+	@* The right-click menu, last so it draws over everything, with a backdrop that closes it. *@
+	@if ( UiState.MenuOpen )
+	{
+		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
+
+		<div class="menu" style="left: @( MenuLeft )px; top: @( MenuTop )px;">
+			@if ( UiState.MenuHeading is not null )
+			{
+				<div class="heading">@UiState.MenuHeading</div>
+			}
+
+			@foreach ( var item in UiState.Menu )
+			{
+				@if ( item.Separator )
+				{
+					<div class="separator"></div>
+				}
+
+				<div class="item @( item.Enabled ? "" : "disabled" )"
+				     @onclick=@( () => Navi.Act( FilesViewModel.ChooseMenuAction, item.Id ) )>
+					<i>@item.Icon</i>
+					<div class="item-label">@item.Label</div>
+					<div class="keys">@item.Keys</div>
+				</div>
+			}
+		</div>
+	}
 </root>
 
 @code
@@ -208,6 +240,60 @@
 	}
 
 	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	/// <summary>
+	/// The host's copy gets the player's keyboard shortcuts, from whichever client they're on.
+	/// </summary>
+	protected override void OnShortcut( string keys ) => ViewModel.Shortcut( keys );
+
+	/// <summary>
+	/// A click on an entry selects it, Ctrl+click adds it to the selection or takes it away, Shift+click selects the
+	/// range to it. The keys are read here, on the clicking player's client, and go with the action. The click stops
+	/// here, so the list behind it doesn't clear the selection.
+	/// </summary>
+	void ClickRow( string path, PanelEvent e )
+	{
+		e.StopPropagation();
+
+		var mode = e is MousePanelEvent { HasCtrl: true } ? FilesViewModel.ToggleMode
+			: e is MousePanelEvent { HasShift: true } ? FilesViewModel.RangeMode
+			: "";
+
+		Navi.Act( FilesViewModel.SelectAction, path, mode );
+	}
+
+	/// <summary>
+	/// A right-click on an entry, or on the empty list (null): the menu opens where the mouse is, in this panel's pixels.
+	/// </summary>
+	void RightClick( string path, PanelEvent e )
+	{
+		e.StopPropagation();
+
+		var at = MousePosition * ScaleFromScreen;
+		var culture = System.Globalization.CultureInfo.InvariantCulture;
+		Navi.Act( FilesViewModel.OpenMenuAction, path ?? "", at.x.ToString( culture ), at.y.ToString( culture ) );
+	}
+
+	const float MenuWidth = 190f, MenuItemHeight = 20f, MenuSeparatorHeight = 5f, MenuPadding = 6f;
+
+	/// <summary>
+	/// Where the menu is drawn: where it was opened, moved left or up as far as it takes to stay inside the panel. Every
+	/// player's copy works it out from its own size, the same as the host's.
+	/// </summary>
+	float MenuLeft => System.Math.Max( 0f, System.Math.Min( UiState.MenuX, PanelSize.x - MenuWidth ) );
+
+	float MenuTop
+	{
+		get
+		{
+			var height = MenuPadding + UiState.Menu.Count * MenuItemHeight + UiState.Menu.Count( x => x.Separator ) * MenuSeparatorHeight
+				+ (UiState.MenuHeading is null ? 0f : MenuItemHeight);
+
+			return System.Math.Max( 0f, System.Math.Min( UiState.MenuY, PanelSize.y - height ) );
+		}
+	}
+
+	Vector2 PanelSize => Box.Rect.Size * ScaleFromScreen;
 
 	/// <summary>
 	/// The eject button sits on the drive's row: it ejects, and the row's own click doesn't open the drive.

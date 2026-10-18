@@ -6,14 +6,15 @@ namespace NaviApps;
 public sealed record PlaceItem( string Path, string Label, string Icon, bool Selected, bool Ejectable = false );
 
 /// <summary>
-/// A part of the path above the list, which opens that folder.
+/// A part of the path above the list, which opens that folder. <see cref="Ahead"/> parts are below the open folder:
+/// where the player came from before going up, drawn grayed out so they can go back down.
 /// </summary>
-public sealed record Crumb( string Path, string Label );
+public sealed record Crumb( string Path, string Label, bool Ahead = false );
 
 /// <summary>
 /// An entry in the open folder. <see cref="Detail"/> is a file's size or a folder's item count; <see cref="Badge"/> marks
 /// a link ("link" for a symlink, "alias" for an alias, empty otherwise); <see cref="Faded"/> is a hidden entry shown
-/// anyway.
+/// anyway; <see cref="Cursor"/> is where the arrow keys move from.
 /// </summary>
 public sealed record FileRow(
 	string Path,
@@ -23,7 +24,14 @@ public sealed record FileRow(
 	string Modified,
 	string Badge,
 	bool Selected,
-	bool Faded );
+	bool Faded,
+	bool Cursor );
+
+/// <summary>
+/// An entry of the right-click menu. <see cref="Keys"/> is its keyboard shortcut, shown at the right, or empty. A
+/// <see cref="Separator"/> is a line before the item.
+/// </summary>
+public sealed record MenuItem( string Id, string Label, string Icon, string Keys = "", bool Enabled = true, bool Separator = false );
 
 /// <summary>
 /// Everything the Files panel draws. Replaced whole by <see cref="FilesViewModel"/> on every change.
@@ -60,8 +68,11 @@ public sealed record FilesUiState
 	/// <summary>The open folder is a trash folder: entries there are restored or deleted for good.</summary>
 	public bool InTrash { get; init; }
 
-	/// <summary>An entry is selected, and it can be moved, renamed or deleted.</summary>
+	/// <summary>Entries are selected, and they can all be moved or deleted.</summary>
 	public bool CanChange { get; init; }
+
+	/// <summary>One entry is selected, and it can be renamed.</summary>
+	public bool CanRename { get; init; }
 
 	public bool HasSelection { get; init; }
 	public bool CanPaste { get; init; }
@@ -78,6 +89,19 @@ public sealed record FilesUiState
 
 	/// <summary>Counts rename bars opened, so the panel focuses the field once for each.</summary>
 	public int RenameSession { get; init; }
+
+	/// <summary>The right-click menu's items, or empty while it is closed.</summary>
+	public IReadOnlyList<MenuItem> Menu { get; init; } = [];
+
+	/// <summary>Over the menu when several entries are selected: how many. Null otherwise.</summary>
+	public string MenuHeading { get; init; }
+
+	/// <summary>Where the menu was opened, in the panel's pixels from its top left. The panel keeps it on screen.</summary>
+	public float MenuX { get; init; }
+
+	public float MenuY { get; init; }
+
+	public bool MenuOpen => Menu.Count > 0;
 
 	public bool Renaming => RenamePath is not null;
 	public bool ListEmpty => Rows.Count == 0;

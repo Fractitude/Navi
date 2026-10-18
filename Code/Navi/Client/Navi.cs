@@ -53,6 +53,17 @@ public abstract class NaviApp : Panel
 	{
 	}
 
+	/// <summary>
+	/// The player pressed a keyboard shortcut while this app's window was in front, e.g. "ctrl+c", "delete", "f2" or
+	/// "shift+down": "ctrl+", "shift+" and "alt+" in that order, then the key (a letter or digit, "enter", "backspace",
+	/// "delete", "tab", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1" to "f12"). Not
+	/// while a text field has the keys, and never Escape, which stands the player up. A shared app gets it on the host's
+	/// copy, any other app on the player's own, like clicks.
+	/// </summary>
+	protected virtual void OnShortcut( string keys )
+	{
+	}
+
 	protected override void OnEvent( PanelEvent e )
 	{
 		if ( Navi.TryGetAction( e, out var action, out var args ) )
@@ -65,6 +76,13 @@ public abstract class NaviApp : Panel
 		if ( Navi.TryGetTrayClick( e, out var item ) )
 		{
 			OnTrayClick( item );
+			e.StopPropagation();
+			return;
+		}
+
+		if ( Navi.TryGetShortcut( e, out var keys ) )
+		{
+			OnShortcut( keys );
 			e.StopPropagation();
 			return;
 		}
@@ -324,6 +342,21 @@ public sealed class Navi
 		}
 
 		item = null;
+		return false;
+	}
+
+	/// <summary>
+	/// Is this event a keyboard shortcut for the app? See <see cref="TryGetAction"/> and <see cref="NaviApp.OnShortcut"/>.
+	/// </summary>
+	public static bool TryGetShortcut( PanelEvent e, out string keys )
+	{
+		if ( e.Name == "navi.shortcut" && e.Value is string value )
+		{
+			keys = value;
+			return true;
+		}
+
+		keys = null;
 		return false;
 	}
 

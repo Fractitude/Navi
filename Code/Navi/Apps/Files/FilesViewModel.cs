@@ -44,6 +44,16 @@ public sealed class FilesViewModel
 	public const string ToggleHiddenAction = "toggle-hidden";
 	public const string EjectAction = "eject";
 	public const string DismissNoticeAction = "dismiss-notice";
+	public const string SelectAllAction = "select-all";
+	public const string OpenMenuAction = "open-menu";
+	public const string ChooseMenuAction = "choose-menu";
+	public const string CloseMenuAction = "close-menu";
+
+	/// <summary>
+	/// How <see cref="SelectAction"/> treats what was selected, as its second argument: replace it (none, a plain click),
+	/// add or take away the entry (Ctrl+click), or select from the last clicked entry to this one (Shift+click).
+	/// </summary>
+	public const string ToggleMode = "toggle", RangeMode = "range";
 
 	// What the computer said.
 
@@ -62,12 +72,39 @@ public sealed class FilesViewModel
 
 	readonly Stack<string> back = new();
 	readonly Stack<string> forward = new();
-	string selected;
+
+	/// <summary>
+	/// The deepest folder on the open folder's path the player has been to: going up keeps it, so the path above the
+	/// list still shows where they came from. Opening anywhere off that path starts it over.
+	/// </summary>
+	string trail = StartFolder;
+
+	/// <summary>The selected entries, in the order they were selected.</summary>
+	readonly List<string> selection = new();
+
+	/// <summary>Where a Shift+click or Shift+arrow selection starts from: the entry last clicked on its own.</summary>
+	string anchor;
+
+	/// <summary>The entry the arrow keys move from: the one last clicked or reached with them.</summary>
+	string cursor;
+
+	/// <summary>An entry to select once the folder being opened is listed.</summary>
+	string selectAfterRefresh;
+
+	/// <summary>The paths of the entries as the list shows them, in order, for ranges and the arrow keys.</summary>
+	List<string> shownPaths = new();
+
 	bool showHidden;
 	string notice;
 
+	/// <summary>The right-click menu while it is open (see <see cref="OpenMenu"/>), else empty.</summary>
+	IReadOnlyList<MenuItem> menu = [];
+
+	string menuHeading;
+	Vector2 menuAt;
+
 	/// <summary>What Copy or Cut took, for Paste.</summary>
-	(string Path, bool Cut)? clipboard;
+	(IReadOnlyList<string> Paths, bool Cut)? clipboard;
 
 	string renamePath;
 
@@ -151,9 +188,11 @@ public sealed class FilesViewModel
 			listError = Describe( e );
 		}
 
-		if ( selected is not null && entries.All( x => x.Path != selected ) )
-			selected = null;
+		selection.RemoveAll( x => entries.All( y => y.Path != x ) );
+		if ( selectAfterRefresh is { } wanted && entries.Any( x => x.Path == wanted ) )
+			SelectOnly( wanted );
 
+		selectAfterRefresh = null;
 		Rebuild();
 	}
 
@@ -165,11 +204,28 @@ public sealed class FilesViewModel
 	{
 		var arg = args is { Length: > 0 } ? args[0] : null;
 
+		// Anything the player does closes the menu, the way a click anywhere else does.
+		if ( action is not (OpenMenuAction or ChooseMenuAction or SetRenameTextAction) )
+			menu = [];
+
 		switch ( action )
 		{
+			case OpenMenuAction:
+				OpenMenu( arg, Number( args, 1 ), Number( args, 2 ) );
+				break;
+
+			case ChooseMenuAction when arg is not null:
+				ChooseMenu( arg );
+				break;
+
+			case CloseMenuAction:
+				Rebuild();
+				break;
+
 			case OpenPathAction when arg is not null: OpenPath( arg ); break;
 			case OpenAction when arg is not null: _ = OpenAsync( arg ); break;
-			case SelectAction: Select( arg ); break;
+			case SelectAction: Select( arg, args is { Length: > 1 } ? args[1] : "" ); break;
+			case SelectAllAction: SelectAll(); break;
 			case BackAction: GoBack(); break;
 			case ForwardAction: GoForward(); break;
 			case UpAction: GoUp(); break;
@@ -207,8 +263,12 @@ public sealed class FilesViewModel
 
 	void GoTo( string to )
 	{
+		if ( !IsWithin( trail, to ) )
+			trail = to;
+
 		path = to;
-		selected = null;
+		selection.Clear();
+		anchor = cursor = null;
 		renamePath = null;
 		Rebuild();
 		_ = RefreshAsync();
@@ -278,9 +338,17 @@ public sealed class FilesViewModel
 			// An alias to a file shows the file where it is.
 			if ( info.Kind == Navi.FileKind.Alias )
 			{
-				OpenPath( FolderOf( entry ) );
-				selected = entry;
-				Rebuild();
+				if ( FolderOf( entry ) == path )
+				{
+					SelectOnly( entry );
+					Rebuild();
+				}
+				else
+				{
+					OpenPath( FolderOf( entry ) );
+					selectAfterRefresh = entry;
+				}
+
 				return;
 			}
 
@@ -292,13 +360,266 @@ public sealed class FilesViewModel
 		}
 	}
 
-	public void Select( string entry )
+	/// <summary>
+	/// A click on an entry, with <paramref name="mode"/> saying which keys were held (<see cref="ToggleMode"/>,
+	/// <see cref="RangeMode"/>, or none). A plain click on nothing clears the selection.
+	/// </summary>
+	public void Select( string entry, string mode = "" )
 	{
 		if ( renamePath is not null && entry != renamePath )
 			renamePath = null;
 
-		selected = entries.Any( x => x.Path == entry ) ? entry : null;
+		if ( entry is null || !shownPaths.Contains( entry ) )
+		{
+			if ( mode == "" )
+				selection.Clear();
+
+			Rebuild();
+			return;
+		}
+
+		switch ( mode )
+		{
+			case ToggleMode:
+				if ( !selection.Remove( entry ) )
+					selection.Add( entry );
+
+				anchor = entry;
+				break;
+
+			case RangeMode:
+				SelectRange( anchor ?? entry, entry );
+				break;
+
+			default:
+				SelectOnly( entry );
+				break;
+		}
+
+		cursor = entry;
 		Rebuild();
+	}
+
+	void SelectOnly( string entry )
+	{
+		selection.Clear();
+		selection.Add( entry );
+		anchor = cursor = entry;
+	}
+
+	/// <summary>
+	/// Select the entries from <paramref name="from"/> to <paramref name="to"/> as the list shows them, and nothing else.
+	/// </summary>
+	void SelectRange( string from, string to )
+	{
+		var (a, b) = (shownPaths.IndexOf( from ), shownPaths.IndexOf( to ));
+		if ( a < 0 )
+			a = b;
+
+		selection.Clear();
+		selection.AddRange( shownPaths.Skip( System.Math.Min( a, b ) ).Take( System.Math.Abs( a - b ) + 1 ) );
+		anchor = from;
+	}
+
+	public void SelectAll()
+	{
+		selection.Clear();
+		selection.AddRange( shownPaths );
+		Rebuild();
+	}
+
+	/// <summary>
+	/// The arrow keys, Home and End: move to the entry <paramref name="by"/> rows away (or to the first or last), and
+	/// select it, or with <paramref name="extend"/> (Shift) everything from the anchor to it.
+	/// </summary>
+	void MoveCursor( int by, bool extend )
+	{
+		if ( shownPaths.Count == 0 )
+			return;
+
+		var at = cursor is null ? -1 : shownPaths.IndexOf( cursor );
+		var to = by switch
+		{
+			int.MinValue => 0,
+			int.MaxValue => shownPaths.Count - 1,
+			_ when at < 0 => by > 0 ? 0 : shownPaths.Count - 1,
+			_ => int.Clamp( at + by, 0, shownPaths.Count - 1 ),
+		};
+
+		var entry = shownPaths[to];
+		if ( extend )
+			SelectRange( anchor ?? cursor ?? entry, entry );
+		else
+			SelectOnly( entry );
+
+		cursor = entry;
+		renamePath = null;
+		Rebuild();
+	}
+
+	/// <summary>
+	/// A keyboard shortcut (<c>NaviApp.OnShortcut</c>), as in Windows' File Explorer, with Ctrl+Shift+N and Ctrl+H from
+	/// Linux file managers. Keys it doesn't know do nothing.
+	/// </summary>
+	public void Shortcut( string keys )
+	{
+		if ( menu.Count > 0 )
+		{
+			menu = [];
+			Rebuild();
+		}
+
+		// The rename field has the keys while it is open; these are the ones that reach the app around it.
+		if ( renamePath is not null && keys is not ("enter" or "f2") )
+			return;
+
+		switch ( keys )
+		{
+			case "up": MoveCursor( -1, false ); break;
+			case "down": MoveCursor( 1, false ); break;
+			case "shift+up": MoveCursor( -1, true ); break;
+			case "shift+down": MoveCursor( 1, true ); break;
+			case "home": MoveCursor( int.MinValue, false ); break;
+			case "end": MoveCursor( int.MaxValue, false ); break;
+			case "shift+home": MoveCursor( int.MinValue, true ); break;
+			case "shift+end": MoveCursor( int.MaxValue, true ); break;
+			case "ctrl+a": SelectAll(); break;
+			case "enter" when renamePath is not null: _ = SubmitRenameAsync(); break;
+			case "enter" when selection.Count == 1: _ = OpenAsync( selection[0] ); break;
+			case "f2" when renamePath is null: StartRename(); break;
+			case "delete": _ = TrashAsync(); break;
+			case "ctrl+c": Copy( cut: false ); break;
+			case "ctrl+x": Copy( cut: true ); break;
+			case "ctrl+v": _ = PasteAsync(); break;
+			case "ctrl+shift+n": _ = NewFolderAsync(); break;
+			case "ctrl+h": ToggleHidden(); break;
+			case "backspace" or "alt+up": GoUp(); break;
+			case "alt+left": GoBack(); break;
+			case "alt+right": GoForward(); break;
+		}
+	}
+
+	// The right-click menu.
+
+	static float Number( string[] args, int index ) =>
+		args is not null && index < args.Length
+		&& float.TryParse( args[index], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value )
+		&& float.IsFinite( value )
+			? value
+			: 0f;
+
+	/// <summary>
+	/// A right-click at (<paramref name="x"/>, <paramref name="y"/>) in the panel, on <paramref name="entry"/> or on the
+	/// empty list (null). An entry that isn't selected becomes the selection, as in Windows; one that is keeps the whole
+	/// selection, so the menu acts on all of it. On the empty list nothing stays selected, and the menu is about the folder.
+	/// </summary>
+	public void OpenMenu( string entry, float x, float y )
+	{
+		renamePath = null;
+
+		if ( entry is not null && shownPaths.Contains( entry ) )
+		{
+			if ( !selection.Contains( entry ) )
+				SelectOnly( entry );
+
+			cursor = entry;
+		}
+		else
+		{
+			selection.Clear();
+		}
+
+		menuAt = new Vector2( x, y );
+		(menu, menuHeading) = BuildMenu();
+		Rebuild();
+	}
+
+	/// <summary>
+	/// What the menu offers for what is selected: one entry, several, or (nothing selected) the open folder.
+	/// </summary>
+	(IReadOnlyList<MenuItem> Items, string Heading) BuildMenu()
+	{
+		var inTrash = IsTrash( path );
+		var canChange = CanChange( selection );
+
+		if ( selection.Count == 0 )
+		{
+			if ( inTrash )
+			{
+				return ([
+					new( EmptyTrashAction, "Empty trash", "delete_sweep", "", entries.Count > 0 ),
+					new( SelectAllAction, "Select all", "select_all", "Ctrl+A", shownPaths.Count > 0, Separator: true ),
+				], null);
+			}
+
+			return ([
+				new( NewFolderAction, "New folder", "create_new_folder", "Ctrl+Shift+N" ),
+				new( NewFileAction, "New text file", "note_add" ),
+				new( PasteAction, "Paste", "content_paste", "Ctrl+V", clipboard is not null, Separator: true ),
+				new( SelectAllAction, "Select all", "select_all", "Ctrl+A", shownPaths.Count > 0, Separator: true ),
+				new( ToggleHiddenAction, showHidden ? "Hide hidden files" : "Show hidden files",
+					showHidden ? "visibility_off" : "visibility", "Ctrl+H" ),
+			], null);
+		}
+
+		if ( inTrash )
+		{
+			return ([
+				new( RestoreAction, "Put back", "restore_from_trash", "", canChange ),
+				new( TrashAction, "Delete for good", "delete_forever", "Delete", canChange ),
+			], selection.Count > 1 ? $"{selection.Count} items" : null);
+		}
+
+		if ( selection.Count > 1 )
+		{
+			return ([
+				new( MakeAliasAction, "Make aliases", "shortcut" ),
+				new( MakeSymlinkAction, "Make symlinks", "link" ),
+				new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
+				new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
+				new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
+			], $"{selection.Count} items");
+		}
+
+		var entry = entries.FirstOrDefault( x => x.Path == selection[0] );
+		if ( entry is { IsDrive: true } )
+		{
+			return ([
+				new( OpenAction, "Open", "folder_open", "Enter" ),
+				new( EjectAction, "Eject", "eject", Separator: true ),
+			], null);
+		}
+
+		return ([
+			new( OpenAction, entry?.Kind == Navi.FileKind.Alias ? "Show original" : "Open", "folder_open", "Enter" ),
+			new( StartRenameAction, "Rename", "edit", "F2", canChange, Separator: true ),
+			new( MakeAliasAction, "Make alias", "shortcut" ),
+			new( MakeSymlinkAction, "Make symlink", "link" ),
+			new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
+			new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
+			new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
+		], null);
+	}
+
+	/// <summary>
+	/// The player chose a menu item. Only an item the menu offers, enabled, does anything: the id came over the network.
+	/// </summary>
+	public void ChooseMenu( string id )
+	{
+		var item = menu.FirstOrDefault( x => x.Id == id );
+		menu = [];
+		Rebuild();
+
+		if ( item is not { Enabled: true } )
+			return;
+
+		var first = selection.FirstOrDefault();
+		switch ( id )
+		{
+			case OpenAction when first is not null: _ = OpenAsync( first ); break;
+			case EjectAction when first is not null: _ = EjectAsync( first ); break;
+			default: Act( id, [] ); break;
+		}
 	}
 
 	// Making and changing.
@@ -323,17 +644,20 @@ public sealed class FilesViewModel
 	async Task ShowAndRenameAsync( string made )
 	{
 		await RefreshAsync();
-		selected = made;
+		SelectOnly( made );
 		StartRename();
 	}
 
+	/// <summary>
+	/// Open the rename bar for the selected entry. Only one can be renamed at a time.
+	/// </summary>
 	public void StartRename()
 	{
-		if ( !CanChange( selected ) )
+		if ( selection.Count != 1 || !CanChange( selection ) )
 			return;
 
-		renamePath = selected;
-		UiState = UiState with { RenameText = NameOf( selected ), RenameSession = UiState.RenameSession + 1 };
+		renamePath = selection[0];
+		UiState = UiState with { RenameText = NameOf( renamePath ), RenameSession = UiState.RenameSession + 1 };
 		Rebuild();
 	}
 
@@ -360,7 +684,7 @@ public sealed class FilesViewModel
 
 		var moved = await RunAsync( () => navi.Files.MoveAsync( from, Join( FolderOf( from ), name ) ) );
 		if ( moved is not null )
-			selected = Join( FolderOf( from ), name );
+			selectAfterRefresh = Join( FolderOf( from ), name );
 
 		await RefreshAsync();
 	}
@@ -372,29 +696,38 @@ public sealed class FilesViewModel
 	}
 
 	/// <summary>
-	/// Move the selection to the trash, or in the trash delete it for good.
+	/// Move the selection to the trash, or in the trash delete it for good. One that fails stops the rest.
 	/// </summary>
 	async Task TrashAsync()
 	{
-		if ( !CanChange( selected ) )
+		if ( !CanChange( selection ) )
 			return;
 
-		var entry = selected;
-		if ( IsTrash( path ) )
-			await RunAsync( async () => { await navi.Files.DeleteAsync( entry ); return entry; } );
-		else
-			await RunAsync( () => navi.Files.TrashAsync( entry ) );
+		var inTrash = IsTrash( path );
+		foreach ( var entry in selection.ToList() )
+		{
+			var done = inTrash
+				? await RunAsync( async () => { await navi.Files.DeleteAsync( entry ); return entry; } )
+				: await RunAsync( () => navi.Files.TrashAsync( entry ) );
+
+			if ( done is null )
+				break;
+		}
 
 		await RefreshAsync();
 	}
 
 	async Task RestoreAsync()
 	{
-		if ( !CanChange( selected ) )
+		if ( !CanChange( selection ) )
 			return;
 
-		var entry = selected;
-		await RunAsync( () => navi.Files.RestoreAsync( entry ) );
+		foreach ( var entry in selection.ToList() )
+		{
+			if ( await RunAsync( () => navi.Files.RestoreAsync( entry ) ) is null )
+				break;
+		}
+
 		await RefreshAsync();
 	}
 
@@ -410,57 +743,91 @@ public sealed class FilesViewModel
 	}
 
 	/// <summary>
-	/// Make an alias ("name alias") or a symlink ("name link") to the selection, next to it.
+	/// Make an alias ("name alias") or a symlink ("name link") to each selected entry, next to it. The new ones end up
+	/// selected.
 	/// </summary>
 	async Task MakeLinkAsync( bool alias )
 	{
-		if ( selected is not { } target )
+		if ( selection.Count == 0 )
 			return;
 
-		var at = Join( path, FreeName( $"{NameOf( target )} {(alias ? "alias" : "link")}" ) );
-		var made = await RunAsync( () => alias ? navi.Files.CreateAliasAsync( at, target ) : navi.Files.CreateSymlinkAsync( at, target ) );
-		await RefreshAsync();
-
-		if ( made is not null )
+		var taken = new HashSet<string>( System.StringComparer.Ordinal );
+		var made = new List<string>();
+		foreach ( var target in selection.ToList() )
 		{
-			selected = made;
-			Rebuild();
+			var at = Join( path, FreeName( $"{NameOf( target )} {(alias ? "alias" : "link")}", taken ) );
+			taken.Add( NameOf( at ) );
+
+			if ( await RunAsync( () => alias ? navi.Files.CreateAliasAsync( at, target ) : navi.Files.CreateSymlinkAsync( at, target ) ) is not { } link )
+				break;
+
+			made.Add( link );
 		}
+
+		await RefreshAsync();
+		SelectMade( made );
 	}
 
 	void Copy( bool cut )
 	{
-		if ( selected is null || (cut && !CanChange( selected )) )
+		if ( selection.Count == 0 || (cut && !CanChange( selection )) )
 			return;
 
-		clipboard = (selected, cut);
+		clipboard = (selection.ToList(), cut);
 		Rebuild();
 	}
 
 	/// <summary>
-	/// Copy what Copy took into the open folder, or move what Cut took. A name that is taken gets a number.
+	/// Copy what Copy took into the open folder, or move what Cut took. A name that is taken gets a number. What was
+	/// pasted ends up selected.
 	/// </summary>
 	async Task PasteAsync()
 	{
-		if ( clipboard is not { } taken )
+		if ( clipboard is not { } taken || IsTrash( path ) )
 			return;
 
-		// Cut and pasted where it already is: nothing to move.
-		if ( taken.Cut && FolderOf( taken.Path ) == path )
-			return;
+		var names = new HashSet<string>( System.StringComparer.Ordinal );
+		var pasted = new List<string>();
+		var failed = false;
 
-		var to = Join( path, FreeName( NameOf( taken.Path ) ) );
+		foreach ( var from in taken.Paths )
+		{
+			// Cut and pasted where it already is: nothing to move.
+			if ( taken.Cut && FolderOf( from ) == path )
+				continue;
 
-		var pasted = await RunAsync( () => taken.Cut ? navi.Files.MoveAsync( taken.Path, to ) : navi.Files.CopyAsync( taken.Path, to ) );
-		if ( taken.Cut && pasted is not null )
+			var to = Join( path, FreeName( NameOf( from ), names ) );
+			names.Add( NameOf( to ) );
+
+			if ( await RunAsync( () => taken.Cut ? navi.Files.MoveAsync( from, to ) : navi.Files.CopyAsync( from, to ) ) is null )
+			{
+				failed = true;
+				break;
+			}
+
+			pasted.Add( to );
+		}
+
+		// What was cut is gone from where it was, so it can't be pasted again.
+		if ( taken.Cut && !failed )
 			clipboard = null;
 
 		await RefreshAsync();
-		if ( pasted is not null )
-		{
-			selected = to;
-			Rebuild();
-		}
+		SelectMade( pasted );
+	}
+
+	/// <summary>
+	/// Select entries that were just made here, once they are listed.
+	/// </summary>
+	void SelectMade( List<string> made )
+	{
+		if ( made.Count == 0 )
+			return;
+
+		selection.Clear();
+		selection.AddRange( made.Where( shownPaths.Contains ) );
+		anchor = cursor = selection.LastOrDefault();
+		Rebuild();
 	}
 
 	void ToggleHidden()
@@ -520,17 +887,21 @@ public sealed class FilesViewModel
 
 	// Building the state.
 
-	bool CanChange( string entry ) =>
-		entry is not null && entries.FirstOrDefault( x => x.Path == entry ) is { IsDrive: false };
+	/// <summary>
+	/// Something is selected, and all of it can be moved, renamed or deleted: no drives.
+	/// </summary>
+	bool CanChange( IReadOnlyCollection<string> paths ) =>
+		paths.Count > 0 && paths.All( p => entries.FirstOrDefault( x => x.Path == p ) is { IsDrive: false } );
 
 	bool IsTrash( string folder ) => NameOf( folder ) == TrashName;
 
 	/// <summary>
-	/// <paramref name="name"/>, or "name 2.txt" and so on if the open folder has one.
+	/// <paramref name="name"/>, or "name 2.txt" and so on if the open folder has one, or <paramref name="alsoTaken"/>
+	/// does (names about to be used).
 	/// </summary>
-	string FreeName( string name )
+	string FreeName( string name, IEnumerable<string> alsoTaken = null )
 	{
-		var taken = entries.Select( x => NameOf( x.Path ) ).ToHashSet( System.StringComparer.Ordinal );
+		var taken = entries.Select( x => NameOf( x.Path ) ).Concat( alsoTaken ?? [] ).ToHashSet( System.StringComparer.Ordinal );
 		var dot = name.LastIndexOf( '.' );
 		var (stem, extension) = dot > 0 ? (name[..dot], name[dot..]) : (name, "");
 
@@ -555,13 +926,19 @@ public sealed class FilesViewModel
 			.ThenBy( x => x.Name, System.StringComparer.Ordinal )
 			.ToList();
 
+		shownPaths = shown.Take( MaxRows ).Select( x => x.Path ).ToList();
+		selection.RemoveAll( x => !shownPaths.Contains( x ) );
+
 		var rows = shown.Take( MaxRows ).Select( x => new FileRow(
 			x.Path, x.Name, IconOf( x ), DetailOf( x ), x.Modified.ToLocalTime().ToString( "yyyy-MM-dd HH:mm" ),
 			x.Kind switch { Navi.FileKind.Symlink => "link", Navi.FileKind.Alias => "alias", _ => "" },
-			x.Path == selected, x.Name.StartsWith( '.' ) ) ).ToList();
+			selection.Contains( x.Path ), x.Name.StartsWith( '.' ), x.Path == cursor ) ).ToList();
 
 		var drive = CurrentDrive;
 		var count = shown.Count == 1 ? "1 item" : $"{shown.Count} items";
+		if ( selection.Count > 1 )
+			count = $"{selection.Count} of {shown.Count} selected";
+
 		if ( shown.Count > MaxRows )
 			count += $", {MaxRows} shown";
 
@@ -588,11 +965,16 @@ public sealed class FilesViewModel
 			CanForward = forward.Count > 0,
 			CanUp = path != "/",
 			InTrash = inTrash,
-			CanChange = CanChange( selected ),
-			HasSelection = selected is not null,
+			CanChange = CanChange( selection ),
+			CanRename = selection.Count == 1 && CanChange( selection ),
+			HasSelection = selection.Count > 0,
 			CanPaste = clipboard is not null && !inTrash,
 			ShowHidden = showHidden,
 			RenamePath = renamePath,
+			Menu = menu,
+			MenuHeading = menu.Count > 0 ? menuHeading : null,
+			MenuX = menuAt.x,
+			MenuY = menuAt.y,
 		};
 	}
 
@@ -600,10 +982,10 @@ public sealed class FilesViewModel
 	{
 		var crumbs = new List<Crumb> { new( "/", drives.FirstOrDefault( x => x.Path == "/" )?.Label ?? "/" ) };
 		var at = "";
-		foreach ( var part in path.Split( '/', System.StringSplitOptions.RemoveEmptyEntries ) )
+		foreach ( var part in trail.Split( '/', System.StringSplitOptions.RemoveEmptyEntries ) )
 		{
 			at += "/" + part;
-			crumbs.Add( new Crumb( at, part ) );
+			crumbs.Add( new Crumb( at, part, !IsWithin( path, at ) ) );
 		}
 
 		return crumbs;

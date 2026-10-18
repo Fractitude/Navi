@@ -4,6 +4,8 @@
 {
 	Files
 	{
+		// The right-click menu is positioned against this panel.
+		position: relative;
 		width: 480px;
 		height: 280px;
 		flex-direction: row;
@@ -183,6 +185,18 @@
 		{
 			flex-shrink: 0;
 			opacity: 0.5;
+
+			&.ahead
+			{
+				opacity: 0.25;
+			}
+		}
+
+		// Where the player came from before going up: still there to click, grayed out.
+		.crumb.ahead
+		{
+			font-weight: 400;
+			opacity: 0.45;
 		}
 	}
 
@@ -302,6 +316,95 @@
 		{
 			color: $paper-t;
 			background-color: $ink-bg;
+		}
+
+		// Where the arrow keys move from, when it isn't selected (after a Ctrl+click took it away).
+		&.cursor:not(.selected)
+		{
+			border-left: 2px solid $ink-bc;
+		}
+	}
+
+	.menu-backdrop
+	{
+		position: absolute;
+		left: 0;
+		top: 0;
+		right: 0;
+		bottom: 0;
+	}
+
+	.menu
+	{
+		position: absolute;
+		width: 190px;
+		flex-direction: column;
+		padding: 2px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+		.heading
+		{
+			height: 20px;
+			align-items: center;
+			padding: 0 8px;
+			font-size: 10px;
+			font-weight: 700;
+			opacity: 0.6;
+		}
+
+		.separator
+		{
+			height: 1px;
+			margin: 2px 4px;
+			background-color: $line-bg;
+		}
+
+		.item
+		{
+			height: 20px;
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+			padding: 0 8px;
+			font-size: 11px;
+			font-weight: 700;
+			white-space: nowrap;
+			cursor: pointer;
+
+			> i
+			{
+				flex-shrink: 0;
+				font-size: 14px;
+			}
+
+			.item-label
+			{
+				flex-grow: 1;
+				margin-right: 10px;
+			}
+
+			.keys
+			{
+				flex-shrink: 0;
+				font-size: 9px;
+				font-weight: 400;
+				opacity: 0.6;
+			}
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+
+			&.disabled
+			{
+				opacity: 0.35;
+				pointer-events: none;
+			}
 		}
 	}
 

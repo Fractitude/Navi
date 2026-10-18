@@ -48,6 +48,12 @@ public static class NaviEvents
 	/// <c>NaviApp.OnTrayClick</c>.
 	/// </summary>
 	public const string Tray = "navi.tray";
+
+	/// <summary>
+	/// The player pressed a keyboard shortcut while the app was in front, raised on the app's panel with the keys, e.g.
+	/// "ctrl+c". See <c>NaviApp.OnShortcut</c>.
+	/// </summary>
+	public const string Shortcut = "navi.shortcut";
 }
 
 /// <summary>
@@ -284,6 +290,15 @@ public sealed class NaviAppHost : Panel
 	{
 		if ( app is not null && app.IsValid && !viewer )
 			app.CreateEvent( new PanelEvent( NaviEvents.Action, app ) { Value = (action, args) } );
+	}
+
+	/// <summary>
+	/// Give the app's copy here a keyboard shortcut: on the host for a shared app, on the user's client for one that isn't.
+	/// </summary>
+	internal void DeliverShortcut( string keys )
+	{
+		if ( app is not null && app.IsValid && !viewer )
+			app.CreateEvent( new PanelEvent( NaviEvents.Shortcut, app ) { Value = keys } );
 	}
 
 	/// <summary>
