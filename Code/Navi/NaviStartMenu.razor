@@ -4,7 +4,8 @@
 
 @* The start menu, above the start button. It lists every installed app for finding one fast: the pinned apps (drag one to *@
 @* put it elsewhere, the star unpins), the ones installed most recently, and all of them by letter. Typing in the search *@
-@* field replaces the lists with the matches; Enter opens the first. The footer has Settings and the Store (Packages). *@
+@* field replaces the lists with the matches; Enter opens the first. The footer has Settings, the Store (Packages) and *@
+@* Lock, which locks the screen. *@
 @* Part of the desktop, so it draws the host's state and sends the player's choices to it, like the taskbar does. *@
 
 <root>
@@ -104,6 +105,9 @@
 		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.PackagesApp ))>
 			<i>download</i>Get apps
 		</div>
+		<div class="action lock" @onclick=@(() => OnLock?.Invoke())>
+			<i>lock</i>Lock
+		</div>
 	</div>
 </root>
 
@@ -115,6 +119,11 @@
 	/// Called with the app the player picked, so the desktop can open it and close the menu.
 	/// </summary>
 	public System.Action<NaviAppInfo> OnOpen { get; set; }
+
+	/// <summary>
+	/// Called when the player picks Lock, so the desktop can close the menu and lock the computer.
+	/// </summary>
+	public System.Action OnLock { get; set; }
 
 	TextEntry Entry;
 

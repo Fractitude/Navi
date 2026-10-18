@@ -102,6 +102,30 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	public bool CanUse => IsUser || UserId == default;
 
 	/// <summary>
+	/// The screen is locked: a lock screen covers it, and the computer does nothing the player asks until it is unlocked
+	/// (<see cref="Authorize"/>). Apps keep running. Whoever locked it unlocks it, from the seat. It stays locked when they
+	/// stand up, so another player can sit at the screen but not use it, and unlocks itself if the player who locked it
+	/// leaves the game. Not saved: a computer starts unlocked.
+	/// </summary>
+	public bool IsLocked { get; private set; }
+
+	/// <summary>
+	/// Connection id of the player who locked the screen, or empty if it was locked without one (by game code), or while
+	/// offline. Only they can unlock it with <see cref="UserUnlock"/>; if it is empty, whoever is in the seat can.
+	/// </summary>
+	public System.Guid LockOwner { get; private set; }
+
+	/// <summary>
+	/// The local player may unlock the screen, if they are in the seat: they locked it, or it has no owner.
+	/// </summary>
+	public bool IsLockOwner => IsLocked && (!Networking.IsActive || LockOwner == default || LockOwner == Connection.Local?.Id);
+
+	/// <summary>
+	/// The player who locked the screen, or null.
+	/// </summary>
+	public Connection Locker => LockOwner == default ? null : Connection.Find( LockOwner );
+
+	/// <summary>
 	/// Seconds the user can leave the computer alone before the seat is freed. It isn't freed while a permission prompt
 	/// is open.
 	/// </summary>
@@ -170,6 +194,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Requests = snapshot.Requests,
 			Downloading = snapshot.Downloading,
 			User = snapshot.User,
+			Locked = IsLocked,
+			LockOwner = LockOwner,
 		} );
 		if ( session != NetworkSession )
 			NetworkSession = session;
@@ -306,6 +332,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		} ).ToList(),
 		Downloading = downloading.ToList(),
 		User = UserId,
+		Locked = IsLocked,
+		LockOwner = LockOwner,
 	};
 
 	/// <summary>
@@ -329,6 +357,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 				Requests = session.Requests,
 				Downloading = session.Downloading,
 				User = session.User,
+				Locked = session.Locked,
+				LockOwner = session.LockOwner,
 			};
 		}
 		catch ( System.Exception e )
@@ -346,6 +376,8 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		downloading.Clear();
 		downloading.UnionWith( snapshot.Downloading ?? [] );
 		UserId = snapshot.User;
+		IsLocked = snapshot.Locked;
+		LockOwner = snapshot.LockOwner;
 
 		var processes = new List<NaviProcess>();
 		foreach ( var entry in snapshot.Layout?.Processes ?? [] )
@@ -447,6 +479,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	void UpdateSeat()
 	{
+		// The player who locked the screen left the game: nobody could unlock it.
+		if ( IsLocked && LockOwner != default && Locker is null )
+			Unlock();
+
 		if ( UserId == default )
 			return;
 
@@ -484,9 +520,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// while the seat is free, which gives it to them. Never trusts what the caller says about itself: the connection is
 	/// the network's.
 	/// </summary>
-	bool Authorize( bool sit = false )
+	bool Authorize( bool sit = false, bool whileLocked = false )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || (IsLocked && !whileLocked) )
 			return false;
 
 		if ( !Networking.IsActive )
@@ -677,7 +713,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserSit()
 	{
-		Authorize( sit: true );
+		Authorize( sit: true, whileLocked: true );
 	}
 
 	/// <summary>
@@ -686,7 +722,60 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host( NetFlags.Unreliable )]
 	public void UserKeepSeat()
 	{
-		Authorize();
+		Authorize( whileLocked: true );
+	}
+
+	/// <summary>
+	/// Lock the screen. See <see cref="IsLocked"/>. The player in the seat owns the lock, if there is one. Returns false if it
+	/// is locked already.
+	/// </summary>
+	public bool Lock()
+	{
+		if ( !IsAuthority || IsLocked )
+			return false;
+
+		IsLocked = true;
+		LockOwner = Networking.IsActive ? UserId : default;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Unlock the screen, whoever locked it. Returns false if it isn't locked.
+	/// </summary>
+	public bool Unlock()
+	{
+		if ( !IsAuthority || !IsLocked )
+			return false;
+
+		IsLocked = false;
+		LockOwner = default;
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// The user locks the screen, from the start menu.
+	/// </summary>
+	[Rpc.Host]
+	public void UserLock()
+	{
+		if ( Authorize() )
+			Lock();
+	}
+
+	/// <summary>
+	/// The user unlocks the screen. Only the player who locked it may (see <see cref="LockOwner"/>), and only from the seat.
+	/// </summary>
+	[Rpc.Host]
+	public void UserUnlock()
+	{
+		if ( !Authorize( whileLocked: true ) || !IsLocked )
+			return;
+
+		var caller = Networking.IsActive ? Rpc.Caller ?? Connection.Local : null;
+		if ( !Networking.IsActive || LockOwner == default || caller?.Id == LockOwner )
+			Unlock();
 	}
 
 	/// <summary>
@@ -695,7 +784,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserLeave()
 	{
-		if ( !Authorize() )
+		if ( !Authorize( whileLocked: true ) )
 			return;
 
 		if ( Networking.IsActive )

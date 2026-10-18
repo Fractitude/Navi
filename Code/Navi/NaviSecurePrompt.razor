@@ -6,12 +6,40 @@
 @* in front of the screen, so it draws above everything and gets clicks first. While a prompt is open it covers the *@
 @* whole screen, so apps can't be clicked. Apps can't reach it through their panel's ancestors, and every control *@
 @* in it only reacts to a real mouse press made after the prompt has been up for a moment. See the Security section *@
-@* of AGENTS.md for what this does and doesn't protect against. *@
+@* of AGENTS.md for what this does and doesn't protect against. The lock screen is here for the same reason: it *@
+@* covers the whole screen, and only a real press from the player who locked it can unlock it. *@
 
-<root class="@(Request is null ? "" : "active") @(Computer?.ThemeClasses)"
+<root class="@(Locked ? "active locked" : Request is null ? "" : "active") @(Computer?.ThemeClasses)"
 	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
 	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
-	@if ( Request is { } request )
+	@if ( Locked )
+	{
+		var now = System.DateTime.Now;
+
+		<div class="lock-screen @(Armed && Computer.IsLockOwner ? "" : "arming")"
+			@onmousedown=@(( PanelEvent e ) => Press( e ))
+			@onclick=@(( PanelEvent e ) => Release( e, () => Unlock() ))>
+			<div class="time">@now.ToString( "HH:mm" )</div>
+			<div class="date">@now.ToString( "dddd, d MMMM" )</div>
+
+			<div class="status">
+				<i>lock</i>
+				@if ( !Computer.IsLockOwner )
+				{
+					@($"Locked by {Computer.Locker?.DisplayName ?? "another player"}")
+				}
+				else if ( !Computer.IsSeated )
+				{
+					@("Locked. Click to sit down.")
+				}
+				else
+				{
+					@("Locked. Click to unlock.")
+				}
+			</div>
+		</div>
+	}
+	else if ( Request is { } request )
 	{
 		var heading = request.IsRoot
 			? (request.Launch ? $"{request.App.Name} wants full system access" : $"Install {request.App.Name} with full system access?")
@@ -98,6 +126,17 @@
 	NaviPermissionRequest Request => Computer.IsValid() ? Computer.PermissionRequests.FirstOrDefault() : null;
 
 	/// <summary>
+	/// The screen is locked (<see cref="NaviComputer.IsLocked"/>). The lock screen shows instead of any prompt, which waits.
+	/// </summary>
+	bool Locked => Computer.IsValid() && Computer.IsLocked;
+
+	void Unlock()
+	{
+		if ( Computer.IsLockOwner )
+			Computer.UserUnlock();
+	}
+
+	/// <summary>
 	/// The controls react: the prompt has been up for <see cref="ArmTime"/> since the local player sat at the computer.
 	/// Everyone else at the screen sees the prompt but can't answer it.
 	/// </summary>
@@ -168,7 +207,7 @@
 	/// </summary>
 	void PressSit( PanelEvent e )
 	{
-		sitPressed = Request is not null && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
+		sitPressed = (Request is not null || Locked) && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
 			&& e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" );
 	}
 
@@ -192,5 +231,5 @@
 
 	protected override int BuildHash() =>
 		System.HashCode.Combine( Request, Armed, Computer?.CanUse, Computer?.IsSeated, Unticked.Count, string.Join( ",", Unticked ),
-			Computer?.ThemeClasses );
+			Computer?.ThemeClasses, (Locked, Computer?.LockOwner, System.DateTime.Now.Minute) );
 }

@@ -850,7 +850,7 @@ public sealed partial class NaviComputer : Component
 	/// The window that has the player's input: the window in front, while someone sits at the computer. Otherwise null.
 	/// See <see cref="NaviInputCapture"/>.
 	/// </summary>
-	public NaviWindow InputCapture => HasUser ? FocusedWindow : null;
+	public NaviWindow InputCapture => HasUser && !IsLocked ? FocusedWindow : null;
 
 	/// <summary>
 	/// Installed apps, sorted by name.

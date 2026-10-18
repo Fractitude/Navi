@@ -79,7 +79,7 @@
 
 	@if ( StartOpen )
 	{
-		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart></NaviStartMenu>
+		<NaviStartMenu class="start-menu" Computer=@Computer OnOpen=@OpenFromStart OnLock=@LockFromStart></NaviStartMenu>
 	}
 
 	<div class="taskbar">
@@ -365,7 +365,7 @@
 			TrayMenuApp = null;
 
 		// A taskbar or tray menu opened with the start menu already up, or the player stood up.
-		if ( StartOpen && (MenuApp is not null || TrayMenuApp is not null || !Computer.CanUse) )
+		if ( StartOpen && (MenuApp is not null || TrayMenuApp is not null || !Computer.CanUse || Computer.IsLocked) )
 			StartOpen = false;
 
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
@@ -440,6 +440,15 @@
 	{
 		CloseMenus();
 		OpenApp( app );
+	}
+
+	/// <summary>
+	/// The player picked Lock in the start menu: close the menu and lock the computer.
+	/// </summary>
+	void LockFromStart()
+	{
+		CloseMenus();
+		Computer.UserLock();
 	}
 
 	void OpenTrayMenu( string id )

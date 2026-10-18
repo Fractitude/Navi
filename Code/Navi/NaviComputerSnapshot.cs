@@ -38,6 +38,16 @@ public sealed class NaviComputerSnapshot
 	/// Connection id of the player using the computer, or empty. See <see cref="NaviComputer.UserId"/>.
 	/// </summary>
 	public System.Guid User { get; set; }
+
+	/// <summary>
+	/// The screen is locked. See <see cref="NaviComputer.IsLocked"/>.
+	/// </summary>
+	public bool Locked { get; set; }
+
+	/// <summary>
+	/// Connection id of the player who locked it. See <see cref="NaviComputer.LockOwner"/>.
+	/// </summary>
+	public System.Guid LockOwner { get; set; }
 }
 
 /// <summary>
@@ -49,6 +59,8 @@ public sealed class NaviSessionSnapshot
 	public List<NaviRequestSnapshot> Requests { get; set; } = new();
 	public List<string> Downloading { get; set; } = new();
 	public System.Guid User { get; set; }
+	public bool Locked { get; set; }
+	public System.Guid LockOwner { get; set; }
 }
 
 /// <summary>

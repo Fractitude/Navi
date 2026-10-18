@@ -615,6 +615,12 @@ NaviDesktop
 			padding-top: 6px;
 			border-top: 1px solid $line-bc;
 
+			// Lock sits at the far end, apart from the buttons that open apps.
+			.action.lock
+			{
+				margin-left: auto;
+			}
+
 			.action
 			{
 				flex-direction: row;
