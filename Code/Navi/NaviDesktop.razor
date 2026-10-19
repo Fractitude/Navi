@@ -451,9 +451,10 @@
 		if ( TrayMenuApp is not null && Computer.GetProcess( TrayMenuApp )?.Tray is null )
 			TrayMenuApp = null;
 
-		// A taskbar or tray menu opened with the start menu already up, or the player stood up.
-		if ( StartOpen && (MenuApp is not null || TrayMenuApp is not null || !Computer.CanUse || Computer.IsLocked) )
-			StartOpen = false;
+		// A taskbar or tray menu opened with the start menu already up. The host closes it when the player stands up or the
+		// screen locks.
+		if ( StartOpen && Computer.CanUse && (MenuApp is not null || TrayMenuApp is not null) )
+			SetStart( false );
 
 		if ( (NotificationsOpen || NotificationMenu != 0) && (!Computer.CanUse || Computer.IsLocked) )
 		{
@@ -513,7 +514,7 @@
 	{
 		MenuApp = null;
 		TrayMenuApp = null;
-		StartOpen = false;
+		SetStart( false );
 		NotificationsOpen = false;
 		NotificationMenu = 0;
 	}
@@ -567,7 +568,7 @@
 		var open = NotificationMenu != id;
 		MenuApp = null;
 		TrayMenuApp = null;
-		StartOpen = false;
+		SetStart( false );
 		NotificationMenu = open ? id : 0;
 	}
 
@@ -627,15 +628,25 @@
 	}
 
 	/// <summary>
-	/// Whether the start menu is open.
+	/// Whether the start menu is open. The computer keeps it, so everyone at the screen sees it.
 	/// </summary>
-	bool StartOpen;
+	bool StartOpen => Computer.IsStartMenuOpen;
+
+	/// <summary>
+	/// Open or close the start menu, for everyone. Only the player in the seat can; it is asked of the host only when it
+	/// changes.
+	/// </summary>
+	void SetStart( bool open )
+	{
+		if ( Computer.CanUse && StartOpen != open )
+			Computer.UserSetStartMenu( open, "" );
+	}
 
 	void ToggleStart()
 	{
 		var open = !StartOpen;
 		CloseMenus();
-		StartOpen = open;
+		SetStart( open );
 	}
 
 	/// <summary>
@@ -832,7 +843,14 @@
 		var last = from < pinnedCount ? pinnedCount - 1 : icons.Count - 1;
 
 		var slot = taskbarDragSlot;
-		var offset = Clamp( delta, -from * slot, (last - from) * slot );
+		var left = -from * slot;
+
+		// The divider makes the way to the first icon longer than the icons before the dragged one. Reach past the first
+		// icon's center, so there is a place in front of it.
+		if ( from >= pinnedCount && pinnedCount > 0 && !float.IsNaN( taskbarDragDivider ) )
+			left = taskbarDragCenters[0] - taskbarDragCenters[from] - slot * 0.5f;
+
+		var offset = Clamp( delta, left, (last - from) * slot );
 		var to = slot > 0f ? from + (int)System.MathF.Round( offset / slot ) : from;
 
 		// An icon that isn't pinned becomes pinned when it is dragged to the left of the divider. It goes in front of the

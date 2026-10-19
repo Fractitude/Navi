@@ -197,6 +197,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Locked = IsLocked,
 			LockOwner = LockOwner,
 			LockSetupOpen = IsLockSetupOpen,
+			StartMenuOpen = IsStartMenuOpen,
+			StartMenuQuery = StartMenuQuery,
+			StartMenuScroll = StartMenuScroll,
 			FailedAttempts = FailedAttempts,
 			RetryAt = RetryAt.Ticks,
 		} );
@@ -338,6 +341,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		Locked = IsLocked,
 		LockOwner = LockOwner,
 		LockSetupOpen = IsLockSetupOpen,
+		StartMenuOpen = IsStartMenuOpen,
+		StartMenuQuery = StartMenuQuery,
+		StartMenuScroll = StartMenuScroll,
 		FailedAttempts = FailedAttempts,
 		RetryAt = RetryAt.Ticks,
 	};
@@ -366,6 +372,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 				Locked = session.Locked,
 				LockOwner = session.LockOwner,
 				LockSetupOpen = session.LockSetupOpen,
+				StartMenuOpen = session.StartMenuOpen,
+				StartMenuQuery = session.StartMenuQuery,
+				StartMenuScroll = session.StartMenuScroll,
 				FailedAttempts = session.FailedAttempts,
 				RetryAt = session.RetryAt,
 			};
@@ -388,6 +397,9 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		IsLocked = snapshot.Locked;
 		LockOwner = snapshot.LockOwner;
 		IsLockSetupOpen = snapshot.LockSetupOpen;
+		IsStartMenuOpen = snapshot.StartMenuOpen;
+		StartMenuQuery = snapshot.StartMenuQuery ?? "";
+		StartMenuScroll = snapshot.StartMenuScroll;
 		seenFailed = snapshot.FailedAttempts;
 		seenRetryAt = snapshot.RetryAt > 0 ? new System.DateTime( snapshot.RetryAt, System.DateTimeKind.Utc ) : default;
 
@@ -525,6 +537,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		sinceUserActed = 0;
 		userInput.Clear();
 		IsLockSetupOpen = false;
+		ResetStartMenu();
 
 		foreach ( var request in permissionRequests.ToList() )
 			DismissPermissionRequest( request );
@@ -563,6 +576,65 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		SetUser( caller.Id );
 		return true;
+	}
+
+	/// <summary>
+	/// The start menu is open. The host keeps it and sends it to everyone, so players watching the screen see the menu too.
+	/// Cleared when the seat changes or the screen locks.
+	/// </summary>
+	public bool IsStartMenuOpen { get; private set; }
+
+	/// <summary>
+	/// What is typed in the start menu's search field, sent to everyone with <see cref="IsStartMenuOpen"/>.
+	/// </summary>
+	public string StartMenuQuery { get; private set; } = "";
+
+	/// <summary>
+	/// The most the start menu's search can be, in characters.
+	/// </summary>
+	public const int MaxStartMenuQuery = 64;
+
+	/// <summary>
+	/// The user opened or closed the start menu, or typed in its search.
+	/// </summary>
+	[Rpc.Host]
+	public void UserSetStartMenu( bool open, string query )
+	{
+		query = open ? NaviAppInfo.Cap( query ?? "", MaxStartMenuQuery ) : "";
+
+		if ( !Authorize() || (IsStartMenuOpen == open && StartMenuQuery == query) )
+			return;
+
+		if ( !open )
+			StartMenuScroll = 0f;
+
+		IsStartMenuOpen = open;
+		StartMenuQuery = query;
+		Version++;
+	}
+
+	/// <summary>
+	/// How far the start menu's list is scrolled, in panel pixels, sent to everyone with <see cref="IsStartMenuOpen"/>.
+	/// </summary>
+	public float StartMenuScroll { get; private set; }
+
+	/// <summary>
+	/// The user scrolled the start menu's list. Only passed on: it doesn't rebuild anything.
+	/// </summary>
+	[Rpc.Host]
+	public void UserScrollStartMenu( float scroll )
+	{
+		if ( !Authorize() || !IsStartMenuOpen || !float.IsFinite( scroll ) )
+			return;
+
+		StartMenuScroll = System.Math.Clamp( scroll, 0f, 100000f );
+	}
+
+	void ResetStartMenu()
+	{
+		IsStartMenuOpen = false;
+		StartMenuQuery = "";
+		StartMenuScroll = 0f;
 	}
 
 	// What the player at the screen does. Each runs on the host, for the user only. The desktop and the secure layer call
@@ -770,6 +842,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		IsLocked = true;
 		IsLockSetupOpen = false;
+		ResetStartMenu();
 		LockOwner = Networking.IsActive ? UserId : default;
 		Version++;
 		return true;

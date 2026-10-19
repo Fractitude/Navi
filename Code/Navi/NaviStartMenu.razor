@@ -15,7 +15,7 @@
 		           onsubmit=@( () => OpenFirst() )/>
 	</div>
 
-	<div class="lists">
+	<div class="lists" @ref="Lists">
 		@if ( Searching )
 		{
 			@if ( Matches.Count == 0 )
@@ -139,7 +139,10 @@
 
 	TextEntry Entry;
 
-	string Query = "";
+	/// <summary>
+	/// What is typed in the search. The computer keeps it, so players watching the screen see the same list.
+	/// </summary>
+	string Query => Computer.StartMenuQuery ?? "";
 
 	/// <summary>
 	/// How far the mouse moves, in panel pixels, before pressing a pinned app becomes dragging it.
@@ -219,13 +222,14 @@
 	{
 		base.OnAfterTreeRender( firstTime );
 
-		if ( firstTime )
+		if ( firstTime && Computer.CanUse )
 			Entry?.Focus();
 	}
 
 	void SearchEdited( string text )
 	{
-		Query = text ?? "";
+		if ( Computer.CanUse )
+			Computer.UserSetStartMenu( true, text ?? "" );
 	}
 
 	void OpenFirst()
@@ -299,8 +303,76 @@
 		recent = null;
 		matches = null;
 
+		// Players watching show what the player at the screen typed. The player's own field is theirs while they type.
+		if ( !Computer.CanUse && Entry is not null && Entry.Text != Query )
+			Entry.Text = Query;
+
+		TickScroll();
+
 		if ( dragHandle is not null )
 			UpdateDrag();
+	}
+
+	// Scrolling. The list is scrolled on each client's own panel, so the player at the screen sends where it is and the others
+	// scroll theirs to match, like a shared app's lists (NaviAppHost).
+
+	Panel Lists;
+
+	const float ScrollSendInterval = 0.1f;
+	const float ScrollRecheckInterval = 0.5f;
+
+	RealTimeSince sinceScrollSent;
+	RealTimeSince sinceScrollChecked;
+
+	/// <summary>Where the list was, as last sent or applied. A change from it is the local player scrolling.</summary>
+	float knownScroll;
+
+	float lastRemoteScroll;
+
+	float CurrentScroll => System.MathF.Round( Lists.ScrollOffset.y * Lists.ScaleFromScreen );
+
+	void ApplyScroll( float scroll )
+	{
+		Lists.ScrollVelocity = Vector2.Zero;
+		Lists.ScrollOffset = new Vector2( Lists.ScrollOffset.x, scroll * Lists.ScaleToScreen );
+		knownScroll = CurrentScroll;
+	}
+
+	void TickScroll()
+	{
+		if ( Lists is null || !Lists.IsValid() )
+			return;
+
+		var remote = Computer.StartMenuScroll;
+		if ( remote != lastRemoteScroll )
+		{
+			lastRemoteScroll = remote;
+
+			// The player's own client is where it came from, and may have scrolled on since.
+			if ( !Computer.IsUser )
+				ApplyScroll( remote );
+		}
+
+		// A watcher's list may fill in after the scrolling arrived, or clamp it while it was shorter: catch up now and then.
+		if ( !Computer.CanUse && sinceScrollChecked > ScrollRecheckInterval )
+		{
+			sinceScrollChecked = 0;
+
+			if ( CurrentScroll != remote )
+				ApplyScroll( remote );
+		}
+
+		if ( !Computer.CanUse || sinceScrollSent < ScrollSendInterval )
+			return;
+
+		sinceScrollSent = 0;
+
+		var scroll = CurrentScroll;
+		if ( scroll == knownScroll )
+			return;
+
+		knownScroll = scroll;
+		Computer.UserScrollStartMenu( scroll );
 	}
 
 	/// <summary>

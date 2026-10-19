@@ -55,6 +55,15 @@ public sealed class NaviComputerSnapshot
 	public bool LockSetupOpen { get; set; }
 
 	/// <summary>
+	/// The start menu is open, and what is typed in its search. See <see cref="NaviComputer.IsStartMenuOpen"/>.
+	/// </summary>
+	public bool StartMenuOpen { get; set; }
+
+	public string StartMenuQuery { get; set; } = "";
+
+	public float StartMenuScroll { get; set; }
+
+	/// <summary>
 	/// Wrong passwords or patterns tried, and until when the host won't check another (UTC ticks, 0 for no wait). See
 	/// <see cref="NaviComputer.FailedAttempts"/>.
 	/// </summary>
@@ -75,6 +84,9 @@ public sealed class NaviSessionSnapshot
 	public bool Locked { get; set; }
 	public System.Guid LockOwner { get; set; }
 	public bool LockSetupOpen { get; set; }
+	public bool StartMenuOpen { get; set; }
+	public string StartMenuQuery { get; set; } = "";
+	public float StartMenuScroll { get; set; }
 	public int FailedAttempts { get; set; }
 	public long RetryAt { get; set; }
 }
