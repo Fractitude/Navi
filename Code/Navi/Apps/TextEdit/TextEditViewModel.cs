@@ -528,7 +528,7 @@ public sealed class TextEditViewModel
 
 	static string Describe( System.Exception e ) => e switch
 	{
-		Navi.MissingPermissionException => "Text Edit isn't allowed to reach that file. Allow it Files access in the taskbar's \"Open with permissions...\".",
+		Navi.MissingPermissionException => "Text Edit isn't allowed to reach that file. Allow it Files access in the taskbar's \"Permissions...\".",
 		Navi.FileException f => f.Error switch
 		{
 			Navi.FileError.NotFound => $"\"{NameOf( f.Path )}\" isn't there.",

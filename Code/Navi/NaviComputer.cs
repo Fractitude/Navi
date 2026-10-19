@@ -1324,7 +1324,7 @@ public sealed partial class NaviComputer : Component
 
 		if ( NeedsReview( app ) )
 		{
-			ReviewPermissions( id );
+			ReviewPermissions( id, launch: true );
 			return true;
 		}
 
@@ -1627,9 +1627,10 @@ public sealed partial class NaviComputer : Component
 
 	/// <summary>
 	/// Show the player every permission an app declares, ticked as it has them (all ticked the first time), so they can
-	/// change them. Opens the app afterwards if it isn't running. The taskbar menu's "Permissions..." does this.
+	/// change them. The taskbar menu's "Permissions..." does this, for a running app or not, and opens nothing. With
+	/// <paramref name="launch"/> the app opens afterwards: that is the review before an app's first launch.
 	/// </summary>
-	public void ReviewPermissions( string id )
+	public void ReviewPermissions( string id, bool launch = false )
 	{
 		if ( !IsAuthority )
 			return;
@@ -1648,7 +1649,7 @@ public sealed partial class NaviComputer : Component
 			Permissions = app.Permissions,
 			Ticked = NeedsReview( app ) ? app.Permissions : GetPermissions( app ).ToArray(),
 			IsReview = true,
-			Launch = !IsRunning( id ),
+			Launch = launch && !IsRunning( id ),
 		} );
 
 		Version++;

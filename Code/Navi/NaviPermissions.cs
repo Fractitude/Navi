@@ -2,8 +2,8 @@ namespace Sandbox;
 
 /// <summary>
 /// What an app may do beyond the basics. Every app can open apps, list them and control its own window. Anything else needs
-/// a permission, which the player grants: when the app asks (<c>Navi.Permissions.RequestAsync</c>), or by opening it from the
-/// taskbar with "Open with permissions...". An app lists the permissions it may ask for in its <see cref="NaviAppResource"/>.
+/// a permission, which the player grants: when the app asks (<c>Navi.Permissions.RequestAsync</c>), or from the
+/// taskbar with "Permissions...". An app lists the permissions it may ask for in its <see cref="NaviAppResource"/>.
 /// System apps get theirs without asking. Grants last until the app closes.
 /// </summary>
 public static class NaviPermissions

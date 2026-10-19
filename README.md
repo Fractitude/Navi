@@ -355,7 +355,7 @@ Every app can open apps, list them and control its own window. Anything more nee
 - **Apps can ask while running.** `await Navi.Permissions.RequestAsync( Navi.Permission.InstallApps )` shows the same dialog for the ones it lacks and returns which were `Granted` and which `Denied`.
 - **Missing permissions fail.** A call without its permission throws `Navi.MissingPermissionException`, whose `Permission` says which one. `Navi.WithPermissionAsync( () => Navi.Apps.InstallAsync( id ) )` makes a call, asks for a missing permission, and tries once more.
 - **Grants are remembered** per app (`NaviComputer.GrantedPermissions`), across launches. Uninstalling forgets them.
-- **The player can change them** from the taskbar menu: Permissions... (or Open with permissions... when the app is closed) shows every declared permission, ticked as granted. Unticking revokes.
+- **The player can change them** from the taskbar menu: Permissions..., for a running app or not, shows every declared permission, ticked as granted. Unticking revokes. It opens nothing.
 - **System apps** have root, which allows everything, and skip these dialogs. See below.
 
 The app's job is to cope with what it was denied: hide or disable those features, or explain why they don't work.

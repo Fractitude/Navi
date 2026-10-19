@@ -179,7 +179,7 @@
 						@if ( app.Permissions.Count > 0 && !app.IsSystem )
 						{
 							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserReviewPermissions( app.Id ) ))>
-								<i>tune</i>@(process is null ? "Open with permissions..." : "Permissions...")
+								<i>tune</i>Permissions...
 							</div>
 						}
 
