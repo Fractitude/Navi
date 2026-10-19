@@ -29,6 +29,11 @@ public static class NaviEvents
 	public const string ViewerClass = "navi-viewer";
 
 	/// <summary>
+	/// Class on an app's panel on a client that isn't the one using the computer. See <c>Navi.IsWatching</c>.
+	/// </summary>
+	public const string WatchingClass = "navi-watching";
+
+	/// <summary>
 	/// The app asks for the lock screen's setup dialog (<c>Navi.Settings.OpenLockSetup</c>). Only core apps are listened to.
 	/// </summary>
 	public const string LockSetup = "navi.lock-setup";
@@ -123,6 +128,7 @@ public sealed class NaviAppHost : Panel
 		// A shared app's copy on the host runs for whoever is using the computer.
 		var capture = Computer?.InputCapture == Window;
 		app.SetClass( NaviEvents.HasInputClass, capture && (Computer.IsSeated || IsShared) );
+		app.SetClass( NaviEvents.WatchingClass, Computer is not null && !Computer.IsUser );
 
 		// Where tray clicks and a shared app's actions are delivered to. A viewer's copy gets neither.
 		if ( Computer is not null && !viewer )

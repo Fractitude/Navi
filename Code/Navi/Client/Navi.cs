@@ -190,6 +190,12 @@ public sealed class Navi
 	public bool HasInput => panel.HasClass( "navi-input" );
 
 	/// <summary>
+	/// True on a client that is only looking at someone else's computer in multiplayer. An app that is private to the player
+	/// (not Shared) can skip drawing what costs much, e.g. a web page, and say so instead.
+	/// </summary>
+	public bool IsWatching => panel.HasClass( "navi-watching" );
+
+	/// <summary>
 	/// Goes up whenever apps are installed, opened or closed, or packages change. Poll it to know when to refresh.
 	/// </summary>
 	public Task<int> GetVersionAsync() => CallAsync<int>( "system.version" );

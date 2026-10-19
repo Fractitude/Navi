@@ -7,35 +7,45 @@
 @* It isn't shared: a web page is drawn from the client's own pixels, so each player browses on their own copy. *@
 
 <root>
-	<div class="toolbar">
-		<div class="button @( UiState.CanGoBack ? "" : "disabled" )" tooltip="Back" @onclick=@( () => ViewModel.GoBack() )>
-			<i>arrow_back</i>
-		</div>
-		<div class="button @( UiState.CanGoForward ? "" : "disabled" )" tooltip="Forward" @onclick=@( () => ViewModel.GoForward() )>
-			<i>arrow_forward</i>
-		</div>
-		<div class="button" tooltip="Reload" @onclick=@( () => ViewModel.Reload() )>
-			<i>refresh</i>
-		</div>
-		<div class="button" tooltip="Home" @onclick=@( () => ViewModel.GoHome() )>
-			<i>home</i>
-		</div>
-
-		<div class="address">
-			<TextEntry Value=@( UiState.AddressText ) Placeholder="Search or enter an address"
-			           OnTextEdited=@AddressEdited
-			           onsubmit=@( () => ViewModel.SubmitAddress() )/>
-		</div>
-	</div>
-
-	@if ( UiState.Notice is not null )
+	@if ( Navi.IsWatching )
 	{
-		<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
-			@UiState.Notice
+		<div class="private">
+			<i>visibility_off</i>
+			<label>This player is browsing the internet privately.</label>
 		</div>
 	}
+	else
+	{
+		<div class="toolbar">
+			<div class="button @( UiState.CanGoBack ? "" : "disabled" )" tooltip="Back" @onclick=@( () => ViewModel.GoBack() )>
+				<i>arrow_back</i>
+			</div>
+			<div class="button @( UiState.CanGoForward ? "" : "disabled" )" tooltip="Forward" @onclick=@( () => ViewModel.GoForward() )>
+				<i>arrow_forward</i>
+			</div>
+			<div class="button" tooltip="Reload" @onclick=@( () => ViewModel.Reload() )>
+				<i>refresh</i>
+			</div>
+			<div class="button" tooltip="Home" @onclick=@( () => ViewModel.GoHome() )>
+				<i>home</i>
+			</div>
 
-	<WebPanel @ref="Web" class="page"/>
+			<div class="address">
+				<TextEntry Value=@( UiState.AddressText ) Placeholder="Search or enter an address"
+				           OnTextEdited=@AddressEdited
+				           onsubmit=@( () => ViewModel.SubmitAddress() )/>
+			</div>
+		</div>
+
+		@if ( UiState.Notice is not null )
+		{
+			<div class="notice" @onclick=@( () => ViewModel.DismissNotice() )>
+				@UiState.Notice
+			</div>
+		}
+
+		<WebPanel @ref="Web" class="page"/>
+	}
 </root>
 
 @code
@@ -54,7 +64,7 @@
 	WebPanel Web;
 
 	/// <summary>The <see cref="WebBrowserUiState.LoadId"/> the page was last told to load.</summary>
-	int loadedId;
+	int loadedId = -1;
 
 	/// <summary>
 	/// The page is a panel of the engine, so loading into it and reading which address it is on are done here, between it
@@ -64,8 +74,12 @@
 	{
 		base.Tick();
 
-		if ( Web is null )
+		if ( Navi.IsWatching || !Web.IsValid() )
+		{
+			// The page is made again when the player is back, and loads the address again.
+			loadedId = -1;
 			return;
+		}
 
 		if ( loadedId != UiState.LoadId )
 		{
@@ -96,5 +110,5 @@
 	/// </summary>
 	void AddressEdited( string text ) => ViewModel.SetAddressText( text );
 
-	protected override int BuildHash() => ViewModel.Revision;
+	protected override int BuildHash() => System.HashCode.Combine( ViewModel.Revision, Navi.IsWatching );
 }

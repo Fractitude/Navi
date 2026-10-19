@@ -75,6 +75,25 @@
 		cursor: pointer;
 	}
 
+	// Shown instead of the whole app to players who only watch: the page is not drawn for them.
+	.private
+	{
+		flex-grow: 1;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 16px;
+		padding: 12px;
+		text-align: center;
+		font-size: 18px;
+		color: $ink-t;
+
+		i
+		{
+			font-size: 64px;
+		}
+	}
+
 	// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
 	.page
 	{
