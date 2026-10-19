@@ -775,8 +775,9 @@ public sealed partial class NaviComputer : Component
 	[Property] public string SaveId { get; set; } = "";
 
 	/// <summary>
-	/// Load this computer's save when it starts, and save it a moment after every change. Turn it off to save and load
-	/// only from game code (<see cref="Save"/>, <see cref="Load"/>, <see cref="NaviSaveData"/>).
+	/// Remember this computer between launches. When on, the computer loads its saved state when it starts and saves it
+	/// a moment after every change: installed apps, settings, files and so on. When off, nothing is loaded or saved
+	/// unless game code does it (<see cref="Save"/>, <see cref="Load"/>, <see cref="NaviSaveData"/>).
 	/// </summary>
 	[Property] public bool AutoSave { get; set; } = true;
 
