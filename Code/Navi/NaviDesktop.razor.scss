@@ -168,6 +168,18 @@ NaviDesktop
 			}
 		}
 
+		// Invisible grab areas along the sides, below the corners.
+		> .edge
+		{
+			position: absolute;
+			z-index: 9;
+
+			&.n { top: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+			&.s { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+			&.w { left: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+			&.e { right: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+		}
+
 		&.minimized
 		{
 			display: none;

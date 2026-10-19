@@ -66,6 +66,15 @@
 					{
 						<div class="corner @corner.Name" @onmousedown=@( ( PanelEvent e ) => StartResize( window, corner.Direction, e ) )></div>
 					}
+
+					@* Edges can't keep a fixed aspect ratio, so those windows resize from the corners only. *@
+					if ( info.AspectRatio <= 0f )
+					{
+						foreach ( var edge in Edges )
+						{
+							<div class="edge @edge.Name" @onmousedown=@( ( PanelEvent e ) => StartResize( window, edge.Direction, e ) )></div>
+						}
+					}
 				}
 			</div>
 		}
@@ -292,6 +301,14 @@
 		new( "ne", new Vector2( 1, -1 ) ),
 		new( "sw", new Vector2( -1, 1 ) ),
 		new( "se", new Vector2( 1, 1 ) ),
+	};
+
+	static readonly Corner[] Edges =
+	{
+		new( "n", new Vector2( 0, -1 ) ),
+		new( "s", new Vector2( 0, 1 ) ),
+		new( "w", new Vector2( -1, 0 ) ),
+		new( "e", new Vector2( 1, 0 ) ),
 	};
 
 	// The window being moved or resized. The drag lasts while the mouse button is held on dragHandle.
