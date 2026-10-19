@@ -16,7 +16,7 @@ public enum PackageAction
 	/// <summary>On this computer: the row says Installed.</summary>
 	Installed,
 
-	/// <summary>Installed, but its app didn't load, so the Apps tab has nothing to uninstall: the row offers Remove.</summary>
+	/// <summary>Installed, but its app didn't load, so the Installed tab has nothing to uninstall: the row offers Remove.</summary>
 	Missing,
 
 	/// <summary>The game blocks it: the row says Blacklisted, and it can't be installed.</summary>
@@ -33,6 +33,20 @@ public enum AppAction
 
 	Install,
 	Uninstall,
+}
+
+/// <summary>
+/// The tabs of the Packages app, in the order they are drawn.
+/// </summary>
+public enum PackagesTab
+{
+	/// <summary>The apps the player installed: Store apps, not the ones that ship with the game.</summary>
+	Installed,
+
+	Store,
+
+	/// <summary>The apps that ship with the game or a library, installed or not.</summary>
+	Prepackaged,
 }
 
 /// <summary>
@@ -100,7 +114,7 @@ public sealed record AppRow
 }
 
 /// <summary>
-/// One kind of app the Apps tab can show, with whether it is the one being shown.
+/// One kind of app an app tab can show, with whether it is the one being shown.
 /// </summary>
 public sealed record FilterItem( string Key, string Label, bool Selected );
 
@@ -123,16 +137,19 @@ public sealed record PackagesUiState
 	/// <summary>What a viewer draws until the host's state arrives.</summary>
 	public static PackagesUiState Empty { get; } = new();
 
-	/// <summary>The Store tab is up, rather than the Apps tab.</summary>
-	public bool ShowStore { get; init; }
+	/// <summary>The tab that is up.</summary>
+	public PackagesTab Tab { get; init; }
+
+	/// <summary>The Store tab is up, rather than one of the app lists.</summary>
+	public bool ShowStore => Tab == PackagesTab.Store;
 
 	/// <summary>The filter menu is up.</summary>
 	public bool FilterOpen { get; init; }
 
-	/// <summary>The key of the kind the Apps tab is showing. One of the <see cref="Filters"/> keys.</summary>
+	/// <summary>The key of the kind the current app tab is showing. One of the <see cref="Filters"/> keys.</summary>
 	public string Filter { get; init; }
 
-	/// <summary>The kinds the Apps tab can show, in menu order.</summary>
+	/// <summary>The kinds the current app tab can show, in menu order.</summary>
 	public IReadOnlyList<FilterItem> Filters { get; init; } = [];
 
 	/// <summary>The current kind's name, for the filter button's tooltip.</summary>

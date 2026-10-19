@@ -21,9 +21,6 @@ public sealed class PackagesViewModel
 	/// </summary>
 	readonly Navi navi;
 
-	/// <summary>The kind the Apps tab starts on.</summary>
-	const string StartFilter = "installed";
-
 	/// <summary>How often the computer's version is polled, in seconds: a change there is what makes the lists stale.</summary>
 	const float PollInterval = 0.25f;
 
@@ -40,17 +37,26 @@ public sealed class PackagesViewModel
 	const int StorePageSize = 20;
 
 	/// <summary>
-	/// The kinds of app the Apps tab can show, in menu order. A property, not a field: a hot reload patches methods,
-	/// so a change to this list shows up in a running game, while a field's initializer only runs once per load.
+	/// The kinds of app an app tab can show, in menu order; the first is the one it starts on. A method, not a field:
+	/// a hot reload patches methods, so a change to these lists shows up in a running game, while a field's
+	/// initializer only runs once per load.
 	/// </summary>
-	static (string Key, string Name)[] Kinds =>
-	[
-		("installed", "Installed"),
-		("store", "From Store"),
-		("core", "Core"),
-		("system", "System"),
-		("prepackaged", "Pre-packaged"),
-	];
+	static (string Key, string Name)[] KindsOf( PackagesTab tab ) => tab switch
+	{
+		PackagesTab.Prepackaged =>
+		[
+			("prepackaged", "Regular"),
+			("core", "Core"),
+		],
+		_ =>
+		[
+			("store", "From Store"),
+			("system", "Root access"),
+		],
+	};
+
+	/// <summary>The kind each app tab is showing, kept while another tab is up.</summary>
+	readonly Dictionary<PackagesTab, string> filters = new();
 
 	// What the computer said, kept apart from what is drawn from it: drawing formats and filters, this is the data.
 
@@ -102,13 +108,7 @@ public sealed class PackagesViewModel
 	{
 		this.navi = navi ?? throw new System.ArgumentNullException( nameof(navi) );
 
-		UiState = new PackagesUiState
-		{
-			Filter = StartFilter,
-			Filters = BuildFilters( StartFilter ),
-			FilterName = NameOf( StartFilter ),
-			EmptyText = EmptyTextFor( StartFilter ),
-		};
+		UiState = WithFilter( new PackagesUiState { Tab = PackagesTab.Installed }, FilterOf( PackagesTab.Installed ) );
 	}
 
 	/// <summary>
@@ -138,38 +138,54 @@ public sealed class PackagesViewModel
 
 	// Tabs.
 
-	/// <summary>Show the apps on this computer.</summary>
-	public void OpenApps() => Update( uiState => uiState with { ShowStore = false } );
+	/// <summary>Show the apps the player installed.</summary>
+	public void OpenInstalled() => OpenAppTab( PackagesTab.Installed );
+
+	/// <summary>Show the apps that ship with the game or a library.</summary>
+	public void OpenPrepackaged() => OpenAppTab( PackagesTab.Prepackaged );
 
 	/// <summary>Show the Store, fetching its first page the first time.</summary>
 	public void OpenStore()
 	{
-		// The filter belongs to the Apps tab: the button is gone now, and a menu with no button to anchor it is a ghost.
-		Update( uiState => uiState with { ShowStore = true, FilterOpen = false } );
+		// The filter belongs to the app tabs: the button is gone now, and a menu with no button to anchor it is a ghost.
+		Update( uiState => uiState with { Tab = PackagesTab.Store, FilterOpen = false } );
 
 		if ( !storeLoaded )
 			_ = FetchStoreAsync( false );
 	}
 
-	// The kinds of app the Apps tab shows.
+	/// <summary>
+	/// Show one of the app lists, on the kind it was showing when it was left. Its menu lists other kinds, so an open
+	/// one closes.
+	/// </summary>
+	void OpenAppTab( PackagesTab tab ) =>
+		Update( uiState => WithFilter( uiState with { Tab = tab, FilterOpen = false }, FilterOf( tab ) ) );
+
+	// The kinds of app the app tabs show.
 
 	public void ToggleFilterMenu() => Update( uiState => uiState with { FilterOpen = !uiState.FilterOpen } );
 
 	public void CloseFilterMenu() => Update( uiState => uiState with { FilterOpen = false } );
 
-	/// <summary>Show the apps of one <see cref="Kinds"/> kind.</summary>
+	/// <summary>Show the apps of one of the current tab's kinds (<see cref="KindsOf"/>).</summary>
 	public void ChooseFilter( string filter )
 	{
-		Update( uiState => uiState with
-		{
-			Filter = filter,
-			FilterOpen = false,
-			Filters = BuildFilters( filter ),
-			FilterName = NameOf( filter ),
-			EmptyText = EmptyTextFor( filter ),
-			AppRows = BuildAppRows( filter ),
-		} );
+		filters[UiState.Tab] = filter;
+		Update( uiState => WithFilter( uiState with { FilterOpen = false }, filter ) );
 	}
+
+	/// <summary>The kind <paramref name="tab"/> shows: the one last chosen there, or its first.</summary>
+	string FilterOf( PackagesTab tab ) => filters.GetValueOrDefault( tab ) ?? KindsOf( tab )[0].Key;
+
+	/// <summary>The state with its app list showing the kind <paramref name="filter"/> of its tab.</summary>
+	PackagesUiState WithFilter( PackagesUiState uiState, string filter ) => uiState with
+	{
+		Filter = filter,
+		Filters = BuildFilters( uiState.Tab, filter ),
+		FilterName = NameOf( uiState.Tab, filter ),
+		EmptyText = EmptyTextFor( filter ),
+		AppRows = BuildAppRows( filter ),
+	};
 
 	/// <summary>Dismiss the notice above the list.</summary>
 	public void DismissNotice()
@@ -230,7 +246,8 @@ public sealed class PackagesViewModel
 	// The panel's controls, as actions (Navi.Act): they reach the host's copy from whichever client the player is on.
 
 	public const string SetSearchTextAction = "set-search-text";
-	public const string OpenAppsAction = "open-apps";
+	public const string OpenInstalledAction = "open-installed";
+	public const string OpenPrepackagedAction = "open-prepackaged";
 	public const string OpenStoreAction = "open-store";
 	public const string ToggleFilterMenuAction = "toggle-filter-menu";
 	public const string CloseFilterMenuAction = "close-filter-menu";
@@ -256,11 +273,12 @@ public sealed class PackagesViewModel
 		switch ( action )
 		{
 			case SetSearchTextAction: SetSearchText( arg ); break;
-			case OpenAppsAction: OpenApps(); break;
+			case OpenInstalledAction: OpenInstalled(); break;
+			case OpenPrepackagedAction: OpenPrepackaged(); break;
 			case OpenStoreAction: OpenStore(); break;
 			case ToggleFilterMenuAction: ToggleFilterMenu(); break;
 			case CloseFilterMenuAction: CloseFilterMenu(); break;
-			case ChooseFilterAction when Kinds.Any( x => x.Key == arg ): ChooseFilter( arg ); break;
+			case ChooseFilterAction when KindsOf( UiState.Tab ).Any( x => x.Key == arg ): ChooseFilter( arg ); break;
 			case DismissNoticeAction: DismissNotice(); break;
 			case SubmitSearchAction: SubmitSearch(); break;
 			case LoadMoreAction: LoadMore(); break;
@@ -495,44 +513,43 @@ public sealed class PackagesViewModel
 		};
 	}
 
-	static IReadOnlyList<FilterItem> BuildFilters( string selected ) => Kinds
+	static IReadOnlyList<FilterItem> BuildFilters( PackagesTab tab, string selected ) => KindsOf( tab )
 		.Select( x => new FilterItem( x.Key, x.Name, x.Key == selected ) )
 		.ToArray();
 
 	/// <summary>
-	/// The current kind's name, for the button's tooltip. Falls back to the first kind if the filter is one this
+	/// The current kind's name, for the button's tooltip. Falls back to the tab's first kind if the filter is one this
 	/// build doesn't know: a hot reload can leave an instance holding an older one, and a missing name shouldn't
 	/// take the panel down with it.
 	/// </summary>
-	static string NameOf( string filter ) => Kinds.FirstOrDefault( x => x.Key == filter ).Name ?? Kinds[0].Name;
+	static string NameOf( PackagesTab tab, string filter ) =>
+		KindsOf( tab ).FirstOrDefault( x => x.Key == filter ).Name ?? KindsOf( tab )[0].Name;
 
 	/// <summary>
-	/// Is the app in the list under <paramref name="filter"/>? Installed is the plain apps that are installed: core and
-	/// system apps are left to their own kinds. Pre-packaged is the apps that ship with the game or a library but
-	/// aren't part of the OS, whether or not they are installed, because the Store can't bring them back; the rest are
-	/// Store apps, which are left to the Store tab when they aren't installed. Core apps are part of the OS, and
-	/// system apps ask for full system access, whether they ship with the game or with a Store package, so an app can
-	/// match more than one of these.
+	/// Is the app in the list under <paramref name="filter"/>? From Store is the Store apps that are installed:
+	/// pre-packaged apps have their own tab, and Store apps that aren't installed are left to the Store tab. Regular is
+	/// the apps that ship with the game or a library but aren't part of the OS, whether or not they are installed,
+	/// because the Store can't bring them back. Core apps are part of the OS, and system apps ask for full system
+	/// access, whether they ship with the game or with a Store package, so an app can match more than one of these.
+	/// An unknown filter (a hot reload can leave an older one) shows From Store.
 	/// </summary>
 	static bool Matches( string filter, bool installed, Navi.AppKind kind, bool fromStore ) => filter switch
 	{
-		"store" => installed && fromStore,
-		"core" => kind is Navi.AppKind.Core,
+		"core" => !fromStore && kind is Navi.AppKind.Core,
 		"system" => installed && kind is Navi.AppKind.Core or Navi.AppKind.System,
 		"prepackaged" => !fromStore && kind is not Navi.AppKind.Core,
-		_ => installed && kind is Navi.AppKind.App,
+		_ => installed && fromStore,
 	};
 
 	/// <summary>
-	/// Shown in the Apps list when no app matches the kind being shown.
+	/// Shown in an app list when no app matches the kind being shown.
 	/// </summary>
 	static string EmptyTextFor( string filter ) => filter switch
 	{
-		"store" => "No Store apps are installed.",
 		"core" => "No apps are part of the OS.",
 		"system" => "No apps ask for full system access.",
 		"prepackaged" => "No apps come with the game.",
-		_ => "No apps are installed.",
+		_ => "No Store apps are installed.",
 	};
 
 	// Formatting for the details, done here so the panel prints values rather than working them out.

@@ -10,11 +10,16 @@
 
 <root>
 	<div class="tabs">
-		<div class="tab @( UiState.ShowStore ? "" : "active" )" @onclick=@( () => Navi.Act( PackagesViewModel.OpenAppsAction ) )>
-			Apps
+		<div class="tab @( UiState.Tab == PackagesTab.Installed ? "active" : "" )"
+		     @onclick=@( () => Navi.Act( PackagesViewModel.OpenInstalledAction ) )>
+			Installed
 		</div>
 		<div class="tab @( UiState.ShowStore ? "active" : "" )" @onclick=@( () => Navi.Act( PackagesViewModel.OpenStoreAction ) )>
 			Store
+		</div>
+		<div class="tab @( UiState.Tab == PackagesTab.Prepackaged ? "active" : "" )"
+		     @onclick=@( () => Navi.Act( PackagesViewModel.OpenPrepackagedAction ) )>
+			Pre-packaged
 		</div>
 		<div class="spacer"></div>
 
@@ -26,7 +31,7 @@
 		}
 		else
 		{
-			@* Which apps the list shows. Only the Apps tab filters, so the Store tab has its refresh button *@
+			@* Which apps the list shows. Only the app tabs filter, so the Store tab has its refresh button *@
 			@* here instead. *@
 			<div class="filter" tooltip="Show: @UiState.FilterName"
 			     @onclick=@( () => Navi.Act( PackagesViewModel.ToggleFilterMenuAction ) )>
