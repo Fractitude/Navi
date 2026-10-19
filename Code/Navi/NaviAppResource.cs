@@ -116,6 +116,14 @@ public sealed class NaviAppResource : GameResource
 	[Property] public List<string> Permissions { get; set; } = new();
 
 	/// <summary>
+	/// The kinds of file the app opens, as extensions without the dot, e.g. "txt". Opening one in the file explorer
+	/// (<c>Navi.Files.OpenAsync</c>) launches the app with it. The computer picks the app, an app that ships with the game
+	/// first; one from the Store is only picked if it declares <see cref="NaviPermissions.Files"/>, since without it the
+	/// file is out of its reach.
+	/// </summary>
+	[Property] public List<string> FileTypes { get; set; } = new();
+
+	/// <summary>
 	/// A system app: it asks for full system access (root), which allows everything, whatever <see cref="Permissions"/> lists.
 	/// A Store app gets it only after the player accepts, when they install it. One that ships with the game or a library
 	/// is part of the OS: it has root without asking, is always installed, and can't be uninstalled.

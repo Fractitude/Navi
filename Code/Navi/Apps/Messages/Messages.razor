@@ -1,0 +1,322 @@
+@using Sandbox.UI
+@inherits NaviApp
+@namespace NaviApps
+
+@* Direct messages between players, in the style of Discord: the players down the left, the open conversation on the *@
+@* right, an emoji picker at the composer. A shared app, so the host runs it and everyone at the screen sees what the *@
+@* player in the seat sees. *@
+@* *@
+@* The panel is a view: every value is read from MessagesUiState and every control calls the view model through *@
+@* Navi.Act. It keeps no app state of its own. *@
+
+<root>
+	@if ( UiState.NeedsPermission )
+	{
+		<div class="gate">
+			<i>lock</i>
+			<div class="heading">Messages needs your permission</div>
+			<div class="hint">It reads and sends your direct messages.</div>
+			<div class="button" @onclick=@( () => Navi.Act( MessagesViewModel.AllowAction ) )>Allow</div>
+
+			@if ( UiState.Notice is not null )
+			{
+				<div class="notice" @onclick=@( () => Navi.Act( MessagesViewModel.DismissNoticeAction ) )>@UiState.Notice</div>
+			}
+		</div>
+	}
+	else if ( !UiState.SignedIn )
+	{
+		<div class="gate">
+			<i>chat</i>
+			<div class="heading">Sit down to read your messages</div>
+			<div class="hint">Messages belong to the player at the screen.</div>
+		</div>
+	}
+	else
+	{
+		<div class="sidebar">
+			<div class="find">
+				<TextEntry Placeholder="Find a conversation" MaxLength=@( 40 )
+				           OnTextEdited=@FilterEdited/>
+			</div>
+
+			<div class="section">DIRECT MESSAGES</div>
+
+			<div class="contacts">
+				@foreach ( var contact in UiState.Contacts )
+				{
+					<div class="contact @( contact.Active ? "active" : "" ) @( contact.Unread > 0 ? "unread" : "" )"
+					     @onclick=@( () => Navi.Act( MessagesViewModel.SelectAction, contact.Id ) )>
+						<div class="avatar" style="background-color: @contact.Color;">
+							<span>@contact.Initial</span>
+							<div class="photo" style="background-image: url( avatar:@contact.Id );"></div>
+							<div class="status @( contact.Online ? "online" : "" )"></div>
+						</div>
+
+						<div class="meta">
+							<div class="name">@contact.Name</div>
+
+							@if ( contact.Preview.Length > 0 )
+							{
+								<div class="preview">@contact.Preview</div>
+							}
+						</div>
+
+						@if ( contact.Unread > 0 )
+						{
+							<div class="badge">@contact.Unread</div>
+						}
+					</div>
+				}
+
+				@if ( UiState.ContactsEmptyText.Length > 0 )
+				{
+					<div class="empty">@UiState.ContactsEmptyText</div>
+				}
+			</div>
+
+			<div class="me">
+				<div class="avatar" style="background-color: @UiState.SelfColor;">
+					<span>@UiState.SelfInitial</span>
+					<div class="photo" style="background-image: url( avatar:@UiState.SelfId );"></div>
+					<div class="status online"></div>
+				</div>
+
+				<div class="meta">
+					<div class="name">@UiState.SelfName</div>
+					<div class="preview">Online</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="main">
+			@if ( UiState.HasActive )
+			{
+				<div class="header">
+					<div class="avatar small" style="background-color: @UiState.ActiveColor;">
+						<span>@UiState.ActiveInitial</span>
+						<div class="photo" style="background-image: url( avatar:@UiState.ActiveId );"></div>
+						<div class="status @( UiState.ActiveOnline ? "online" : "" )"></div>
+					</div>
+
+					<div class="name">@UiState.ActiveName</div>
+					<div class="presence">@( UiState.ActiveOnline ? "Online" : "Offline" )</div>
+				</div>
+
+				<div class="messages" @ref="MessagesList">
+					@if ( UiState.Groups.Count == 0 )
+					{
+						<div class="beginning">
+							<div class="avatar big" style="background-color: @UiState.ActiveColor;">
+								<span>@UiState.ActiveInitial</span>
+								<div class="photo" style="background-image: url( avatar:@UiState.ActiveId );"></div>
+							</div>
+
+							<div class="heading">@UiState.ActiveName</div>
+							<div class="hint">This is the beginning of your conversation with @UiState.ActiveName.</div>
+						</div>
+					}
+
+					@foreach ( var group in UiState.Groups )
+					{
+						<div class="group">
+							<div class="avatar" style="background-color: @group.Color;">
+								<span>@group.Initial</span>
+								<div class="photo" style="background-image: url( avatar:@group.SenderId );"></div>
+							</div>
+
+							<div class="body">
+								<div class="byline">
+									<div class="sender">@group.SenderName</div>
+									<div class="time">@group.Time</div>
+								</div>
+
+								@foreach ( var line in group.Lines )
+								{
+									<div class="line @( line.Jumbo ? "jumbo" : "" )">@line.Text</div>
+								}
+							</div>
+						</div>
+					}
+				</div>
+
+				@if ( UiState.Notice is not null )
+				{
+					<div class="notice" @onclick=@( () => Navi.Act( MessagesViewModel.DismissNoticeAction ) )>@UiState.Notice</div>
+				}
+
+				<div class="composer">
+					<TextEntry @ref="DraftEntry" Value=@( UiState.Draft ) Placeholder=@( "Message @" + UiState.ActiveName )
+					           MaxLength=@( 400 )
+					           OnTextEdited=@DraftEdited
+					           onsubmit=@( () => Navi.Act( MessagesViewModel.SendAction ) )/>
+
+					<div class="emoji-button @( UiState.PickerOpen ? "open" : "" )" tooltip="Emoji"
+					     @onclick=@( () => Navi.Act( MessagesViewModel.TogglePickerAction ) )>
+						<i>mood</i>
+					</div>
+				</div>
+
+				@* Drawn after the conversation so it paints over it, with a backdrop that closes it. *@
+				@if ( UiState.PickerOpen )
+				{
+					<div class="picker-backdrop" @onmousedown=@( () => Navi.Act( MessagesViewModel.ClosePickerAction ) )></div>
+
+					<div class="picker">
+						<div class="categories">
+							@foreach ( var category in MessagesEmoji.Categories )
+							{
+								<div class="category @( category.Key == UiState.PickerCategory && UiState.PickerSearch.Length == 0 ? "active" : "" )"
+								     tooltip=@category.Label
+								     @onclick=@( () => Navi.Act( MessagesViewModel.PickerCategoryAction, category.Key ) )>
+									@category.Icon
+								</div>
+							}
+						</div>
+
+						<div class="picker-search">
+							<TextEntry Placeholder="Find the perfect emoji" MaxLength=@( 24 )
+							           OnTextEdited=@PickerSearchEdited/>
+						</div>
+
+						<div class="grid">
+							@foreach ( var emoji in Emoji )
+							{
+								<div class="emoji" tooltip=@( ":" + emoji.Code + ":" )
+								     @onclick=@( () => Navi.Act( MessagesViewModel.EmojiAction, emoji.Char ) )>
+									@emoji.Char
+								</div>
+							}
+
+							@if ( Emoji.Count == 0 )
+							{
+								<div class="none">
+									@( UiState.PickerSearch.Length > 0 ? "No emoji match that." : "Emoji you use show up here." )
+								</div>
+							}
+						</div>
+					</div>
+				}
+			}
+			else
+			{
+				<div class="gate">
+					<i>forum</i>
+					<div class="heading">Pick a conversation</div>
+					<div class="hint">Choose a player on the left to message them.</div>
+				</div>
+			}
+		</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state. Made on first use, with the panel's own Navi.
+	/// </summary>
+	MessagesViewModel ViewModel => field ??= new(Navi);
+
+	/// <summary>
+	/// What is drawn above. Read only. On a viewer (the app is shared) it is what the host's copy published.
+	/// </summary>
+	MessagesUiState UiState => Navi.IsViewer ? Navi.GetState<MessagesUiState>() ?? MessagesUiState.Empty : ViewModel.UiState;
+
+	/// <summary>
+	/// The emoji the picker shows now: a lookup in data that never changes, so the state doesn't carry it.
+	/// </summary>
+	IReadOnlyList<EmojiEntry> Emoji => MessagesEmoji.Find( UiState.PickerCategory, UiState.PickerSearch, UiState.Recent );
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		FitScrollbarGutter();
+		ScrollToNewest();
+
+		if ( Navi.IsViewer )
+			return;
+
+		ViewModel.Tick();
+		Navi.Publish( ViewModel.UiState );
+	}
+
+	/// <summary>
+	/// The host's copy runs what the player did, from whichever client they're on.
+	/// </summary>
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	void DraftEdited( string text ) => Navi.Act( MessagesViewModel.DraftAction, text );
+
+	void FilterEdited( string text ) => Navi.Act( MessagesViewModel.FilterAction, text );
+
+	void PickerSearchEdited( string text ) => Navi.Act( MessagesViewModel.PickerSearchAction, text );
+
+	Panel MessagesList;
+	TextEntry DraftEntry;
+
+	/// <summary>The <see cref="MessagesUiState.ScrollKey"/> the conversation was last scrolled down for.</summary>
+	int scrolledFor = -1;
+
+	/// <summary>
+	/// A new message, or another conversation, shows from the newest end. Where a list is scrolled is the panel's own, so
+	/// it is done here when the state says something new came in. The list isn't laid out until a frame after it is
+	/// built, so it tries for a few frames.
+	/// </summary>
+	void ScrollToNewest()
+	{
+		if ( UiState.ScrollKey != scrolledFor )
+		{
+			scrolledFor = UiState.ScrollKey;
+			scrollFrames = 4;
+		}
+
+		if ( scrollFrames <= 0 || MessagesList is null )
+			return;
+
+		scrollFrames--;
+		MessagesList.ScrollVelocity = Vector2.Zero;
+		MessagesList.ScrollOffset = new Vector2( 0, MessagesList.ScrollSize.y );
+	}
+
+	int scrollFrames;
+
+	/// <summary>
+	/// The engine draws the scrollbar over a list instead of taking room from it, and scrollbar-gutter keeps room whether or
+	/// not the list scrolls. So the room is made here, only while the bar is there. This is the panel doing to its own tree
+	/// what CSS can't, and it holds no state, so it stays out of the view model.
+	/// </summary>
+	void FitScrollbarGutter()
+	{
+		foreach ( var list in FindByClass( "contacts", "messages", "grid" ) )
+		{
+			var scrolling = false;
+			foreach ( var bar in list.Children )
+				scrolling |= bar is ScrollBar;
+
+			list.SetClass( "scrolling", scrolling );
+		}
+	}
+
+	IEnumerable<Panel> FindByClass( params string[] classes )
+	{
+		var stack = new Stack<Panel>( Children );
+		while ( stack.Count > 0 )
+		{
+			var panel = stack.Pop();
+			if ( classes.Any( panel.HasClass ) )
+				yield return panel;
+
+			foreach ( var child in panel.Children )
+				stack.Push( child );
+		}
+	}
+
+	/// <summary>
+	/// Typing doesn't bump the revision, so the lists aren't redrawn on every key. The composer still follows the text as the
+	/// host has it, so others at the screen see it being typed, except where it has focus: that is where the player is
+	/// typing, and the host's text is a keystroke behind.
+	/// </summary>
+	protected override int BuildHash() =>
+		System.HashCode.Combine( UiState.Revision, DraftEntry is { HasFocus: true } ? null : UiState.Draft );
+}

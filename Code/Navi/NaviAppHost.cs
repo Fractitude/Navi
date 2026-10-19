@@ -54,6 +54,12 @@ public static class NaviEvents
 	/// "ctrl+c". See <c>NaviApp.OnShortcut</c>.
 	/// </summary>
 	public const string Shortcut = "navi.shortcut";
+
+	/// <summary>
+	/// The player is closing the app's window, which asked to be told first (<c>Navi.Window.SetCloseGuardAsync</c>). Raised
+	/// on the app's panel. See <c>NaviApp.OnCloseRequested</c>.
+	/// </summary>
+	public const string CloseRequest = "navi.close-request";
 }
 
 /// <summary>
@@ -299,6 +305,18 @@ public sealed class NaviAppHost : Panel
 	{
 		if ( app is not null && app.IsValid && !viewer )
 			app.CreateEvent( new PanelEvent( NaviEvents.Shortcut, app ) { Value = keys } );
+	}
+
+	/// <summary>
+	/// On the host: tell the app's copy the player is closing its window. False if there is no copy here to tell.
+	/// </summary>
+	internal bool DeliverCloseRequest()
+	{
+		if ( app is null || !app.IsValid || viewer )
+			return false;
+
+		app.CreateEvent( new PanelEvent( NaviEvents.CloseRequest, app ) );
+		return true;
 	}
 
 	/// <summary>

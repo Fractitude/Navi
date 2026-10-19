@@ -1,0 +1,630 @@
+@import "../../Themes/_paper-light.scss";
+
+// Discord's palette for what is Messages' own: the accent, the online dot, the unread badge. The rest follows the theme.
+$blurple: #5865f2;
+$online: #23a559;
+$alert: #f23f43;
+
+@mixin messages-style
+{
+	Messages
+	{
+		// The picker is positioned against this panel's main column, not against the window it sits in.
+		width: 480px;
+		height: 270px;
+		flex-direction: row;
+		color: $ink-t;
+		background-color: $surface-bg;
+		font-size: 12px;
+
+		.gate
+		{
+			flex-grow: 1;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			gap: 6px;
+			padding: 12px;
+			text-align: center;
+
+			i
+			{
+				font-size: 40px;
+				color: $line-t;
+			}
+
+			.heading
+			{
+				font-size: 15px;
+				font-weight: 700;
+			}
+
+			.hint
+			{
+				color: $line-t;
+			}
+
+			.button
+			{
+				margin-top: 4px;
+				padding: 5px 16px;
+				color: white;
+				font-weight: 700;
+				background-color: $blurple;
+				border-radius: 3px;
+				cursor: pointer;
+
+				&:hover
+				{
+					background-color: #4752c4;
+				}
+			}
+		}
+
+		// Avatars: a circle of the player's color with their initial, and their picture over it once it loads.
+		.avatar
+		{
+			position: relative;
+			width: 30px;
+			height: 30px;
+			flex-shrink: 0;
+			justify-content: center;
+			align-items: center;
+			border-radius: 50%;
+
+			span
+			{
+				color: white;
+				font-size: 14px;
+				font-weight: 700;
+			}
+
+			.photo
+			{
+				position: absolute;
+				left: 0;
+				top: 0;
+				width: 100%;
+				height: 100%;
+				border-radius: 50%;
+				background-size: cover;
+				background-position: center;
+			}
+
+			.status
+			{
+				position: absolute;
+				right: -2px;
+				bottom: -2px;
+				width: 10px;
+				height: 10px;
+				border-radius: 50%;
+				background-color: $line-bg;
+				border: 2px solid $surface2-bg;
+
+				&.online
+				{
+					background-color: $online;
+				}
+			}
+
+			&.small
+			{
+				width: 24px;
+				height: 24px;
+
+				span
+				{
+					font-size: 12px;
+				}
+
+				.status
+				{
+					border-color: $surface-bg;
+				}
+			}
+
+			&.big
+			{
+				width: 64px;
+				height: 64px;
+
+				span
+				{
+					font-size: 28px;
+				}
+			}
+		}
+
+		// The players.
+		.sidebar
+		{
+			width: 150px;
+			flex-shrink: 0;
+			flex-direction: column;
+			background-color: $surface2-bg;
+
+			.find
+			{
+				flex-shrink: 0;
+				padding: 6px;
+				border-bottom: 1px solid $line-bc;
+			}
+
+			.section
+			{
+				flex-shrink: 0;
+				padding: 8px 8px 3px 8px;
+				color: $line-t;
+				font-size: 9px;
+				font-weight: 700;
+				letter-spacing: 0.5px;
+			}
+
+			.contacts
+			{
+				flex-grow: 1;
+				flex-direction: column;
+				padding: 0 4px;
+				overflow-y: auto;
+				scrollbar-width: thin;
+				scrollbar-color: #8a8472 transparent;
+
+				&.scrolling
+				{
+					padding-right: 10px;
+				}
+
+				scrollbar > .thumb
+				{
+					border-radius: 2px;
+				}
+			}
+
+			.contact
+			{
+				flex-shrink: 0;
+				flex-direction: row;
+				align-items: center;
+				gap: 7px;
+				padding: 4px;
+				color: $line-t;
+				border-radius: 4px;
+				cursor: pointer;
+
+				&:hover
+				{
+					color: $ink-t;
+					background-color: $sand-bg;
+				}
+
+				&.active
+				{
+					color: $ink-t;
+					background-color: $sand-bg;
+				}
+
+				&.unread
+				{
+					color: $ink-t;
+
+					.name
+					{
+						font-weight: 700;
+					}
+				}
+
+				.meta
+				{
+					flex-grow: 1;
+					flex-shrink: 1;
+					min-width: 0;
+					flex-direction: column;
+				}
+
+				.name
+				{
+					font-size: 12px;
+					white-space: nowrap;
+					text-overflow: ellipsis;
+					overflow: hidden;
+				}
+
+				.preview
+				{
+					font-size: 9px;
+					color: $line-t;
+					white-space: nowrap;
+					text-overflow: ellipsis;
+					overflow: hidden;
+				}
+
+				.badge
+				{
+					flex-shrink: 0;
+					min-width: 14px;
+					height: 14px;
+					padding: 0 4px;
+					justify-content: center;
+					align-items: center;
+					color: white;
+					font-size: 9px;
+					font-weight: 700;
+					background-color: $alert;
+					border-radius: 7px;
+				}
+			}
+
+			.empty
+			{
+				padding: 10px 6px;
+				color: $line-t;
+				font-size: 10px;
+				text-align: center;
+			}
+
+			// Whose messages these are, like Discord's user panel.
+			.me
+			{
+				flex-shrink: 0;
+				flex-direction: row;
+				align-items: center;
+				gap: 7px;
+				padding: 5px 6px;
+				background-color: $paper-bg;
+
+				.meta
+				{
+					flex-grow: 1;
+					min-width: 0;
+					flex-direction: column;
+				}
+
+				.name
+				{
+					font-size: 11px;
+					font-weight: 700;
+					white-space: nowrap;
+					text-overflow: ellipsis;
+					overflow: hidden;
+				}
+
+				.preview
+				{
+					font-size: 9px;
+					color: $line-t;
+				}
+			}
+		}
+
+		// The open conversation.
+		.main
+		{
+			position: relative;
+			flex-grow: 1;
+			min-width: 0;
+			flex-direction: column;
+
+			.header
+			{
+				flex-shrink: 0;
+				flex-direction: row;
+				align-items: center;
+				gap: 7px;
+				padding: 6px 10px;
+				border-bottom: 1px solid $line-bc;
+				box-shadow: 0 1px 0 rgba( 0, 0, 0, 0.12 );
+
+				.name
+				{
+					font-size: 13px;
+					font-weight: 700;
+				}
+
+				.presence
+				{
+					color: $line-t;
+					font-size: 10px;
+				}
+			}
+
+			.messages
+			{
+				flex-grow: 1;
+				flex-direction: column;
+				padding: 8px 10px 4px 10px;
+				overflow-y: auto;
+				scrollbar-width: thin;
+				scrollbar-color: #8a8472 transparent;
+
+				&.scrolling
+				{
+					padding-right: 16px;
+				}
+
+				scrollbar > .thumb
+				{
+					border-radius: 2px;
+				}
+			}
+
+			.beginning
+			{
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 4px;
+				padding: 6px 0 12px 0;
+
+				.heading
+				{
+					font-size: 18px;
+					font-weight: 700;
+				}
+
+				.hint
+				{
+					color: $line-t;
+				}
+			}
+
+			.group
+			{
+				flex-shrink: 0;
+				flex-direction: row;
+				gap: 9px;
+				padding: 4px 0;
+
+				.body
+				{
+					flex-grow: 1;
+					flex-shrink: 1;
+					min-width: 0;
+					flex-direction: column;
+				}
+
+				.byline
+				{
+					flex-direction: row;
+					align-items: baseline;
+					gap: 6px;
+				}
+
+				.sender
+				{
+					font-size: 12px;
+					font-weight: 700;
+				}
+
+				.time
+				{
+					color: $line-t;
+					font-size: 9px;
+				}
+
+				.line
+				{
+					font-size: 12px;
+					line-height: 16px;
+					white-space: normal;
+					word-break: break-word;
+
+					&.jumbo
+					{
+						font-size: 28px;
+						line-height: 34px;
+					}
+				}
+			}
+
+			// A message about the last action. Click to dismiss.
+			.notice
+			{
+				flex-shrink: 0;
+				margin: 0 10px;
+				padding: 3px 8px;
+				color: white;
+				font-size: 10px;
+				background-color: #8a3a3a;
+				border-radius: 3px;
+				cursor: pointer;
+			}
+
+			.composer
+			{
+				flex-shrink: 0;
+				flex-direction: row;
+				align-items: center;
+				gap: 4px;
+				margin: 6px 10px 10px 10px;
+				padding: 0 4px 0 0;
+				background-color: $sand-bg;
+				border-radius: 6px;
+
+				.textentry
+				{
+					flex-grow: 1;
+					min-width: 0;
+					padding: 8px 10px;
+					font-size: 12px;
+					color: $ink-t;
+					background-color: transparent;
+					border: none;
+				}
+
+				.emoji-button
+				{
+					width: 24px;
+					height: 24px;
+					flex-shrink: 0;
+					justify-content: center;
+					align-items: center;
+					font-size: 20px;
+					color: $line-t;
+					border-radius: 4px;
+					cursor: pointer;
+
+					&:hover, &.open
+					{
+						color: $ink-t;
+					}
+
+					&.open
+					{
+						color: $blurple;
+					}
+				}
+			}
+
+			// Under the picker, to close it on a click anywhere else.
+			.picker-backdrop
+			{
+				position: absolute;
+				left: 0;
+				top: 0;
+				right: 0;
+				bottom: 0;
+				pointer-events: all;
+			}
+
+			.picker
+			{
+				position: absolute;
+				right: 10px;
+				bottom: 48px;
+				width: 236px;
+				height: 180px;
+				flex-direction: column;
+				border: 1px solid $line-bc;
+				border-radius: 6px;
+				box-shadow: 0 4px 12px rgba( 0, 0, 0, 0.45 );
+
+				.categories
+				{
+					flex-shrink: 0;
+					flex-direction: row;
+					justify-content: space-between;
+					padding: 4px 6px 0 6px;
+				}
+
+				.category
+				{
+					width: 26px;
+					height: 24px;
+					justify-content: center;
+					align-items: center;
+					font-size: 15px;
+					border-bottom: 2px solid transparent;
+					cursor: pointer;
+					opacity: 0.6;
+
+					&:hover
+					{
+						opacity: 1;
+					}
+
+					&.active
+					{
+						opacity: 1;
+						border-bottom-color: $blurple;
+					}
+				}
+
+				.picker-search
+				{
+					flex-shrink: 0;
+					padding: 4px 6px;
+				}
+
+				.textentry
+				{
+					width: 100%;
+					min-width: 0;
+					padding: 3px 6px;
+					font-size: 11px;
+					color: $ink-t;
+					background-color: $surface2-bg;
+					border: 1px solid $line-bc;
+					border-radius: 3px;
+				}
+
+				.grid
+				{
+					flex-grow: 1;
+					flex-direction: row;
+					flex-wrap: wrap;
+					align-content: flex-start;
+					padding: 2px 4px 4px 6px;
+					overflow-y: auto;
+					scrollbar-width: thin;
+					scrollbar-color: #8a8472 transparent;
+
+					&.scrolling
+					{
+						padding-right: 10px;
+					}
+
+					scrollbar > .thumb
+					{
+						border-radius: 2px;
+					}
+				}
+
+				.emoji
+				{
+					width: 28px;
+					height: 28px;
+					justify-content: center;
+					align-items: center;
+					font-size: 18px;
+					border-radius: 4px;
+					cursor: pointer;
+
+					&:hover
+					{
+						background-color: $sand-bg;
+					}
+				}
+
+				.none
+				{
+					width: 100%;
+					padding: 14px 0;
+					color: $line-t;
+					font-size: 10px;
+					text-align: center;
+				}
+			}
+		}
+	}
+}
+
+@include messages-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
+{
+	@include messages-style;
+}
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
+{
+	@include messages-style;
+}
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
+{
+	@include messages-style;
+}
+
+// The picker floats over the conversation, so it is solid in every look, Glass included.
+.scheme-light Messages .picker
+{
+	background-color: #f2eee2;
+}
+
+.scheme-dark Messages .picker
+{
+	background-color: #1f1e33;
+}

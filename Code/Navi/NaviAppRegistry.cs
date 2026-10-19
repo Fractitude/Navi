@@ -119,6 +119,12 @@ public sealed class NaviAppInfo
 	public IReadOnlyList<string> Permissions { get; init; }
 
 	/// <summary>
+	/// The kinds of file the app opens, as lowercase extensions without the dot. See <see cref="NaviAppResource.FileTypes"/>.
+	/// Only the host uses them, to pick the app that opens a file, so they aren't sent to clients.
+	/// </summary>
+	public IReadOnlyList<string> FileTypes { get; init; } = [];
+
+	/// <summary>
 	/// The app's panel class.
 	/// </summary>
 	public TypeDescription PanelType { get; init; }
@@ -177,6 +183,10 @@ public sealed class NaviAppInfo
 			IsPrepackaged = prepackaged,
 			IsSystem = resource.IsSystem,
 			Permissions = resource.Permissions?.Where( NaviPermissions.IsKnown ).Distinct().ToArray() ?? [],
+			FileTypes = resource.FileTypes?.Where( x => !string.IsNullOrWhiteSpace( x ) )
+				.Select( x => x.Trim().TrimStart( '.' ).ToLowerInvariant() )
+				.Distinct()
+				.ToArray() ?? [],
 			PanelType = panelType,
 			Resource = resource,
 		};

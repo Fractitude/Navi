@@ -48,6 +48,8 @@ public sealed class FilesViewModel
 	public const string OpenMenuAction = "open-menu";
 	public const string ChooseMenuAction = "choose-menu";
 	public const string CloseMenuAction = "close-menu";
+	public const string ConfirmAction = "confirm";
+	public const string CancelConfirmAction = "cancel-confirm";
 
 	/// <summary>
 	/// How <see cref="SelectAction"/> treats what was selected, as its second argument: replace it (none, a plain click),
@@ -102,6 +104,9 @@ public sealed class FilesViewModel
 
 	string menuHeading;
 	Vector2 menuAt;
+
+	/// <summary>The action <see cref="ConfirmAction"/> runs, while the player is asked about it; else null.</summary>
+	string confirming;
 
 	/// <summary>What Copy or Cut took, for Paste.</summary>
 	(IReadOnlyList<string> Paths, bool Cut)? clipboard;
@@ -208,8 +213,15 @@ public sealed class FilesViewModel
 		if ( action is not (OpenMenuAction or ChooseMenuAction or SetRenameTextAction) )
 			menu = [];
 
+		// While a question is open it covers the window: only its answers do anything.
+		if ( confirming is not null && action is not (ConfirmAction or CancelConfirmAction) )
+			return;
+
 		switch ( action )
 		{
+			case ConfirmAction: Answer( true ); break;
+			case CancelConfirmAction: Answer( false ); break;
+
 			case OpenMenuAction:
 				OpenMenu( arg, Number( args, 1 ), Number( args, 2 ) );
 				break;
@@ -237,7 +249,7 @@ public sealed class FilesViewModel
 			case CancelRenameAction: CancelRename(); break;
 			case TrashAction: _ = TrashAsync(); break;
 			case RestoreAction: _ = RestoreAsync(); break;
-			case EmptyTrashAction: _ = EmptyTrashAsync(); break;
+			case EmptyTrashAction: Ask( EmptyTrashAction ); break;
 			case MakeAliasAction: _ = MakeLinkAsync( alias: true ); break;
 			case MakeSymlinkAction: _ = MakeLinkAsync( alias: false ); break;
 			case CopyAction: Copy( cut: false ); break;
@@ -300,7 +312,7 @@ public sealed class FilesViewModel
 
 	/// <summary>
 	/// What a double-click does: a folder (or a symlink to one) opens in the list, an alias opens what it points at, and a
-	/// file waits for an app that can open it.
+	/// file opens in the app for its kind (a ".txt" in Text Edit).
 	/// </summary>
 	public async Task OpenAsync( string entry )
 	{
@@ -352,7 +364,9 @@ public sealed class FilesViewModel
 				return;
 			}
 
-			Notify( $"There's no app to open \"{to.Name}\" yet." );
+			// The computer picks the app for the file's kind and gives it the file.
+			if ( !await navi.Files.OpenAsync( entry ) )
+				Notify( $"There's no app to open \"{to.Name}\"." );
 		}
 		catch ( System.Exception e )
 		{
@@ -469,6 +483,15 @@ public sealed class FilesViewModel
 			Rebuild();
 		}
 
+		// A question takes the keys: Enter answers yes. Escape stands the player up, so no is the button only.
+		if ( confirming is not null )
+		{
+			if ( keys == "enter" )
+				Answer( true );
+
+			return;
+		}
+
 		// The rename field has the keys while it is open; these are the ones that reach the app around it.
 		if ( renamePath is not null && keys is not ("enter" or "f2") )
 			return;
@@ -557,8 +580,6 @@ public sealed class FilesViewModel
 				new( NewFileAction, "New text file", "note_add" ),
 				new( PasteAction, "Paste", "content_paste", "Ctrl+V", clipboard is not null, Separator: true ),
 				new( SelectAllAction, "Select all", "select_all", "Ctrl+A", shownPaths.Count > 0, Separator: true ),
-				new( ToggleHiddenAction, showHidden ? "Hide hidden files" : "Show hidden files",
-					showHidden ? "visibility_off" : "visibility", "Ctrl+H" ),
 			], null);
 		}
 
@@ -730,6 +751,36 @@ public sealed class FilesViewModel
 
 		await RefreshAsync();
 	}
+
+	/// <summary>
+	/// Ask the player before running <paramref name="action"/>, which can't be undone. <see cref="Answer"/> runs it.
+	/// </summary>
+	void Ask( string action )
+	{
+		if ( action == EmptyTrashAction && (!IsTrash( path ) || entries.Count == 0) )
+			return;
+
+		confirming = action;
+		Rebuild();
+	}
+
+	void Answer( bool yes )
+	{
+		var action = confirming;
+		confirming = null;
+		Rebuild();
+
+		if ( yes && action == EmptyTrashAction )
+			_ = EmptyTrashAsync();
+	}
+
+	ConfirmDialog BuildConfirm() => confirming switch
+	{
+		EmptyTrashAction => new ConfirmDialog( "Empty the trash?",
+			$"{(entries.Count == 1 ? "1 item" : $"{entries.Count} items")} will be deleted for good. This can't be undone.",
+			"Empty trash" ),
+		_ => null,
+	};
 
 	async Task EmptyTrashAsync()
 	{
@@ -975,6 +1026,7 @@ public sealed class FilesViewModel
 			MenuHeading = menu.Count > 0 ? menuHeading : null,
 			MenuX = menuAt.x,
 			MenuY = menuAt.y,
+			Confirm = BuildConfirm(),
 		};
 	}
 

@@ -76,21 +76,40 @@ public sealed class NaviInputCapture : Component
 	}
 
 	/// <summary>
-	/// Send the shortcuts the player pressed this frame to the app in front, once the screen fills the view. Not while a
-	/// text field has the keys: there they are typing.
+	/// The letters a text field keeps with Ctrl held: select all, copy, cut, paste, undo and redo.
+	/// </summary>
+	static readonly HashSet<string> textFieldLetters = ["a", "c", "x", "v", "z", "y"];
+
+	/// <summary>
+	/// Does a shortcut reach the app while a text field has the keys? Only Ctrl with a letter or digit the field doesn't
+	/// use itself, like Ctrl+S: everything else is typing, or moving the caret.
+	/// </summary>
+	public static bool PassesTextField( string keys )
+	{
+		if ( !keys.StartsWith( "ctrl+", System.StringComparison.Ordinal ) )
+			return false;
+
+		var key = keys[(keys.LastIndexOf( '+' ) + 1)..];
+		return key.Length == 1 && char.IsAsciiLetterOrDigit( key[0] ) && !textFieldLetters.Contains( key );
+	}
+
+	/// <summary>
+	/// Send the shortcuts the player pressed this frame to the app in front, once the screen fills the view. While a
+	/// text field has the keys they are typing, so only <see cref="PassesTextField"/> ones go.
 	/// </summary>
 	void ForwardShortcuts()
 	{
-		if ( state != State.Captured || Computer.InputCapture is not { } window || Sandbox.UI.InputFocus.Current is Sandbox.UI.TextEntry )
+		if ( state != State.Captured || Computer.InputCapture is not { } window )
 			return;
 
+		var typing = Sandbox.UI.InputFocus.Current is Sandbox.UI.TextEntry;
 		var modifiers = (Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" ) ? "ctrl+" : "")
 			+ (Input.Keyboard.Down( "SHIFT" ) || Input.Keyboard.Down( "RSHIFT" ) ? "shift+" : "")
 			+ (Input.Keyboard.Down( "ALT" ) || Input.Keyboard.Down( "RALT" ) ? "alt+" : "");
 
 		foreach ( var (key, name) in ShortcutKeys )
 		{
-			if ( Input.Keyboard.Pressed( key ) )
+			if ( Input.Keyboard.Pressed( key ) && (!typing || PassesTextField( modifiers + name )) )
 				Computer.SendShortcut( window, modifiers + name );
 		}
 	}

@@ -131,10 +131,11 @@
 
 			<div class="spacer"></div>
 
-			<div class="tool @( UiState.ShowHidden ? "active" : "" )"
-			     tooltip=@( UiState.ShowHidden ? "Hide hidden files (Ctrl+H)" : "Show hidden files (Ctrl+H)" )
+			@* The engine's tooltip attribute doesn't show on a computer's screen, so this draws its own. *@
+			<div class="tool has-tip @( UiState.ShowHidden ? "active" : "" )"
 			     @onclick=@( () => Navi.Act( FilesViewModel.ToggleHiddenAction ) )>
 				<i>@( UiState.ShowHidden ? "visibility" : "visibility_off" )</i>
+				<div class="tip">@( UiState.ShowHidden ? "Hide hidden files (Ctrl+H)" : "Show hidden files (Ctrl+H)" )</div>
 			</div>
 		</div>
 
@@ -215,6 +216,23 @@
 					<div class="keys">@item.Keys</div>
 				</div>
 			}
+		</div>
+	}
+
+	@* A question before something that can't be undone, over the whole window so nothing else can be clicked. *@
+	@if ( UiState.Confirm is { } confirm )
+	{
+		<div class="confirm-backdrop">
+			<div class="confirm">
+				<div class="confirm-title">@confirm.Title</div>
+				<div class="confirm-text">@confirm.Text</div>
+				<div class="confirm-buttons">
+					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.CancelConfirmAction ) )>Cancel</div>
+					<div class="tool wide danger" @onclick=@( () => Navi.Act( FilesViewModel.ConfirmAction ) )>
+						@confirm.Button
+					</div>
+				</div>
+			</div>
 		</div>
 	}
 </root>

@@ -128,6 +128,18 @@ public sealed class NaviWindow
 	/// Stacking order. The highest is in front.
 	/// </summary>
 	public int ZIndex { get; set; }
+
+	/// <summary>
+	/// The app wants to be asked before the player closes this window, e.g. because it has unsaved changes
+	/// (<c>Navi.Window.SetCloseGuardAsync</c>). It can't stop the close: see <see cref="NaviComputer.AskBeforeClosing"/>.
+	/// On the host.
+	/// </summary>
+	public bool GuardsClose { get; internal set; }
+
+	/// <summary>
+	/// Since the app was last asked about the player closing it, or null if it wasn't. On the host.
+	/// </summary>
+	internal RealTimeSince? CloseAskedAt { get; set; }
 }
 
 /// <summary>
@@ -248,7 +260,10 @@ public sealed partial class NaviComputer : Component
 	/// Ids of the installed apps. System apps are always installed and don't need to be listed.
 	/// </summary>
 	[Property]
-	public List<string> InstalledApps { get; set; } = new() { NaviAppRegistry.BuiltInFolder + "calculator.napp" };
+	public List<string> InstalledApps { get; set; } = new()
+	{
+		NaviAppRegistry.BuiltInFolder + "calculator.napp", NaviAppRegistry.BuiltInFolder + "textedit.napp",
+	};
 
 	/// <summary>
 	/// Store packages (sbox.game idents, e.g. "org.notes") installed on this computer. They are downloaded when the game starts.
@@ -688,6 +703,7 @@ public sealed partial class NaviComputer : Component
 			return;
 
 		UpdateFilesSave();
+		UpdateMessages();
 
 		// The delay counts from the latest change.
 		if ( changedVersion != Version )
@@ -711,6 +727,9 @@ public sealed partial class NaviComputer : Component
 		// computer is never out of range, so here it was really turned off.
 		if ( IsAuthority )
 			DestroyStandIn();
+
+		if ( IsAuthority )
+			NaviMessages.Flush();
 
 		// Moving a window doesn't change Version; Save skips the write if nothing changed.
 		if ( AutoSave && IsAuthority )
@@ -1264,6 +1283,7 @@ public sealed partial class NaviComputer : Component
 		InstalledAt?.Remove( id );
 		ForgetNotifications( id );
 		ForgetAppFolder( id );
+		filesToOpen.Remove( id );
 
 		var windowPrefix = id + NaviWindow.KeySeparator;
 		foreach ( var key in windowPlacements.Keys.Where( x => x == id || x.StartsWith( windowPrefix ) ).ToList() )
@@ -1407,6 +1427,58 @@ public sealed partial class NaviComputer : Component
 
 		process.WindowList.Add( NewWindow( process, info ) );
 		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Seconds after an app is asked about the player closing it (<see cref="AskBeforeClosing"/>) in which closing it again
+	/// closes it without asking.
+	/// </summary>
+	public const float ForceCloseSeconds = 5f;
+
+	/// <summary>
+	/// Ask an app before the player closes it, or these windows of it, if one of them guards its close
+	/// (<see cref="NaviWindow.GuardsClose"/>). The app gets <c>NaviApp.OnCloseRequested</c> and answers in its own window,
+	/// e.g. with Save / Don't save / Cancel, then closes itself or doesn't. Returns true if it was asked, and the windows
+	/// should stay open for now.
+	/// </summary>
+	/// <remarks>
+	/// The app can only ask to be asked; it can never keep a window open. Closing it again within
+	/// <see cref="ForceCloseSeconds"/> of the question closes it, whatever the app does or doesn't answer. Only the
+	/// player's own closes ask: the app closing itself, another app with <see cref="NaviPermissions.ManageApps"/>,
+	/// uninstalling, loading a save and game code close at once. In multiplayer only a shared app is asked, since the
+	/// host's copy of any other app isn't the one the player sees.
+	/// </remarks>
+	internal bool AskBeforeClosing( IEnumerable<NaviWindow> windows )
+	{
+		var window = windows.FirstOrDefault( x => x.GuardsClose && !x.IsService );
+		if ( window is null || (Networking.IsActive && !window.App.Shared) )
+			return false;
+
+		if ( window.CloseAskedAt is { } asked && asked < ForceCloseSeconds )
+			return false;
+
+		if ( !appHosts.TryGetValue( window.Key, out var host ) || !host.DeliverCloseRequest() )
+			return false;
+
+		window.CloseAskedAt = 0;
+		Focus( window.App.Id, window.Id );
+		return true;
+	}
+
+	/// <summary>
+	/// Have the player asked before <paramref name="windowId"/> of the app is closed, or stop. False if the window isn't
+	/// open. See <see cref="AskBeforeClosing"/>.
+	/// </summary>
+	public bool SetCloseGuard( string id, string windowId, bool guard )
+	{
+		if ( !IsAuthority || GetWindow( id, windowId ) is not { IsService: false } window )
+			return false;
+
+		window.GuardsClose = guard;
+		if ( !guard )
+			window.CloseAskedAt = null;
+
 		return true;
 	}
 

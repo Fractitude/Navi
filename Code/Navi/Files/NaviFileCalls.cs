@@ -150,6 +150,29 @@ public static class NaviFileCalls
 				return at.Node.Id == NaviDrive.RootId && computer.EjectDrive( at.Drive );
 			}
 
+			case "files.open":
+			{
+				// The app that opens it is the computer's choice, never the caller's, and the caller must reach the file
+				// itself: as written and where it leads. So no app can use another to read what it couldn't.
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true );
+				var at = files.Resolve( path );
+				if ( at.Node.Kind == NaviFileKind.Folder )
+					throw new NaviFileException( NaviFileError.IsAFolder, at.Path );
+
+				if ( at.Node.Kind != NaviFileKind.File )
+					throw new NaviFileException( NaviFileError.NotFound, at.Path );
+
+				var name = NaviFileSystem.NameOf( at.Path );
+				var dot = name.LastIndexOf( '.' );
+				var handler = dot > 0 ? computer.FindFileHandler( name[(dot + 1)..] ) : null;
+				return handler is not null && computer.OpenFileWith( handler, at.Path );
+			}
+
+			case "files.opened":
+				// Only the app's own: what the player opened with it.
+				return computer.TakeFilesToOpen( self );
+
 			case "files.trash-path":
 			{
 				var path = Opt( args, 0, "/" );

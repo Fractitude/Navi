@@ -1,0 +1,17 @@
+{
+  "Title": "Messages",
+  "Description": "Send direct messages to other players, with emoji.",
+  "Icon": "chat",
+  "Color": "#5865f2",
+  "PanelType": "NaviApps.Messages",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": true,
+  "Permissions": [
+    "navi.messages.access"
+  ],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

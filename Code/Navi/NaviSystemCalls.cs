@@ -66,6 +66,10 @@ public static class NaviSystemCalls
 			}
 		}
 
+		// Direct messages. The host has them, and they are the seated player's.
+		if ( method.StartsWith( "messages." ) )
+			return NaviMessageCalls.Run( computer, process, method, args );
+
 		// Files. The host has them; a client's own copy of an app gets an error.
 		if ( method.StartsWith( "files." ) )
 			return NaviFileCalls.Run( computer, process, method, args );
@@ -90,6 +94,10 @@ public static class NaviSystemCalls
 			// The title of the window the panel is in. The desktop puts the app's name before it.
 			case "window.title":
 				return computer.SetTitle( self, windowId, Arg<string>( args, 0, method ) );
+
+			// Ask before the player closes the window the panel is in. The app is only asked; it can't keep the window open.
+			case "window.close-guard":
+				return computer.SetCloseGuard( self, windowId, Arg<bool>( args, 0, method ) );
 
 			// The app's other windows, which only its manifest can define.
 			case "window.open":

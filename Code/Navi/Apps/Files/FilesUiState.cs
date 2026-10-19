@@ -34,6 +34,12 @@ public sealed record FileRow(
 public sealed record MenuItem( string Id, string Label, string Icon, string Keys = "", bool Enabled = true, bool Separator = false );
 
 /// <summary>
+/// A question over the window before something that can't be undone, such as emptying the trash. <see cref="Button"/>
+/// is the label of the button that goes ahead.
+/// </summary>
+public sealed record ConfirmDialog( string Title, string Text, string Button );
+
+/// <summary>
 /// Everything the Files panel draws. Replaced whole by <see cref="FilesViewModel"/> on every change.
 /// </summary>
 public sealed record FilesUiState
@@ -100,6 +106,9 @@ public sealed record FilesUiState
 	public float MenuX { get; init; }
 
 	public float MenuY { get; init; }
+
+	/// <summary>The question waiting for the player's answer, or null. It covers the window until answered.</summary>
+	public ConfirmDialog Confirm { get; init; }
 
 	public bool MenuOpen => Menu.Count > 0;
 

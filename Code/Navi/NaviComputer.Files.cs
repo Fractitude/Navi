@@ -143,6 +143,70 @@ public sealed partial class NaviComputer
 			folder.Drive.Delete( folder.Node );
 	}
 
+	// Opening a file with the app for its kind (NaviAppResource.FileTypes).
+
+	/// <summary>
+	/// The most files waiting for one app to take them. More are dropped, oldest first.
+	/// </summary>
+	const int MaxFilesToOpen = 8;
+
+	/// <summary>
+	/// By app id, the files the player opened with that app that it hasn't taken yet (<c>files.opened</c>). On the host.
+	/// </summary>
+	readonly Dictionary<string, List<string>> filesToOpen = new();
+
+	/// <summary>
+	/// The installed app that opens files with this extension, or null. One that ships with the game comes first; a Store
+	/// app only counts if it declares <see cref="NaviPermissions.Files"/>, or the file would be out of its reach.
+	/// </summary>
+	public NaviAppInfo FindFileHandler( string extension )
+	{
+		if ( string.IsNullOrEmpty( extension ) )
+			return null;
+
+		extension = extension.ToLowerInvariant();
+		return NaviAppRegistry.All
+			.Where( x => x.FileTypes.Contains( extension ) && IsInstalled( x ) )
+			.Where( x => x.IsPrepackaged || x.IsSystem || x.Permissions.Contains( NaviPermissions.Files ) )
+			.OrderBy( x => x.IsCore ? 0 : x.IsPrepackaged ? 1 : 2 )
+			.FirstOrDefault();
+	}
+
+	/// <summary>
+	/// Launch <paramref name="app"/> and leave <paramref name="path"/> for it to take. The caller checks that whoever asked
+	/// may reach the path; the app reads it with its own permissions, so this gives it nothing it didn't have.
+	/// </summary>
+	internal bool OpenFileWith( NaviAppInfo app, string path )
+	{
+		if ( !IsAuthority || app is null )
+			return false;
+
+		if ( !filesToOpen.TryGetValue( app.Id, out var waiting ) )
+			filesToOpen[app.Id] = waiting = new();
+
+		waiting.Remove( path );
+		waiting.Add( path );
+		if ( waiting.Count > MaxFilesToOpen )
+			waiting.RemoveRange( 0, waiting.Count - MaxFilesToOpen );
+
+		if ( Launch( app.Id ) )
+			return true;
+
+		filesToOpen.Remove( app.Id );
+		return false;
+	}
+
+	/// <summary>
+	/// The files waiting for an app, which it now has: each is given once.
+	/// </summary>
+	internal string[] TakeFilesToOpen( string appId )
+	{
+		if ( !filesToOpen.Remove( appId, out var waiting ) )
+			return [];
+
+		return waiting.ToArray();
+	}
+
 	// Console commands, to look at and change a computer's files while there is no app for it. Host only. They work on
 	// the computer named by its save key, else the one the local player sits at, else the first one in the scene.
 

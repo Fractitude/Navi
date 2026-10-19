@@ -140,6 +140,36 @@
 			opacity: 0.3;
 			pointer-events: none;
 		}
+
+		// A tooltip at the left of the button, shown while the mouse is over it. Not below: the list draws after the
+		// toolbar, so it would cover it.
+		&.has-tip
+		{
+			position: relative;
+
+			.tip
+			{
+				position: absolute;
+				top: 0;
+				right: 100%;
+				margin-right: 4px;
+				opacity: 0;
+				pointer-events: none;
+				padding: 3px 6px;
+				height: 22px;
+				align-items: center;
+				font-size: 11px;
+				font-weight: 700;
+				color: $paper-t;
+				background-color: $ink-bg;
+				white-space: nowrap;
+			}
+
+			&:hover .tip
+			{
+				opacity: 1;
+			}
+		}
 	}
 
 	.divider
@@ -433,6 +463,57 @@
 				opacity: 0.35;
 				pointer-events: none;
 			}
+		}
+	}
+
+	.confirm-backdrop
+	{
+		position: absolute;
+		left: 0;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		justify-content: center;
+		align-items: center;
+		background-color: rgba( 0, 0, 0, 0.35 );
+	}
+
+	.confirm
+	{
+		width: 240px;
+		flex-direction: column;
+		gap: 6px;
+		padding: 10px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+		.confirm-title
+		{
+			font-size: 12px;
+			font-weight: 700;
+		}
+
+		.confirm-text
+		{
+			font-size: 11px;
+			opacity: 0.8;
+		}
+
+		.confirm-buttons
+		{
+			flex-direction: row;
+			justify-content: flex-end;
+			gap: 6px;
+			margin-top: 4px;
+		}
+
+		.danger
+		{
+			color: #ffffff;
+			background-color: #a0442c;
+			border-color: #a0442c;
 		}
 	}
 

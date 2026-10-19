@@ -584,7 +584,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	[Rpc.Host]
 	public void UserClose( string id )
 	{
-		if ( Authorize() )
+		if ( Authorize() && !(GetProcess( id ) is { } process && AskBeforeClosing( process.Windows )) )
 			Close( id );
 	}
 
@@ -600,12 +600,16 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
-	/// Close a window. See <see cref="CloseWindow"/>.
+	/// Close a window. See <see cref="CloseWindow"/>. The app is asked first if it guards its close
+	/// (<see cref="AskBeforeClosing"/>): closing the main window closes all of them.
 	/// </summary>
 	[Rpc.Host]
 	public void UserCloseWindow( string id, string windowId )
 	{
-		if ( Authorize() )
+		if ( !Authorize() || GetWindow( id, windowId ) is not { } window )
+			return;
+
+		if ( !AskBeforeClosing( window.Id == "" ? window.Process.Windows : [window] ) )
 			CloseWindow( id, windowId );
 	}
 
@@ -642,7 +646,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return;
 
 		if ( item == QuitItem )
-			Close( id );
+		{
+			if ( !AskBeforeClosing( process.Windows ) )
+				Close( id );
+		}
 		else if ( string.IsNullOrEmpty( item ) || (process.App.Shared && process.Tray?.Items.Any( x => x.Id == item ) == true) )
 			DeliverTrayClick( id, item );
 	}

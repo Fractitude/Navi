@@ -56,11 +56,22 @@ public abstract class NaviApp : Panel
 	/// <summary>
 	/// The player pressed a keyboard shortcut while this app's window was in front, e.g. "ctrl+c", "delete", "f2" or
 	/// "shift+down": "ctrl+", "shift+" and "alt+" in that order, then the key (a letter or digit, "enter", "backspace",
-	/// "delete", "tab", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1" to "f12"). Not
-	/// while a text field has the keys, and never Escape, which stands the player up. A shared app gets it on the host's
+	/// "delete", "tab", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1" to "f12"). While
+	/// a text field has the keys, only Ctrl with a letter or digit the field doesn't use (not A, C, X, V, Z or Y) comes,
+	/// e.g. "ctrl+s". Never Escape, which stands the player up. A shared app gets it on the host's
 	/// copy, any other app on the player's own, like clicks.
 	/// </summary>
 	protected virtual void OnShortcut( string keys )
+	{
+	}
+
+	/// <summary>
+	/// The player is closing this window (its close button, the taskbar's Close, the tray's Quit), and the app asked to be
+	/// told first with <see cref="Navi.WindowCalls.SetCloseGuardAsync"/>. The window stays open: ask the player in it
+	/// (e.g. Save / Don't save / Cancel), then close it with <see cref="Navi.WindowCalls.CloseAsync()"/>, or don't. If the
+	/// player closes it again within a few seconds it closes anyway. A shared app gets it on the host's copy.
+	/// </summary>
+	protected virtual void OnCloseRequested()
 	{
 	}
 
@@ -83,6 +94,13 @@ public abstract class NaviApp : Panel
 		if ( Navi.TryGetShortcut( e, out var keys ) )
 		{
 			OnShortcut( keys );
+			e.StopPropagation();
+			return;
+		}
+
+		if ( e.Name == "navi.close-request" )
+		{
+			OnCloseRequested();
 			e.StopPropagation();
 			return;
 		}
@@ -111,6 +129,7 @@ public sealed class Navi
 		Store = new StoreCalls( this );
 		Notifications = new NotificationCalls( this );
 		Files = new FileCalls( this );
+		Messages = new MessageCalls( this );
 		Input = new InputState( this );
 	}
 
@@ -153,6 +172,11 @@ public sealed class Navi
 	/// The computer's files: its drive and any removable ones.
 	/// </summary>
 	public FileCalls Files { get; }
+
+	/// <summary>
+	/// The direct messages of the player at the computer.
+	/// </summary>
+	public MessageCalls Messages { get; }
 
 	/// <summary>
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
@@ -403,6 +427,15 @@ public sealed class Navi
 
 
 		/// <summary>
+		/// Ask to be told before the player closes the window this panel is in, e.g. while it has unsaved changes:
+		/// <see cref="NaviApp.OnCloseRequested"/> comes instead of the close. Turn it off once there is nothing to lose. It
+		/// can't keep the window open: closing it again within a few seconds closes it. Only the player's closes ask; the
+		/// app's own <see cref="CloseAsync()"/> doesn't. In multiplayer only a shared app is asked.
+		/// </summary>
+		public Task SetCloseGuardAsync( bool guard ) => navi.CallAsync( "window.close-guard", guard );
+
+
+		/// <summary>
 		/// Open one of the windows the .napp lists, by its id, or bring it to the front if it is open. False if the app
 		/// has no such window. Needs no permission: an app can only open what its manifest says.
 		/// </summary>
@@ -472,6 +505,11 @@ public sealed class Navi
 		/// (<see cref="FileCalls.GetAppFolderAsync"/>).
 		/// </summary>
 		public const string Files = "navi.files.access";
+
+		/// <summary>
+		/// Read and send the direct messages of the player at the computer (<see cref="MessageCalls"/>).
+		/// </summary>
+		public const string Messages = "navi.messages.access";
 	}
 
 	/// <summary>
@@ -1043,6 +1081,20 @@ public sealed class Navi
 		public Task<bool> EjectAsync( string path ) => navi.CallAsync<bool>( "files.eject", path );
 
 		/// <summary>
+		/// Open a file with the app for its kind, e.g. a ".txt" with Text Edit: the computer picks the app (the ones whose
+		/// .napp lists the extension under FileTypes), launches it, and leaves the file for it to take with
+		/// <see cref="TakeOpenedAsync"/>. False if no installed app opens that kind of file. The file must be one this app
+		/// can reach.
+		/// </summary>
+		public Task<bool> OpenAsync( string path ) => navi.CallAsync<bool>( "files.open", path );
+
+		/// <summary>
+		/// The files the player opened with this app since it last asked, oldest first, as paths with symlinks followed.
+		/// Each is given once. An app that lists FileTypes in its .napp polls this a few times a second.
+		/// </summary>
+		public async Task<IReadOnlyList<string>> TakeOpenedAsync() => await navi.CallAsync<string[]>( "files.opened" );
+
+		/// <summary>
 		/// The trash folder of the drive <paramref name="path"/> is on.
 		/// </summary>
 		public Task<string> GetTrashPathAsync( string path = "/" ) => navi.CallAsync<string>( "files.trash-path", path );
@@ -1051,6 +1103,88 @@ public sealed class Navi
 			x.Item1, x.Item2, (FileKind)x.Item3, x.Item4,
 			DateTimeOffset.FromUnixTimeSeconds( x.Item5 ), DateTimeOffset.FromUnixTimeSeconds( x.Item6 ),
 			x.Item7.Item1, x.Item7.Item2, x.Item7.Item3, x.Item7.Item4 );
+	}
+
+	/// <summary>
+	/// The longest a direct message can be, in characters. More is cut off.
+	/// </summary>
+	public const int MaxMessageText = 400;
+
+	/// <summary>
+	/// The player at the computer.
+	/// </summary>
+	public sealed record MessageUser( string Id, string Name )
+	{
+		/// <summary>Nobody is in the seat.</summary>
+		public bool IsNobody => string.IsNullOrEmpty( Id );
+	}
+
+	/// <summary>
+	/// Another player: whether they are in the game now, the newest message between them and the player at the computer
+	/// (<paramref name="LastAt"/> is 0 if there is none), and how many of their messages that player hasn't read.
+	/// </summary>
+	public sealed record MessageContact( string Id, string Name, bool Online, string LastText, DateTimeOffset LastAt, int Unread, bool LastMine );
+
+	/// <summary>
+	/// One direct message. <paramref name="Mine"/> is whether the player at the computer sent it.
+	/// </summary>
+	public sealed record ChatMessage( long Id, bool Mine, string Text, DateTimeOffset At );
+
+	/// <summary>
+	/// Direct messages between players, as the player in the computer's seat. They are the game's, not the computer's: a
+	/// message reaches the other player wherever they sit down, and the host keeps it. Needs
+	/// <see cref="Permission.Messages"/>. With nobody in the seat the calls answer with nothing. Only the host has the
+	/// messages: in multiplayer, use them from a Shared app.
+	/// </summary>
+	public sealed class MessageCalls( Navi navi )
+	{
+		/// <summary>
+		/// Goes up when something about the player's messages may have changed, including who is in the seat. Poll it to know
+		/// when to list again.
+		/// </summary>
+		public Task<int> GetVersionAsync() => navi.CallAsync<int>( "messages.version" );
+
+		/// <summary>
+		/// The player in the seat: <see cref="MessageUser.IsNobody"/> if there is none.
+		/// </summary>
+		public async Task<MessageUser> GetMeAsync()
+		{
+			var (id, name) = await navi.CallAsync<(string, string)>( "messages.me" );
+			return new MessageUser( id, name );
+		}
+
+		/// <summary>
+		/// The other players the host has seen, in the game now or not, each with the newest message between them and the
+		/// player in the seat.
+		/// </summary>
+		public async Task<IReadOnlyList<MessageContact>> ListContactsAsync()
+		{
+			var contacts = await navi.CallAsync<(string, string, bool, string, long, int, bool)[]>( "messages.contacts" );
+			return contacts.Select( x => new MessageContact( x.Item1, x.Item2, x.Item3, x.Item4,
+				DateTimeOffset.FromUnixTimeSeconds( x.Item5 ), x.Item6, x.Item7 ) ).ToArray();
+		}
+
+		/// <summary>
+		/// The newest <paramref name="take"/> messages (up to 100) between the player in the seat and another, oldest first.
+		/// </summary>
+		public async Task<IReadOnlyList<ChatMessage>> GetHistoryAsync( string playerId, int take = 30 )
+		{
+			var messages = await navi.CallAsync<(long, bool, string, long)[]>( "messages.history", playerId ?? "", take );
+			return messages.Select( x => new ChatMessage( x.Item1, x.Item2, x.Item3, DateTimeOffset.FromUnixTimeSeconds( x.Item4 ) ) )
+				.ToArray();
+		}
+
+		/// <summary>
+		/// Send a message to another player, who may be away: they get it when they come back. It is made one line and cut to
+		/// <see cref="MaxMessageText"/>. False if nothing was sent: the text was empty, the player is unknown or is the
+		/// sender, or they are sending too fast.
+		/// </summary>
+		public Task<bool> SendAsync( string playerId, string text ) => navi.CallAsync<bool>( "messages.send", playerId ?? "", text ?? "" );
+
+		/// <summary>
+		/// The player in the seat has read what another player sent so far.
+		/// </summary>
+		public Task MarkReadAsync( string playerId ) => navi.CallAsync( "messages.read", playerId ?? "" );
 	}
 
 	/// <summary>

@@ -39,6 +39,11 @@ public static class NaviPermissions
 	public const string Files = "navi.files.access";
 
 	/// <summary>
+	/// Read and send the direct messages of the player at the computer.
+	/// </summary>
+	public const string Messages = "navi.messages.access";
+
+	/// <summary>
 	/// How a permission is shown to the player.
 	/// </summary>
 	public record Info( string Id, string Title, string Description, string Icon );
@@ -51,6 +56,7 @@ public static class NaviPermissions
 		new( ChangeSettings, "Change settings", "Change this computer's settings, such as the display scale.", "settings" ),
 		new( Notify, "Send notifications", "Show you notifications, which can play a sound.", "notifications" ),
 		new( Files, "Files", "See, change and delete every file on this computer.", "folder" ),
+		new( Messages, "Messages", "Read and send direct messages as the player using this computer.", "chat" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );

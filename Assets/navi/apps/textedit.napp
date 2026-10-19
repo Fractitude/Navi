@@ -1,0 +1,20 @@
+{
+  "Title": "Text Edit",
+  "Description": "Write and change text files.",
+  "Icon": "edit_note",
+  "Color": "#b0a070",
+  "PanelType": "NaviApps.TextEdit",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": true,
+  "Permissions": [
+    "navi.files.access"
+  ],
+  "FileTypes": [
+    "txt"
+  ],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}
