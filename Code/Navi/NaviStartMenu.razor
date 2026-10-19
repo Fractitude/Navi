@@ -103,10 +103,21 @@
 		var pinnedToTaskbar = Computer.IsTaskbarPinned( ContextApp.Id );
 
 		@* Right-click menu, where the mouse was. *@
-		<div class="context" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;">
+		<div class="context menu" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;">
 			<div class="item"
 			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
-			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )><i>push_pin</i>@(pinnedToTaskbar ? "Unpin" : "Pin to taskbar")</div>
+			     @onclick=@( ( PanelEvent e ) => OpenFromContext( e, ContextApp ) )><i>open_in_new</i>Open</div>
+
+			@if ( ContextApp.Permissions.Count > 0 && !ContextApp.IsSystem )
+			{
+				<div class="item"
+				     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
+				     @onclick=@( ( PanelEvent e ) => ReviewPermissions( e, ContextApp ) )><i>tune</i>Permissions...</div>
+			}
+
+			<div class="item"
+			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
+			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )><i>push_pin</i>@(pinnedToTaskbar ? "Unpin from taskbar" : "Pin to taskbar")</div>
 		</div>
 	}
 
@@ -242,6 +253,22 @@
 	{
 		ContextApp = app;
 		ContextPosition = MousePosition * ScaleFromScreen;
+	}
+
+	void OpenFromContext( PanelEvent e, NaviAppInfo app )
+	{
+		e.StopPropagation();
+		ContextApp = null;
+		OnOpen?.Invoke( app );
+	}
+
+	void ReviewPermissions( PanelEvent e, NaviAppInfo app )
+	{
+		e.StopPropagation();
+		ContextApp = null;
+
+		if ( Computer.CanUse )
+			Computer.UserReviewPermissions( app.Id );
 	}
 
 	void ToggleTaskbarPin( PanelEvent e, NaviAppInfo app )

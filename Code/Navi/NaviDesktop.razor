@@ -183,7 +183,7 @@
 							</div>
 						}
 
-						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserToggleTaskbarPin( app.Id ) ))><i>push_pin</i>@(Computer.IsTaskbarPinned( app.Id ) ? "Unpin" : "Pin to taskbar")</div>
+						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserToggleTaskbarPin( app.Id ) ))><i>push_pin</i>@(Computer.IsTaskbarPinned( app.Id ) ? "Unpin from taskbar" : "Pin to taskbar")</div>
 
 						@if ( process is not null )
 						{
