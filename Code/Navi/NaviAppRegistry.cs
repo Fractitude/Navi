@@ -358,6 +358,8 @@ public static class NaviAppRegistry
 	/// prepackaged one, so a Store app can never replace an app that ships with the game.
 	/// </summary>
 	public static IEnumerable<NaviAppInfo> All => ResourceLibrary.GetAll<NaviAppResource>()
+		.Concat( NaviStore.DownloadedResources )
+		.Distinct()
 		.Select( x => (Resource: x, Id: IdOf( x ), Panel: x.FindPanelType()) )
 		.Where( x => x.Id is not null && x.Panel is not null )
 		.Select( x => NaviAppInfo.FromResource( x.Id, x.Resource, x.Panel ) )

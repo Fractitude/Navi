@@ -88,6 +88,18 @@ public static class NaviStore
 	static readonly Dictionary<string, string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
 
 	/// <summary>
+	/// The manifests downloaded from the Store, by package ident. The resource system holds a cloud resource only weakly,
+	/// so without this a garbage collection (every hot reload runs one) drops it, and its app vanishes while its package
+	/// is still installed.
+	/// </summary>
+	static readonly Dictionary<string, NaviAppResource> downloadedResources = new( System.StringComparer.OrdinalIgnoreCase );
+
+	/// <summary>
+	/// The manifests downloaded from the Store. See <see cref="NaviAppRegistry.All"/>.
+	/// </summary>
+	internal static IEnumerable<NaviAppResource> DownloadedResources => downloadedResources.Values;
+
+	/// <summary>
 	/// Was this app downloaded from the Store? A false doesn't mean it shipped with the game: see <see cref="NaviAppRegistry.IsPrepackaged"/>.
 	/// </summary>
 	public static bool IsDownloaded( NaviAppResource resource ) => PackageOf( resource ) is not null;
@@ -199,6 +211,7 @@ public static class NaviStore
 		}
 
 		downloaded[resource.ResourcePath] = ident;
+		downloadedResources[ident] = resource;
 
 		if ( Package.TryGetCached( ident, out var cached, false ) )
 			installedVersions[ident] = cached.Revision?.VersionId.ToString();
