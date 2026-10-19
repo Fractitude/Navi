@@ -458,14 +458,28 @@ NaviSecurePrompt
 	@include secureprompt-style;
 }
 
+// The dialog is never see-through or blurred, whatever the theme: text behind it would make it unreadable. The glass
+// themes' translucent colors are replaced by solid ones of about the same look.
+@mixin secureprompt-solid( $dialog, $border )
+{
+	.dialog
+	{
+		background-color: $dialog;
+		border-color: $border;
+		backdrop-filter-blur: 0px;
+	}
+}
+
 @import "Themes/_glass-light.scss";
 .theme-glass.scheme-light
 {
 	@include secureprompt-style;
+	@include secureprompt-solid( #f4f7ff, #ffffff );
 }
 
 @import "Themes/_glass-dark.scss";
 .theme-glass.scheme-dark
 {
 	@include secureprompt-style;
+	@include secureprompt-solid( #1c1f32, #3a3d52 );
 }

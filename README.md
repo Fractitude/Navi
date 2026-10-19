@@ -362,6 +362,8 @@ The app's job is to cope with what it was denied: hide or disable those features
 
 Permission and root prompts are shown by Navi's secure layer (`NaviSecurePrompt`), like Windows' secure desktop. It is a panel of its own, floating just in front of the screen, so it draws above every app and gets clicks first. While a prompt is open it covers the screen, so no app can be clicked. Apps can't reach it through their panel's parents. Its controls only react to a real left mouse press, made at least `ArmTime` (0.75 s) after the prompt appeared and released on the same control. An app raising fake click events gets nothing.
 
+**Policy: the secure layer shows its contents only to the player at the screen.** Anyone else watching (not seated at the computer) sees a notice of what the player is doing, never what it holds. A permission request reads "Permission request" and that the player is answering it, without the app, the permissions or the wording; the lock setup says the player is setting the lock screen; a password or pattern is never shown to anyone else. This holds for every new dialog in the layer. The secure layer's dialogs are also always solid: no transparency or blur from the theme, so nothing behind them makes the text hard to read.
+
 ### System apps (root)
 
 An app with `IsSystem` in its manifest asks for full system access: root. Root has every permission, declared or not, and its window shows a shield.

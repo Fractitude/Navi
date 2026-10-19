@@ -148,7 +148,26 @@
 				<div class="heading">Lock screen</div>
 				<i class="lock" tooltip="Navi is asking this, not an app">lock</i>
 			</div>
-			<div class="dialog-text">@($"{Computer.User?.DisplayName ?? "The player at the screen"} is setting the lock screen.")</div>
+			<div class="dialog-text">User is setting the lock screen.</div>
+		</div>
+	}
+	else if ( Request is not null && !Computer.IsSeated )
+	{
+		@* Only the player at the screen sees what is asked. Everyone else sees that a request is open, and nothing of what
+		   it holds: the app, its permissions and its wording stay out of their view. *@
+		<div class="dialog">
+			<div class="dialog-title">
+				<div class="heading">Permission request</div>
+				<i class="lock" tooltip="Navi is asking this, not an app">lock</i>
+			</div>
+			@if ( Computer.CanUse )
+			{
+				<div class="dialog-text">Click to sit down at the computer, then answer this.</div>
+			}
+			else
+			{
+				<div class="dialog-text">User is answering a permission request.</div>
+			}
 		</div>
 	}
 	else if ( Request is { } request )
