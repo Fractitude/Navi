@@ -317,10 +317,11 @@ public sealed partial class NaviComputer : Component
 	[Property] public List<string> RootApps { get; set; } = new();
 
 	/// <summary>
-	/// Ids of the apps the player pinned to the taskbar, in the order they put them in. Nothing is pinned by default, not
-	/// even core apps. See <see cref="TaskbarApps"/>.
+	/// Ids of the apps pinned to the taskbar, in the order they show there. Set it in the editor to preconfigure a computer
+	/// (a kiosk, say) with its main apps laid out; the player's own pins and moves change it from there. Nothing is pinned
+	/// by default, not even core apps. See <see cref="TaskbarApps"/>.
 	/// </summary>
-	[Property] public List<string> TaskbarOrder { get; set; } = new();
+	[Property] public List<string> PinnedApps { get; set; } = new();
 
 	/// <summary>
 	/// Ids of the apps the player pinned to the top of the start menu, in the order they put them in. See
@@ -861,7 +862,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions = GrantedPermissions?.ToList() ?? new(),
 		ReviewedApps = ReviewedApps?.ToList() ?? new(),
 		RootApps = RootApps?.ToList() ?? new(),
-		TaskbarOrder = TaskbarOrder?.ToList() ?? new(),
+		TaskbarOrder = PinnedApps?.ToList() ?? new(),
 		StartFavorites = StartFavorites?.ToList() ?? new(),
 		InstalledAt = InstalledAt is null ? new() : new( InstalledAt ),
 		Notifications = CaptureNotifications(),
@@ -914,7 +915,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions = save.GrantedPermissions?.Where( x => NaviPermissions.IsKnown( x.Split( ' ' ).Last() ) ).Distinct().ToList() ?? new();
 		ReviewedApps = save.ReviewedApps?.Distinct().ToList() ?? new();
 		RootApps = save.RootApps?.Distinct().ToList() ?? new();
-		TaskbarOrder = save.TaskbarOrder?.Distinct().ToList() ?? new();
+		PinnedApps = save.TaskbarOrder?.Distinct().ToList() ?? new();
 		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
 		InstalledAt = save.InstalledAt is null ? new() : new( save.InstalledAt );
 		ApplyNotifications( save );
@@ -1008,7 +1009,7 @@ public sealed partial class NaviComputer : Component
 	{
 		get
 		{
-			var pinned = (TaskbarOrder ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
+			var pinned = (PinnedApps ?? []).Select( NaviAppRegistry.Find ).Where( x => x is not null && IsInstalled( x ) );
 			var open = Running.Where( x => x.Windows.Any( y => !y.IsService ) ).Select( x => x.App );
 
 			return pinned.Concat( open ).DistinctBy( x => x.Id );
@@ -1018,7 +1019,7 @@ public sealed partial class NaviComputer : Component
 	/// <summary>
 	/// Whether an app is pinned to the taskbar.
 	/// </summary>
-	public bool IsTaskbarPinned( string id ) => TaskbarOrder?.Contains( id ) == true;
+	public bool IsTaskbarPinned( string id ) => PinnedApps?.Contains( id ) == true;
 
 	/// <summary>
 	/// Pin an installed app to the taskbar, after the others, or unpin it. Returns false if the app isn't installed.
@@ -1028,9 +1029,9 @@ public sealed partial class NaviComputer : Component
 		if ( !IsAuthority || !IsInstalled( id ) )
 			return false;
 
-		TaskbarOrder ??= new();
-		if ( !TaskbarOrder.Remove( id ) )
-			TaskbarOrder.Add( id );
+		PinnedApps ??= new();
+		if ( !PinnedApps.Remove( id ) )
+			PinnedApps.Add( id );
 
 		Version++;
 		return true;
@@ -1060,9 +1061,9 @@ public sealed partial class NaviComputer : Component
 
 		if ( wasPinned || pin )
 		{
-			var pinned = TaskbarOrder?.ToHashSet() ?? [];
+			var pinned = PinnedApps?.ToHashSet() ?? [];
 			pinned.Add( id );
-			TaskbarOrder = apps.Where( pinned.Contains ).ToList();
+			PinnedApps = apps.Where( pinned.Contains ).ToList();
 		}
 		else
 		{
@@ -1321,7 +1322,7 @@ public sealed partial class NaviComputer : Component
 		GrantedPermissions?.RemoveAll( x => x.StartsWith( id + " " ) );
 		ReviewedApps?.Remove( id );
 		RootApps?.Remove( id );
-		TaskbarOrder?.Remove( id );
+		PinnedApps?.Remove( id );
 		StartFavorites?.Remove( id );
 		InstalledAt?.Remove( id );
 		ForgetNotifications( id );
