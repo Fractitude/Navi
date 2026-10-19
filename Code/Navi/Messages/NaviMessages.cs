@@ -162,7 +162,26 @@ public static class NaviMessages
 		return (local, GetName( local ));
 	}
 
-	static string GetName( string id ) => contacts.TryGetValue( id, out var contact ) ? contact.Name : id;
+	static string GetName( string id ) =>
+		NaviNpcs.Find( id )?.Name ?? (contacts.TryGetValue( id, out var contact ) ? contact.Name : id);
+
+	/// <summary>
+	/// A real player the host has seen, or an NPC the game has made: someone who can be messaged.
+	/// </summary>
+	static bool IsKnown( string id ) => contacts.ContainsKey( id ) || NaviNpcs.Find( id ) is not null;
+
+	/// <summary>
+	/// The ids of the players in the game now. Offline, the local player.
+	/// </summary>
+	public static IEnumerable<string> OnlinePlayerIds() =>
+		Networking.IsActive
+			? Connection.All.Select( IdOf ).ToList()
+			: [Sandbox.Utility.Steam.SteamId.ToString()];
+
+	/// <summary>
+	/// Something the apps show changed without a message: an NPC's name, presence or listing.
+	/// </summary>
+	internal static void Touch() => Changed();
 
 	static void Register( string id, string name )
 	{
@@ -190,7 +209,7 @@ public static class NaviMessages
 		}
 	}
 
-	static string CleanName( string name, string fallback )
+	internal static string CleanName( string name, string fallback )
 	{
 		name = name?.ReplaceLineEndings( " " ).Trim();
 		if ( string.IsNullOrEmpty( name ) )
@@ -213,6 +232,9 @@ public static class NaviMessages
 	/// </summary>
 	static bool IsOnline( string id )
 	{
+		if ( NaviNpcs.Find( id ) is { } npc )
+			return npc.Online;
+
 		if ( !Networking.IsActive )
 			return id == Sandbox.Utility.Steam.SteamId.ToString();
 
@@ -230,18 +252,38 @@ public static class NaviMessages
 		var list = new List<NaviChatContactView>();
 
 		foreach ( var contact in contacts.Values.Where( x => x.Id != me ) )
-		{
-			var thread = Thread( me, contact.Id );
-			var last = thread.LastOrDefault();
-			var readUpTo = reads.GetValueOrDefault( ReadKey( me, contact.Id ) );
-			var unread = thread.Count( x => x.To == me && x.Id > readUpTo );
+			list.Add( ViewOf( me, contact.Id, contact.Name, Thread( me, contact.Id ) ) );
 
-			list.Add( new NaviChatContactView(
-				contact.Id, contact.Name, IsOnline( contact.Id ),
-				last?.Text ?? "", last?.At ?? 0, unread, last?.From == me ) );
+		// A game's characters. A hidden one is listed only once it has said something to this player.
+		foreach ( var npc in NaviNpcs.All )
+		{
+			var thread = Thread( me, npc.Id );
+
+			if ( !npc.Hidden || thread.Count > 0 )
+				list.Add( ViewOf( me, npc.Id, npc.Name, thread ) );
 		}
 
 		return list;
+	}
+
+	static NaviChatContactView ViewOf( string me, string id, string name, List<NaviChatMessage> thread )
+	{
+		var last = thread.LastOrDefault();
+		var readUpTo = reads.GetValueOrDefault( ReadKey( me, id ) );
+		var unread = thread.Count( x => x.To == me && x.Id > readUpTo );
+
+		return new NaviChatContactView( id, name, IsOnline( id ), last?.Text ?? "", last?.At ?? 0, unread, last?.From == me );
+	}
+
+	/// <summary>
+	/// How many messages <paramref name="peer"/> sent <paramref name="me"/> that they haven't read.
+	/// </summary>
+	public static int UnreadCount( string me, string peer )
+	{
+		EnsureLoaded();
+
+		var readUpTo = reads.GetValueOrDefault( ReadKey( me, peer ) );
+		return Thread( me, peer ).Count( x => x.To == me && x.Id > readUpTo );
 	}
 
 	/// <summary>
@@ -279,25 +321,92 @@ public static class NaviMessages
 	{
 		EnsureLoaded();
 
-		if ( me == peer || !contacts.ContainsKey( peer ) || !contacts.ContainsKey( me ) )
+		if ( me == peer || !IsKnown( peer ) || !contacts.ContainsKey( me ) )
+			return false;
+
+		// A hidden character can't be reached until it has reached out.
+		if ( NaviNpcs.Find( peer ) is { Hidden: true } && Thread( me, peer ).Count == 0 )
 			return false;
 
 		text = Clean( text );
 		if ( text.Length == 0 || IsFlooding( me ) )
 			return false;
 
-		messages.Add( new NaviChatMessage
+		var message = Add( me, peer, text, 0 );
+
+		// A game's character hears it, and may answer.
+		NaviNpcs.Find( peer )?.Deliver( message );
+		return true;
+	}
+
+	/// <summary>
+	/// Takes a message that is already clean, with no limit on how fast. <paramref name="at"/> is Unix seconds, or 0 for now.
+	/// Who may send it is for the caller to decide.
+	/// </summary>
+	internal static NaviChatMessage Add( string from, string to, string text, long at )
+	{
+		EnsureLoaded();
+
+		var message = new NaviChatMessage
 		{
 			Id = ++LastId,
-			From = me,
-			To = peer,
+			From = from,
+			To = to,
 			Text = text,
-			At = System.DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-		} );
+			At = at > 0 ? at : System.DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+		};
 
-		Trim( me, peer );
+		messages.Add( message );
+		Trim( from, to );
+		Changed();
+		return message;
+	}
+
+	/// <summary>
+	/// Rewrites a message, if <paramref name="party"/> is the sender or the receiver.
+	/// </summary>
+	internal static bool Edit( long id, string party, string text )
+	{
+		EnsureLoaded();
+
+		text = Clean( text );
+		var message = messages.FirstOrDefault( x => x.Id == id && (x.From == party || x.To == party) );
+		if ( message is null || text.Length == 0 )
+			return false;
+
+		message.Text = text;
 		Changed();
 		return true;
+	}
+
+	/// <summary>
+	/// Removes a message, if <paramref name="party"/> is the sender or the receiver.
+	/// </summary>
+	internal static bool Delete( long id, string party )
+	{
+		EnsureLoaded();
+
+		var message = messages.FirstOrDefault( x => x.Id == id && (x.From == party || x.To == party) );
+		if ( message is null )
+			return false;
+
+		messages.Remove( message );
+		Changed();
+		return true;
+	}
+
+	/// <summary>
+	/// Removes every message between two players. Returns how many.
+	/// </summary>
+	internal static int ClearThread( string a, string b )
+	{
+		EnsureLoaded();
+
+		var removed = messages.RemoveAll( x => (x.From == a && x.To == b) || (x.From == b && x.To == a) );
+		if ( removed > 0 )
+			Changed();
+
+		return removed;
 	}
 
 	/// <summary>
@@ -308,7 +417,7 @@ public static class NaviMessages
 		EnsureLoaded();
 
 		var key = ReadKey( me, peer );
-		if ( reads.GetValueOrDefault( key ) >= LastId || !contacts.ContainsKey( peer ) )
+		if ( reads.GetValueOrDefault( key ) >= LastId || !IsKnown( peer ) )
 			return;
 
 		reads[key] = LastId;
