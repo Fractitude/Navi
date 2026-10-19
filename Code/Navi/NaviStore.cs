@@ -34,13 +34,17 @@ public static class NaviStore
 	/// official apps. Apps from other orgs don't show in the Store and are never downloaded, so their code never loads:
 	/// not on install, not from a save, not on a client whose host has them.
 	/// </summary>
-	public static HashSet<string> AllowedOrgs { get; } = new( System.StringComparer.OrdinalIgnoreCase );
+	public static HashSet<string> AllowedOrgs => allowedOrgs.Value;
+
+	static readonly NaviHotloadKept<HashSet<string>> allowedOrgs = new( new( System.StringComparer.OrdinalIgnoreCase ) );
 
 	/// <summary>
 	/// Store packages the game blocks, by ident (e.g. "org.napp_name"), official ones included. They still show in the
 	/// Store, marked Blacklisted, but can't be installed or downloaded.
 	/// </summary>
-	public static HashSet<string> BlacklistApps { get; } = new( System.StringComparer.OrdinalIgnoreCase );
+	public static HashSet<string> BlacklistApps => blacklistApps.Value;
+
+	static readonly NaviHotloadKept<HashSet<string>> blacklistApps = new( new( System.StringComparer.OrdinalIgnoreCase ) );
 
 	/// <summary>
 	/// The orgs whose apps are allowed, or null if every org is. See <see cref="AllowedOrgs"/>.
@@ -85,12 +89,13 @@ public static class NaviStore
 	/// Resource paths of the apps downloaded from the Store, to the package each came from. They are never trusted as
 	/// shipped with the game, even in one of the <see cref="NaviAppRegistry.SystemAppFolders"/>.
 	/// </summary>
-	static readonly Dictionary<string, string> downloaded = new( System.StringComparer.OrdinalIgnoreCase );
+	static Dictionary<string, string> downloaded => downloadedPaths.Value;
+
+	static readonly NaviHotloadKept<Dictionary<string, string>> downloadedPaths = new( new( System.StringComparer.OrdinalIgnoreCase ) );
 
 	/// <summary>
-	/// The manifests downloaded from the Store, by package ident. The resource system holds a cloud resource only weakly,
-	/// so without this a garbage collection (every hot reload runs one) drops it, and its app vanishes while its package
-	/// is still installed.
+	/// The manifests downloaded from the Store, by package ident. The resource system may hold a cloud resource only
+	/// weakly, so this keeps them loaded while their packages are installed.
 	/// </summary>
 	static readonly Dictionary<string, NaviAppResource> downloadedResources = new( System.StringComparer.OrdinalIgnoreCase );
 
@@ -114,7 +119,9 @@ public static class NaviStore
 	/// <summary>
 	/// The version of each package, by ident, that the package cache had when the app was downloaded.
 	/// </summary>
-	static readonly Dictionary<string, string> installedVersions = new( System.StringComparer.OrdinalIgnoreCase );
+	static Dictionary<string, string> installedVersions => installedVersionsKept.Value;
+
+	static readonly NaviHotloadKept<Dictionary<string, string>> installedVersionsKept = new( new( System.StringComparer.OrdinalIgnoreCase ) );
 
 	/// <summary>
 	/// The version of a Store package this game downloaded, or null if it hasn't (this session) or it isn't known.

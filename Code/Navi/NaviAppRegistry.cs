@@ -290,7 +290,9 @@ public static class NaviAppRegistry
 	/// </summary>
 	public const string SettingsApp = BuiltInFolder + "settings.napp";
 
-	static readonly HashSet<string> systemAppFolders = new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder };
+	static HashSet<string> systemAppFolders => systemAppFoldersKept.Value;
+
+	static readonly NaviHotloadKept<HashSet<string>> systemAppFoldersKept = new( new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder } );
 
 	/// <summary>
 	/// Asset folders whose manifests count as shipped with the game or a library, so their system apps are part of the OS.
