@@ -125,6 +125,12 @@ public sealed class NaviAppInfo
 	public IReadOnlyList<string> FileTypes { get; init; } = [];
 
 	/// <summary>
+	/// The tags of the computers that can install the app, lowercase; empty for any computer. See
+	/// <see cref="NaviAppResource.ComputerTags"/>. Only the host installs apps, so they aren't sent to clients.
+	/// </summary>
+	public IReadOnlyList<string> ComputerTags { get; init; } = [];
+
+	/// <summary>
 	/// The app's panel class.
 	/// </summary>
 	public TypeDescription PanelType { get; init; }
@@ -189,6 +195,7 @@ public sealed class NaviAppInfo
 				.ToArray() ?? [],
 			PanelType = panelType,
 			Resource = resource,
+			ComputerTags = NaviComputer.CleanTags( resource.ComputerTags ),
 		};
 	}
 

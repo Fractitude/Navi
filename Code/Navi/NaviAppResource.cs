@@ -131,6 +131,13 @@ public sealed class NaviAppResource : GameResource
 	[Property] public bool IsSystem { get; set; }
 
 	/// <summary>
+	/// An allow list of computers: the app can only be installed on a computer that has at least one of these tags
+	/// (<see cref="NaviComputer.Tags"/>). Empty for an app any computer can install. Tags are compared without case.
+	/// It only limits where the app goes: it can't give the app anything, and a computer's tags are set by the game.
+	/// </summary>
+	[Property] public List<string> ComputerTags { get; set; } = new();
+
+	/// <summary>
 	/// The panel class named by <see cref="PanelType"/>, or null if it isn't loaded.
 	/// </summary>
 	public TypeDescription FindPanelType() => FindPanelType( PanelType );

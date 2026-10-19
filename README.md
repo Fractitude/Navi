@@ -376,6 +376,18 @@ An app with `IsSystem` in its manifest asks for full system access: root. Root h
 - Accepted apps are kept in `NaviComputer.RootApps`. Uninstalling forgets them.
 - `Navi.Permissions.HasRootAsync()` tells an app whether it has root.
 
+## Kiosk computers
+
+A computer that has `OnlyApps` listed is a kiosk: it has exactly those apps and nothing else, not even the system apps (Packages, Settings, the game's own). `IsInstalled` answers from that list alone, so the start menu, the taskbar, `Launch`, notifications and file opening all follow, and the start menu hides the Settings and Get apps buttons when they aren't there. `Install` refuses everything. It is a scene property: it isn't saved, and no app or `User...` call can change it. Use it for a shop terminal, a bank machine or a locked-down public computer.
+
+## Computer tags
+
+A game can limit an app to some computers, e.g. a gameplay app only the player's home computer may have. Give the computer `NaviComputer.Tags` (say `home`) and list the same tag in the app's `.napp` under `ComputerTags`. An app with tags can be installed only on a computer that has at least one of them (compared without case). An app with none can go anywhere.
+
+- Checked on `Install` and `InstallPackageAsync` (a Store app's manifest is read after the download, so it is refused then, before root is asked for), and the Packages app doesn't list the app on other computers.
+- An app already installed stays, whatever its tags: the scene's `InstalledApps` and saves are the game's own.
+- It only limits where an app goes and gives it nothing. Tags are a scene property: not saved, and no app or `User...` call can change them. A hostile Store app can list tags, but that only narrows itself.
+
 ## Sitting at the computer
 
 Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for every app. `NaviComputer.IsSeated` says whether the local player has it. Offline, the first click on the screen sits the player down.

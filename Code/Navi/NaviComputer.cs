@@ -266,6 +266,36 @@ public sealed partial class NaviComputer : Component
 	};
 
 	/// <summary>
+	/// Makes this computer a kiosk. When it lists any app ids, those are the only apps the computer has: system apps are
+	/// not installed unless listed, and nothing else can be installed. Set in the scene, never saved, and no app or
+	/// <c>User...</c> call can change it. Leave it empty for a normal computer.
+	/// </summary>
+	[Property] public List<string> OnlyApps { get; set; } = new();
+
+	/// <summary>
+	/// Names this computer for the game, e.g. "home". An app whose manifest lists <see cref="NaviAppResource.ComputerTags"/>
+	/// can only be installed on a computer with one of them. Compared without case. Set in the scene, never saved, and no
+	/// app or <c>User...</c> call can change it.
+	/// </summary>
+	[Property] public List<string> Tags { get; set; } = new();
+
+	/// <summary>
+	/// Can this computer install the app? Yes if the app lists no <see cref="NaviAppInfo.ComputerTags"/>, or this computer
+	/// has one of them. An app that is already installed stays, whatever its tags.
+	/// </summary>
+	public bool CanInstall( NaviAppInfo app )
+	{
+		if ( app?.ComputerTags is not { Count: > 0 } allowed )
+			return true;
+
+		var own = CleanTags( Tags );
+		return allowed.Any( own.Contains );
+	}
+
+	internal static string[] CleanTags( IEnumerable<string> tags ) =>
+		tags?.Where( x => !string.IsNullOrWhiteSpace( x ) ).Select( x => x.Trim().ToLowerInvariant() ).Distinct().ToArray() ?? [];
+
+	/// <summary>
 	/// Store packages (sbox.game idents, e.g. "org.notes") installed on this computer. They are downloaded when the game starts.
 	/// </summary>
 	[Property] public List<string> InstalledPackages { get; set; } = new();
@@ -1112,7 +1142,10 @@ public sealed partial class NaviComputer : Component
 
 	public bool IsInstalled( string id ) =>NaviAppRegistry.Find( id ) is { } app && IsInstalled( app );
 
-	public bool IsInstalled( NaviAppInfo app ) => app.IsCore || (InstalledApps?.Contains( app.Id ) ?? false);
+	public bool IsInstalled( NaviAppInfo app ) =>
+		OnlyApps is { Count: > 0 }
+			? OnlyApps.Contains( app.Id )
+			: app.IsCore || (InstalledApps?.Contains( app.Id ) ?? false);
 
 	/// <summary>
 	/// Has full system access: a system app that is part of the OS, or that the player accepted.
@@ -1156,6 +1189,10 @@ public sealed partial class NaviComputer : Component
 
 		var app = await DownloadPackageAsync( packageIdent );
 		if ( app is null )
+			return false;
+
+		// The manifest can only be read once it is downloaded, so the tags are checked here, before root is asked for.
+		if ( !CanInstall( app ) )
 			return false;
 
 		// A system app asks for root before it is installed. The manifest can only be read once it is downloaded.
@@ -1240,8 +1277,14 @@ public sealed partial class NaviComputer : Component
 			return false;
 		}
 
-		if ( IsInstalled( app ) )
+		if ( IsInstalled( app ) || OnlyApps is { Count: > 0 } )
 			return false;
+
+		if ( !CanInstall( app ) )
+		{
+			Log.Warning( $"NaviComputer: '{id}' can't be installed on this computer (tags)" );
+			return false;
+		}
 
 		InstalledApps ??= new();
 		InstalledApps.Add( id );

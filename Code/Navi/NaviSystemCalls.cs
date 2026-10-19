@@ -151,7 +151,9 @@ public static class NaviSystemCalls
 				return computer.Version;
 
 			case "apps.list":
+				// An app this computer can't install is left out, unless it is already installed.
 				return NaviAppRegistry.All
+					.Where( x => computer.CanInstall( x ) || computer.IsInstalled( x ) )
 					.Select( x => (x.Id, x.Name, x.Description, x.Icon, x.Color, computer.IsInstalled( x ), x.IsCore ? "core" : x.IsSystem ? "system" : "app") )
 					.ToArray();
 

@@ -122,12 +122,18 @@
 	}
 
 	<div class="footer">
-		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.SettingsApp ))>
-			<i>settings</i>Settings
-		</div>
-		<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.PackagesApp ))>
-			<i>download</i>Get apps
-		</div>
+		@if ( Computer.IsInstalled( NaviAppRegistry.SettingsApp ) )
+		{
+			<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.SettingsApp ))>
+				<i>settings</i>Settings
+			</div>
+		}
+		@if ( Computer.IsInstalled( NaviAppRegistry.PackagesApp ) )
+		{
+			<div class="action" @onclick=@(() => OpenBuiltIn( NaviAppRegistry.PackagesApp ))>
+				<i>download</i>Get apps
+			</div>
+		}
 		<div class="action lock" @onclick=@(() => OnLock?.Invoke())>
 			<i>lock</i>Lock
 		</div>
