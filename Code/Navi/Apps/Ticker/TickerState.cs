@@ -11,7 +11,7 @@ public static class TickerState
 	/// <summary>
 	/// The host's copies of the Ticker windows, oldest first. They number themselves from their place in it.
 	/// </summary>
-	public static List<TickerWindow> Windows { get; } = new();
+	public static List<TickerWindow> Windows { get; private set; } = new();
 
 	/// <summary>
 	/// The ids of the windows the .napp lists, in the order they are opened.
