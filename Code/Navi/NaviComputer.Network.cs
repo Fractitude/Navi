@@ -523,21 +523,33 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// Give the seat to someone else. Open permission prompts are dismissed: whoever sits down didn't ask for them, and
 	/// mustn't answer them for the player who did.
 	/// </summary>
-	void SetUser( System.Guid id )
+	/// <param name="keepStartMenu">Leave the start menu as it is, as when the player stands up with Escape.</param>
+	void SetUser( System.Guid id, bool keepStartMenu = false )
 	{
 		if ( UserId == id )
 			return;
 
+		// The player who stood up with the menu open finds it as they left it when they sit down again.
+		var returning = id != default && id == menuOwner;
+		menuOwner = keepStartMenu ? UserId : default;
+
 		UserId = id;
-		ResetSession();
+		ResetSession( keepStartMenu || returning );
 	}
 
-	void ResetSession()
+	/// <summary>
+	/// The player who stood up with Escape, whose open start menu was kept for when they sit down again.
+	/// </summary>
+	System.Guid menuOwner;
+
+	void ResetSession( bool keepStartMenu = false )
 	{
 		sinceUserActed = 0;
 		userInput.Clear();
 		IsLockSetupOpen = false;
-		ResetStartMenu();
+
+		if ( !keepStartMenu )
+			ResetStartMenu();
 
 		foreach ( var request in permissionRequests.ToList() )
 			DismissPermissionRequest( request );
@@ -899,12 +911,12 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		if ( Networking.IsActive )
 		{
-			SetUser( default );
+			SetUser( default, keepStartMenu: true );
 		}
 		else if ( seatedOffline )
 		{
 			seatedOffline = false;
-			ResetSession();
+			ResetSession( keepStartMenu: true );
 		}
 	}
 
