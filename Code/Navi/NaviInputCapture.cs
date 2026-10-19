@@ -35,7 +35,7 @@ public sealed class NaviInputCapture : Component
 	/// The input actions sent to the host while a shared app has the player's controls, so its host copy can read them
 	/// with <c>Navi.Input.Down</c>. Games can add their own.
 	/// </summary>
-	public static HashSet<string> ForwardedActions { get; } = new()
+	public static HashSet<string> ForwardedActions { get; private set; } = new()
 	{
 		"Forward", "Backward", "Left", "Right", "Jump", "Run", "Walk", "Duck", "Attack1", "Attack2", "Reload", "Use",
 	};

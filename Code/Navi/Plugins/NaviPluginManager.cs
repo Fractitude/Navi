@@ -35,8 +35,8 @@ public static class NaviPluginManager
 
 	const string SavePath = "navi/plugins.json";
 
-	static readonly Dictionary<string, NaviRunningPlugin> running = new( System.StringComparer.OrdinalIgnoreCase );
-	static readonly HashSet<string> activating = new( System.StringComparer.OrdinalIgnoreCase );
+	static Dictionary<string, NaviRunningPlugin> running = new( System.StringComparer.OrdinalIgnoreCase );
+	static HashSet<string> activating = new( System.StringComparer.OrdinalIgnoreCase );
 
 	static List<string> installed = [];
 	static bool savedLoaded;
