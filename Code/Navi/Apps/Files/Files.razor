@@ -6,7 +6,7 @@
 @* (Assets/navi/apps/files.napp), so it reaches every file. It is shared, because only the host has the files: the *@
 @* panel draws FilesUiState, and its controls are actions (Navi.Act) that the host's copy runs. *@
 
-<root>
+<root @onmousedown=@( ( PanelEvent e ) => HistoryButton( e ) )>
 	<div class="sidebar">
 		<div class="section">Places</div>
 		@foreach ( var place in UiState.Places )
@@ -302,6 +302,18 @@
 
 	/// <summary>The breadcrumb trail is wider than its box, so its start is cut off.</summary>
 	bool crumbsClipped;
+
+	/// <summary>The mouse's side buttons step back and forward through the folder history.</summary>
+	void HistoryButton( PanelEvent e )
+	{
+		if ( e is not MousePanelEvent mouse )
+			return;
+
+		if ( mouse.MouseButton == MouseButtons.Back )
+			Navi.Act( FilesViewModel.BackAction );
+		else if ( mouse.MouseButton == MouseButtons.Forward )
+			Navi.Act( FilesViewModel.ForwardAction );
+	}
 
 	/// <summary>
 	/// The left button went down on the list itself, not on an entry: a drag from here selects. With Ctrl held, what was
