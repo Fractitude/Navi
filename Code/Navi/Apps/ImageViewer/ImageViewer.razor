@@ -108,8 +108,18 @@
 
 	void ClampPan()
 	{
-		// The picture can't be taken further than its own edge reaching the middle of the window.
-		var limit = ScreenSize * 0.5f * zoom;
+		// The picture can't leave the window: an edge can't come further in than the window's own edge, and a side that
+		// is smaller than the window stays centred. The picture is drawn contained in the zoomed box.
+		var window = ScreenSize;
+		var picture = ViewModel.Picture is { } texture ? (Vector2)texture.Size : Vector2.Zero;
+		if ( picture.x <= 0 || picture.y <= 0 || window.x <= 0 || window.y <= 0 )
+		{
+			pan = Vector2.Zero;
+			return;
+		}
+
+		var shown = picture * System.MathF.Min( window.x / picture.x, window.y / picture.y ) * zoom;
+		var limit = new Vector2( System.MathF.Max( 0, shown.x - window.x ), System.MathF.Max( 0, shown.y - window.y ) ) * 0.5f;
 		pan = new Vector2( System.Math.Clamp( pan.x, -limit.x, limit.x ), System.Math.Clamp( pan.y, -limit.y, limit.y ) );
 	}
 
