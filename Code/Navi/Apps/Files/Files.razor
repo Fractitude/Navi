@@ -221,7 +221,7 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<NaviMenu Heading=@UiState.MenuHeading Items=@UiState.Menu OnChoose=@( id => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		<NaviMenu Heading=@UiState.MenuHeading Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
 		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px;"/>
 	}
 

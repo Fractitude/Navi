@@ -102,7 +102,7 @@
 	{
 		@* Right-click menu, where the mouse was. *@
 		<NaviMenu class="context" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;"
-		          Items=@ContextMenu( ContextApp ) OnChoose=@( id => ChooseContext( ContextApp, id ) )/>
+		          Items=@ContextMenu( ContextApp ) OnChoose=@( ( string id ) => ChooseContext( ContextApp, id ) )/>
 	}
 
 	<div class="footer">

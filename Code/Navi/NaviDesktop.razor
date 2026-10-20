@@ -183,7 +183,7 @@
 
 				@if ( MenuApp == app.Id )
 				{
-					<NaviMenu class="taskbar-menu" Items=@TaskbarMenu( app, process ) OnChoose=@( id => TaskbarMenuChoose( app, id ) )/>
+					<NaviMenu class="taskbar-menu" Items=@TaskbarMenu( app, process ) OnChoose=@( ( string id ) => TaskbarMenuChoose( app, id ) )/>
 				}
 			</div>
 		}
@@ -204,7 +204,7 @@
 
 					@if ( TrayMenuApp == id )
 					{
-						<NaviMenu class="tray-menu" Heading=@process.App.Name Items=@TrayMenu( process ) OnChoose=@( item => OnTrayClick( process, item ) )/>
+						<NaviMenu class="tray-menu" Heading=@process.App.Name Items=@TrayMenu( process ) OnChoose=@( ( string item ) => OnTrayClick( process, item ) )/>
 					}
 				</div>
 			}
