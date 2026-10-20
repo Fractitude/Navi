@@ -1160,11 +1160,15 @@ public sealed class FilesViewModel
 		Navi.FileKind.Symlink => "link",
 		Navi.FileKind.Alias => "shortcut",
 		_ when IsPicture( entry.Name ) => "image",
+		_ when IsCode( entry.Name ) => "code",
 		_ => "description",
 	};
 
 	static bool IsPicture( string name ) =>
 		new[] { ".jpg", ".jpeg", ".png" }.Any( x => name.EndsWith( x, System.StringComparison.OrdinalIgnoreCase ) );
+
+	static bool IsCode( string name ) =>
+		new[] { ".cs", ".razor", ".scss" }.Any( x => name.EndsWith( x, System.StringComparison.OrdinalIgnoreCase ) );
 
 	static string DetailOf( Navi.FileInfo entry ) => entry.Kind switch
 	{
