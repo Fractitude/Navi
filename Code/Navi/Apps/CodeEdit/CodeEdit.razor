@@ -21,6 +21,18 @@
 			<i>save_as</i>
 		</div>
 
+		<div class="divider"></div>
+
+		<div class="tool @( Editor is { CanUndo: true } ? "" : "disabled" )" tooltip="Undo (Ctrl+Z)" @onclick=@Undo>
+			<i>undo</i>
+		</div>
+		<div class="tool @( Editor is { CanRedo: true } ? "" : "disabled" )" tooltip="Redo (Ctrl+Y)" @onclick=@Redo>
+			<i>redo</i>
+		</div>
+		<div class="tool" tooltip="@( lightTheme ? "Dark theme" : "Light theme" )" @onclick=@ToggleTheme>
+			<i>@( lightTheme ? "dark_mode" : "light_mode" )</i>
+		</div>
+
 		<div class="spacer"></div>
 
 		<div class="name">@UiState.Name</div>
@@ -97,6 +109,55 @@
 
 	ScriptControl Editor;
 	TextEntry BarEntry;
+
+	/// <summary>The editor is drawn light. Only this panel's view, not the document: it isn't shared.</summary>
+	bool lightTheme;
+
+	static readonly ScriptControl.ThemeDefinition LightTheme = ScriptControl.ThemeDefinition.Default with
+	{
+		Foreground = new Color( 0.12f, 0.12f, 0.12f ),
+		Keyword = new Color( 0f, 0f, 0.8f ),
+		Number = new Color( 0.03f, 0.53f, 0.34f ),
+		String = new Color( 0.64f, 0.08f, 0.08f ),
+		Comment = new Color( 0f, 0.5f, 0f ),
+		Identifier = new Color( 0.0f, 0.06f, 0.5f ),
+		Type = new Color( 0.15f, 0.5f, 0.6f ),
+		Member = new Color( 0.47f, 0.37f, 0.07f ),
+		ControlFlow = new Color( 0.69f, 0.0f, 0.64f ),
+		Selection = new Color( 0.68f, 0.84f, 1f ),
+		CurrentLine = new Color( 0.93f, 0.93f, 0.93f ),
+		LineNumber = new Color( 0.45f, 0.45f, 0.45f ),
+		ActiveLineNumber = new Color( 0.1f, 0.1f, 0.1f ),
+		ActiveParameter = new Color( 0f, 0f, 0f ),
+		Background = new Color( 1f, 1f, 1f ),
+		GutterBackground = new Color( 1f, 1f, 1f ),
+		Caret = new Color( 0f, 0f, 0f ),
+		PopupBackground = new Color( 0.95f, 0.95f, 0.95f ),
+		PopupBorder = new Color( 0.78f, 0.78f, 0.78f ),
+		PopupShadow = new Color( 0f, 0f, 0f, 0.2f ),
+		CompletionSelectedBackground = new Color( 0.0f, 0.38f, 0.7f ),
+		CompletionHoverBackground = new Color( 0.88f, 0.88f, 0.9f ),
+		SymbolIcon = new Color( 0.45f, 0.2f, 0.7f ),
+		PopupTitle = new Color( 0.15f, 0.5f, 0.6f ),
+		PopupDescription = new Color( 0.12f, 0.12f, 0.12f ),
+		MutedForeground = new Color( 0.4f, 0.4f, 0.4f ),
+		SignatureForeground = new Color( 0.3f, 0.3f, 0.3f ),
+	};
+
+	/// <summary>
+	/// Undo and redo are the editor's own, kept by the panel. The change they make comes back through
+	/// <see cref="SourceEdited"/> like typing, so the host's document follows.
+	/// </summary>
+	void Undo() => Editor?.Undo();
+
+	void Redo() => Editor?.Redo();
+
+	void ToggleTheme()
+	{
+		lightTheme = !lightTheme;
+		if ( Editor is not null )
+			Editor.Theme = lightTheme ? LightTheme : ScriptControl.ThemeDefinition.Default;
+	}
 
 	/// <summary>
 	/// What the text field held when it last reported an edit, and the text session it was for. The edits sent are worked
@@ -333,5 +394,5 @@
 	/// </summary>
 	protected override int BuildHash() =>
 		System.HashCode.Combine( UiState.Revision, UiState.TextSession, EditorFocused ? null : UiState.Text,
-			BarEntry is { HasFocus: true } ? null : UiState.BarText );
+			BarEntry is { HasFocus: true } ? null : UiState.BarText, Editor?.CanUndo, Editor?.CanRedo, lightTheme );
 }

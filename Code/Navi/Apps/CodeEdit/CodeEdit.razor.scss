@@ -60,6 +60,21 @@
 		}
 	}
 
+	.divider
+	{
+		flex-shrink: 0;
+		width: 1px;
+		height: 14px;
+		margin: 0 3px;
+		background-color: $line-bc;
+	}
+
+	.disabled
+	{
+		opacity: 0.35;
+		pointer-events: none;
+	}
+
 	.spacer
 	{
 		flex-grow: 1;
