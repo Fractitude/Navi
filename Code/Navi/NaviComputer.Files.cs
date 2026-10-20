@@ -54,7 +54,9 @@ public sealed partial class NaviComputer
 
 		Files = new NaviFileSystem( root );
 		savedDrives.Clear();
-		savedDrives[root] = save is null ? -1 : root.Version;
+		savedDrives[root] = save is null || root.Migrated ? -1 : root.Version;
+		if ( save is not null )
+			NaviSaveData.CleanBlobs( root );
 		Files.EnsureLayout();
 		filesChangedVersion = Files.Version;
 	}
@@ -76,8 +78,8 @@ public sealed partial class NaviComputer
 		if ( savedDrives.TryGetValue( drive, out var saved ) && saved == drive.Version )
 			return;
 
-		NaviSaveData.WriteDrive( drive.Id, drive.CaptureSave() );
-		savedDrives[drive] = drive.Version;
+		if ( NaviSaveData.WriteDrive( drive ) )
+			savedDrives[drive] = drive.Version;
 	}
 
 	/// <summary>

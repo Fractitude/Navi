@@ -41,14 +41,32 @@ public sealed class NaviFileNode
 	public NaviFileKind Kind { get; set; }
 
 	/// <summary>
-	/// A text file's contents. A file has either this or <see cref="Data"/>.
+	/// Only read from drives saved before contents moved out of the index: <see cref="NaviDrive.FromSave"/> moves
+	/// it into the drive's pending contents. Always null in memory and in a new save.
 	/// </summary>
 	public string Text { get; set; }
 
 	/// <summary>
-	/// A binary file's contents (a picture, say), saved as base64 in the drive's JSON. Null for a text file.
+	/// Like <see cref="Text"/>, for a binary file of the old layout.
 	/// </summary>
 	public byte[] Data { get; set; }
+
+	/// <summary>
+	/// A file's size in bytes. Its contents are not here: they are in the drive's blob for this entry
+	/// (<see cref="NaviDrive.ReadContent"/>).
+	/// </summary>
+	public long Size { get; set; }
+
+	/// <summary>
+	/// Is the file binary (a picture, say) rather than text? Reading it as text gives nothing.
+	/// </summary>
+	public bool Binary { get; set; }
+
+	/// <summary>
+	/// Goes up with every write of the contents. A blob is saved as <c>{Id}-{Rev}</c> and never overwritten, so the
+	/// saved index always points at a blob that was written completely.
+	/// </summary>
+	public long Rev { get; set; }
 
 	/// <summary>
 	/// A symlink's target path, absolute or relative to its folder. An alias's target path when it was made, used if
@@ -199,9 +217,92 @@ public sealed class NaviDrive
 		+ Bytes( node.TrashedFrom );
 
 	/// <summary>
-	/// A file's size in bytes: its binary contents, or its text as UTF-8.
+	/// A file's size in bytes.
 	/// </summary>
-	public static long Size( NaviFileNode node ) => node.Data?.LongLength ?? Bytes( node.Text );
+	public static long Size( NaviFileNode node ) => node.Size;
+
+	// Contents. They are not in the nodes: a file's bytes are a blob on disk (NaviSaveData), read when asked for. A write
+	// is kept here, in memory, until the drive is saved.
+
+	/// <summary>
+	/// Contents written since the drive was saved, by entry id.
+	/// </summary>
+	readonly Dictionary<long, byte[]> pending = new();
+
+	/// <summary>
+	/// The blobs on disk that the saved index points at, by entry id: the <see cref="NaviFileNode.Rev"/> of each.
+	/// </summary>
+	readonly Dictionary<long, long> committed = new();
+
+	/// <summary>
+	/// Blobs whose entries were deleted, to remove from disk once the index no longer names them.
+	/// </summary>
+	readonly List<(long Id, long Rev)> abandoned = new();
+
+	/// <summary>
+	/// The drive was read from the old layout and has to be saved in the new one.
+	/// </summary>
+	public bool Migrated { get; private set; }
+
+	/// <summary>
+	/// A file's contents. Empty if it has none or its blob is gone.
+	/// </summary>
+	public byte[] ReadContent( NaviFileNode node )
+	{
+		if ( pending.TryGetValue( node.Id, out var bytes ) )
+			return bytes;
+
+		return node.Rev > 0 ? NaviSaveData.ReadBlob( Id, node.Id, node.Rev ) ?? [] : [];
+	}
+
+	/// <summary>
+	/// Replace a file's contents. The caller checked there is room.
+	/// </summary>
+	public void SetContent( NaviFileNode node, byte[] bytes, bool binary )
+	{
+		Edit( node, x =>
+		{
+			x.Size = bytes.LongLength;
+			x.Binary = binary;
+			x.Rev++;
+		} );
+
+		pending[node.Id] = bytes;
+	}
+
+	/// <summary>
+	/// What a save has to write: the contents written since the last one.
+	/// </summary>
+	public List<(long Id, long Rev, byte[] Bytes)> PendingContents() =>
+		pending.Where( x => nodes.ContainsKey( x.Key ) ).Select( x => (x.Key, nodes[x.Key].Rev, x.Value) ).ToList();
+
+	/// <summary>
+	/// The blobs on disk that the saved index points at. A save names these and no others.
+	/// </summary>
+	public IReadOnlyDictionary<long, long> CommittedBlobs => committed;
+
+	/// <summary>
+	/// A save wrote <paramref name="written"/> and the index. Returns the blobs that are no longer named by it, to delete.
+	/// </summary>
+	public List<(long Id, long Rev)> Committed( IEnumerable<(long Id, long Rev, byte[] Bytes)> written )
+	{
+		var old = new List<(long Id, long Rev)>( abandoned );
+		abandoned.Clear();
+
+		foreach ( var (id, rev, bytes) in written )
+		{
+			if ( committed.TryGetValue( id, out var before ) && before != rev )
+				old.Add( (id, before) );
+
+			committed[id] = rev;
+
+			if ( pending.TryGetValue( id, out var current ) && ReferenceEquals( current, bytes ) )
+				pending.Remove( id );
+		}
+
+		Migrated = false;
+		return old;
+	}
 
 	public static long Bytes( string text ) => string.IsNullOrEmpty( text ) ? 0 : Encoding.UTF8.GetByteCount( text );
 
@@ -285,6 +386,10 @@ public sealed class NaviDrive
 		foreach ( var child in Children( node ).ToList() )
 			Delete( child );
 
+		pending.Remove( node.Id );
+		if ( committed.Remove( node.Id, out var rev ) )
+			abandoned.Add( (node.Id, rev) );
+
 		children.Remove( node.Id );
 		children[node.Parent].Remove( node.Name );
 		nodes.Remove( node.Id );
@@ -326,6 +431,29 @@ public sealed class NaviDrive
 	};
 
 	/// <summary>
+	/// A file of the old layout carried its contents in the index: move them to pending contents, to be saved as a blob.
+	/// A file of the new one has a blob on disk.
+	/// </summary>
+	void TakeContent( NaviFileNode node )
+	{
+		if ( node.Text is not null || node.Data is not null )
+		{
+			var bytes = node.Data ?? Encoding.UTF8.GetBytes( node.Text );
+			node.Binary = node.Data is not null;
+			node.Size = bytes.LongLength;
+			node.Rev = System.Math.Max( 1, node.Rev + 1 );
+			node.Text = null;
+			node.Data = null;
+			pending[node.Id] = bytes;
+			Migrated = true;
+		}
+		else if ( node.Rev > 0 )
+		{
+			committed[node.Id] = node.Rev;
+		}
+	}
+
+	/// <summary>
 	/// A drive from its save. Entries that don't fit the tree (no parent, a bad name, a name used twice, a loop) are
 	/// dropped, with what is in them. <paramref name="capacity"/> overrides the saved one when given; a drive that is
 	/// over it keeps its files but can't grow.
@@ -359,6 +487,10 @@ public sealed class NaviDrive
 
 				var created = node.Created;
 				var modified = node.Modified;
+
+				if ( node.Kind == NaviFileKind.File )
+					drive.TakeContent( node );
+
 				drive.Add( node );
 				node.Created = created;
 				node.Modified = modified;

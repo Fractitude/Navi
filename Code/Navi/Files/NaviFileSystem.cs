@@ -319,7 +319,10 @@ public sealed class NaviFileSystem
 		if ( file.Node.Kind == NaviFileKind.Folder )
 			throw new NaviFileException( NaviFileError.IsAFolder, file.Path );
 
-		return file.Node.Kind == NaviFileKind.File ? file.Node.Text ?? "" : throw new NaviFileException( NaviFileError.NotFound, file.Path );
+		if ( file.Node.Kind != NaviFileKind.File )
+			throw new NaviFileException( NaviFileError.NotFound, file.Path );
+
+		return file.Node.Binary ? "" : System.Text.Encoding.UTF8.GetString( file.Drive.ReadContent( file.Node ) );
 	}
 
 	/// <summary>
@@ -334,7 +337,7 @@ public sealed class NaviFileSystem
 		if ( file.Node.Kind != NaviFileKind.File )
 			throw new NaviFileException( NaviFileError.NotFound, file.Path );
 
-		return file.Node.Data ?? System.Text.Encoding.UTF8.GetBytes( file.Node.Text ?? "" );
+		return file.Drive.ReadContent( file.Node );
 	}
 
 	/// <summary>
@@ -359,16 +362,17 @@ public sealed class NaviFileSystem
 	/// <summary>
 	/// Write a text file, making it or replacing what is in it. A symlink at the path writes its target.
 	/// </summary>
-	public NaviFileLocation WriteText( string path, string text ) => Write( path, text ?? "", null );
+	public NaviFileLocation WriteText( string path, string text ) =>
+		Write( path, System.Text.Encoding.UTF8.GetBytes( text ?? "" ), binary: false );
 
 	/// <summary>
 	/// Write a binary file, making it or replacing what is in it. A symlink at the path writes its target.
 	/// </summary>
-	public NaviFileLocation WriteBytes( string path, byte[] data ) => Write( path, null, data ?? [] );
+	public NaviFileLocation WriteBytes( string path, byte[] data ) => Write( path, data ?? [], binary: true );
 
-	NaviFileLocation Write( string path, string text, byte[] data )
+	NaviFileLocation Write( string path, byte[] data, bool binary )
 	{
-		var size = data?.LongLength ?? NaviDrive.Bytes( text );
+		var size = data.LongLength;
 		var (folder, name) = ResolveNew( path );
 
 		if ( folder.Drive.Child( folder.Node, name ) is { } existing )
@@ -381,19 +385,13 @@ public sealed class NaviFileSystem
 				throw new NaviFileException( NaviFileError.AlreadyExists, file.Path );
 
 			file.Drive.EnsureRoom( size - NaviDrive.Size( file.Node ), 0, file.Path );
-			file.Drive.Edit( file.Node, x =>
-			{
-				x.Text = text;
-				x.Data = data;
-			} );
+			file.Drive.SetContent( file.Node, data, binary );
 			return file;
 		}
 
-		return Create( folder, name, NaviFileKind.File, size, x =>
-		{
-			x.Text = text;
-			x.Data = data;
-		} );
+		var created = Create( folder, name, NaviFileKind.File, size );
+		created.Drive.SetContent( created.Node, data, binary );
+		return created;
 	}
 
 	public NaviFileLocation CreateFolder( string path )
@@ -521,12 +519,13 @@ public sealed class NaviFileSystem
 		var copy = folder.Drive.Create( folder.Node, name, node.Kind );
 		folder.Drive.Edit( copy, x =>
 		{
-			x.Text = node.Text;
-			x.Data = node.Data;
 			x.Target = node.Target;
 			x.TargetDrive = node.TargetDrive;
 			x.TargetNode = node.TargetNode;
 		} );
+
+		if ( node.Kind == NaviFileKind.File )
+			folder.Drive.SetContent( copy, drive.ReadContent( node ), node.Binary );
 
 		var at = new NaviFileLocation( folder.Drive, copy, Join( folder.Path, name ) );
 		foreach ( var child in drive.Children( node ).ToList() )

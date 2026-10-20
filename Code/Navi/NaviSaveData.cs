@@ -142,44 +142,160 @@ public static class NaviSaveData
 		}
 	}
 
-	static string DrivePathFor( string id ) => $"navi/saves/{Slot}/drives/{id}.json";
+	// A drive is a folder: navi/saves/{slot}/drives/{drive}/index.{n}.json is the tree (names, folders, links, sizes and the
+	// revision of each file's blob, no contents), and blobs/{entry}-{revision} are the files' raw bytes. Nothing is
+	// overwritten: a changed file gets a new blob revision, and a save writes the next index.{n}.json once the blobs it
+	// names are written, then removes the older ones, so a crash leaves the previous index and the blobs it names. Drives saved as one drives/{drive}.json
+	// (contents inside) are read, and written in the new layout on the next save.
+
+	static string LegacyDrivePathFor( string id ) => $"navi/saves/{Slot}/drives/{id}.json";
+	static string DriveFolderFor( string id ) => $"navi/saves/{Slot}/drives/{id}";
+	static string IndexPathFor( string id, long generation ) => $"{DriveFolderFor( id )}/index.{generation}.json";
 
 	/// <summary>
-	/// A drive's files in the current slot, or null if it has none. Each drive has its own file, apart from its
-	/// computer's, so a removable drive keeps its files on any computer: <c>navi/saves/{slot}/drives/{drive}.json</c>.
+	/// The generations of a drive's saved index, newest first. Each save writes a new file and removes the older ones, so
+	/// there is one, or two if a save stopped before it cleaned up (and a half-written newest one is skipped on read).
+	/// </summary>
+	static List<long> IndexGenerations( BaseFileSystem data, string id )
+	{
+		if ( !data.DirectoryExists( DriveFolderFor( id ) ) )
+			return [];
+
+		return data.FindFile( DriveFolderFor( id ), "index.*.json", false )
+			.Select( x => x.Split( '.' ) )
+			.Where( x => x.Length == 3 && long.TryParse( x[1], out _ ) )
+			.Select( x => long.Parse( x[1] ) )
+			.OrderByDescending( x => x )
+			.ToList();
+	}
+	static string BlobPathFor( string id, long entry, long rev ) => $"{DriveFolderFor( id )}/blobs/{entry}-{rev}";
+
+	/// <summary>
+	/// A drive's tree in the current slot, or null if it has none. Each drive has its own folder, apart from its
+	/// computer's, so a removable drive keeps its files on any computer. Reads the old single-file layout too, which the
+	/// drive notes (<see cref="NaviDrive.Migrated"/>).
 	/// </summary>
 	public static NaviDriveSave ReadDrive( string id )
 	{
-		if ( !IsPlainName( id ) || FileSystem.Data is not { } data || !data.FileExists( DrivePathFor( id ) ) )
+		if ( !IsPlainName( id ) || FileSystem.Data is not { } data )
+			return null;
+
+		// The newest index that reads; one that doesn't is a save that was cut off.
+		var paths = IndexGenerations( data, id ).Select( x => IndexPathFor( id, x ) ).ToList();
+		if ( data.FileExists( LegacyDrivePathFor( id ) ) )
+			paths.Add( LegacyDrivePathFor( id ) );
+
+		foreach ( var path in paths )
+		{
+			try
+			{
+				if ( data.ReadJson<NaviDriveSave>( path ) is { } save )
+					return save;
+			}
+			catch ( System.Exception e )
+			{
+				Log.Warning( e, $"Navi: couldn't read drive '{id}' from {path}: {e.Message}" );
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// A file's contents, or null if there is no such blob.
+	/// </summary>
+	public static byte[] ReadBlob( string drive, long entry, long rev )
+	{
+		if ( !IsPlainName( drive ) || FileSystem.Data is not { } data || !data.FileExists( BlobPathFor( drive, entry, rev ) ) )
 			return null;
 
 		try
 		{
-			return data.ReadJson<NaviDriveSave>( DrivePathFor( id ) );
+			return data.ReadAllBytes( BlobPathFor( drive, entry, rev ) ).ToArray();
 		}
 		catch ( System.Exception e )
 		{
-			Log.Warning( e, $"Navi: couldn't read drive '{id}': {e.Message}" );
+			Log.Warning( e, $"Navi: couldn't read file {entry} of drive '{drive}': {e.Message}" );
 			return null;
 		}
 	}
 
 	/// <summary>
-	/// Write a drive's files to the current slot.
+	/// Save a drive: the contents written since the last save as new blobs, then the index, then remove the blobs the
+	/// index no longer names. False if it couldn't be written, in which case the drive still counts as unsaved.
 	/// </summary>
-	public static void WriteDrive( string id, NaviDriveSave save )
+	public static bool WriteDrive( NaviDrive drive )
 	{
+		var id = drive.Id;
 		if ( !IsPlainName( id ) || FileSystem.Data is not { } data )
-			return;
+			return false;
 
 		try
 		{
-			data.CreateDirectory( $"navi/saves/{Slot}/drives" );
-			data.WriteJson( DrivePathFor( id ), save );
+			data.CreateDirectory( $"{DriveFolderFor( id )}/blobs" );
+
+			var written = drive.PendingContents();
+			foreach ( var (entry, rev, bytes) in written )
+				data.WriteAllBytes( BlobPathFor( id, entry, rev ), bytes );
+
+			var generations = IndexGenerations( data, id );
+			var next = generations.DefaultIfEmpty( 0 ).Max() + 1;
+			data.WriteAllText( IndexPathFor( id, next ), Json.Serialize( drive.CaptureSave() ) );
+
+			foreach ( var older in generations )
+				data.DeleteFile( IndexPathFor( id, older ) );
+
+			foreach ( var (entry, rev) in drive.Committed( written ) )
+				DeleteBlob( data, id, entry, rev );
+
+			if ( data.FileExists( LegacyDrivePathFor( id ) ) )
+				data.DeleteFile( LegacyDrivePathFor( id ) );
+
+			return true;
 		}
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"Navi: couldn't save drive '{id}': {e.Message}" );
+			return false;
+		}
+	}
+
+	static void DeleteBlob( BaseFileSystem data, string drive, long entry, long rev )
+	{
+		try
+		{
+			if ( data.FileExists( BlobPathFor( drive, entry, rev ) ) )
+				data.DeleteFile( BlobPathFor( drive, entry, rev ) );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't remove a file of drive '{drive}': {e.Message}" );
+		}
+	}
+
+	/// <summary>
+	/// Remove blobs the drive's index doesn't name: left by a save that stopped before its index was written, or by
+	/// entries that didn't load.
+	/// </summary>
+	public static void CleanBlobs( NaviDrive drive )
+	{
+		var folder = $"{DriveFolderFor( drive.Id )}/blobs";
+		if ( !IsPlainName( drive.Id ) || FileSystem.Data is not { } data || !data.DirectoryExists( folder ) )
+			return;
+
+		try
+		{
+			var named = drive.CommittedBlobs.Select( x => $"{x.Key}-{x.Value}" ).ToHashSet();
+
+			foreach ( var name in data.FindFile( folder, "*", false ).ToList() )
+			{
+				if ( !named.Contains( name ) )
+					data.DeleteFile( $"{folder}/{name}" );
+			}
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't clean up drive '{drive.Id}': {e.Message}" );
 		}
 	}
 
