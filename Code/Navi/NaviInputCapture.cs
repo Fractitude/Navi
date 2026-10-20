@@ -154,10 +154,10 @@ public sealed class NaviInputCapture : Component
 	MouseVisibility playerMouse;
 
 	/// <summary>
-	/// Tag of the player's body. The camera stops drawing it while seated, so it isn't in the way inside the head. Its
-	/// shadow stays.
+	/// Tag the game puts on the body of the player it controls. The camera stops drawing that body while seated, so it
+	/// isn't in the way inside the head, and other players' cameras still draw it. Its shadow stays.
 	/// </summary>
-	const string PlayerTag = "player";
+	const string PlayerTag = "local_player";
 
 	/// <summary>
 	/// The camera didn't exclude <see cref="PlayerTag"/> before the seat, so the seat added it and removes it again.
