@@ -1,0 +1,26 @@
+{
+  "Title": "Code Edit",
+  "Description": "Write and change code files with syntax highlighting.",
+  "Icon": "code",
+  "Color": "#5a8fb0",
+  "PanelType": "NaviApps.CodeEdit",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": true,
+  "Permissions": [
+    "navi.files.access"
+  ],
+  "FileTypes": [
+    "cs",
+    "razor",
+    "scss",
+    "css",
+    "json",
+    "js",
+    "lua"
+  ],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

@@ -269,6 +269,7 @@ public sealed partial class NaviComputer : Component
 	public List<string> InstalledApps { get; set; } = new()
 	{
 		NaviAppRegistry.BuiltInFolder + "calculator.napp", NaviAppRegistry.BuiltInFolder + "textedit.napp",
+		NaviAppRegistry.BuiltInFolder + "codeedit.napp",
 	};
 
 	/// <summary>

@@ -1,0 +1,253 @@
+@using Sandbox.UI
+@inherits NaviApp
+@namespace NaviApps
+
+@* A code editor (a ScriptControl) for the computer's files. A prepackaged app (Assets/navi/apps/codeedit.napp) that asks for *@
+@* Files access, and opens code files from the file explorer. It is shared, because only the host has the files: the *@
+@* panel draws CodeEditUiState, and its controls are actions (Navi.Act) that the host's copy runs. *@
+
+<root>
+	<div class="toolbar">
+		<div class="tool" tooltip="New (Ctrl+N)" @onclick=@( () => Navi.Act( CodeEditViewModel.NewAction ) )>
+			<i>note_add</i>
+		</div>
+		<div class="tool" tooltip="Open (Ctrl+O)" @onclick=@( () => Navi.Act( CodeEditViewModel.OpenAction ) )>
+			<i>folder_open</i>
+		</div>
+		<div class="tool" tooltip="Save (Ctrl+S)" @onclick=@( () => Navi.Act( CodeEditViewModel.SaveAction ) )>
+			<i>save</i>
+		</div>
+		<div class="tool" tooltip="Save as (Ctrl+Shift+S)" @onclick=@( () => Navi.Act( CodeEditViewModel.SaveAsAction ) )>
+			<i>save_as</i>
+		</div>
+
+		<div class="spacer"></div>
+
+		<div class="name">@UiState.Name</div>
+		@if ( UiState.Dirty )
+		{
+			<div class="dirty" tooltip="Not saved">•</div>
+		}
+	</div>
+
+	@if ( UiState.BarOpen )
+	{
+		<div class="bar">
+			<i>save_as</i>
+			<div class="bar-label">Save as</div>
+			<TextEntry @ref="BarEntry" Value=@( UiState.BarText ) MaxLength=@( 1024 )
+			           OnTextEdited=@BarEdited
+			           onsubmit=@( () => Navi.Act( CodeEditViewModel.SubmitBarAction ) )/>
+			<div class="tool" tooltip="Save"
+			     @onclick=@( () => Navi.Act( CodeEditViewModel.SubmitBarAction ) )>
+				<i>check</i>
+			</div>
+			<div class="tool" tooltip="Cancel" @onclick=@( () => Navi.Act( CodeEditViewModel.CancelBarAction ) )>
+				<i>close</i>
+			</div>
+		</div>
+	}
+
+	@if ( UiState.Notice is not null )
+	{
+		<div class="notice" @onclick=@( () => Navi.Act( CodeEditViewModel.DismissNoticeAction ) )>
+			@UiState.Notice
+		</div>
+	}
+
+	<div class="page">
+		<ScriptControl @ref="Editor" class="document" ShowStatusBar=@( true ) OnSourceChanged=@SourceEdited/>
+	</div>
+
+	<div class="status">@UiState.Status</div>
+
+	@if ( UiState.Confirming )
+	{
+		<div class="confirm-backdrop">
+			<div class="confirm">
+				<div class="confirm-text">@UiState.ConfirmText</div>
+				<div class="confirm-buttons">
+					<div class="button" @onclick=@( () => Navi.Act( CodeEditViewModel.CancelConfirmAction ) )>Cancel</div>
+					@if ( UiState.ConfirmOtherLabel is not null )
+					{
+						<div class="button" @onclick=@( () => Navi.Act( CodeEditViewModel.ConfirmOtherAction ) )>
+							@UiState.ConfirmOtherLabel
+						</div>
+					}
+					<div class="button danger" @onclick=@( () => Navi.Act( CodeEditViewModel.ConfirmAction ) )>
+						@UiState.ConfirmLabel
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state, in the host's copy only.
+	/// </summary>
+	CodeEditViewModel ViewModel => field ??= new( Navi );
+
+	/// <summary>
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
+	/// </summary>
+	CodeEditUiState UiState => Navi.IsViewer ? Navi.GetState<CodeEditUiState>() ?? CodeEditUiState.Empty : ViewModel.UiState;
+
+	ScriptControl Editor;
+	TextEntry BarEntry;
+
+	/// <summary>
+	/// What the text field held when it last reported an edit, and the text session it was for. The edits sent are worked
+	/// out from it, so it is view plumbing, not state: it follows <see cref="CodeEditUiState.Text"/> whenever the field
+	/// doesn't have the caret, or the text is replaced (<see cref="SyncText"/>). While the player types, it is what the
+	/// field shows; the host's text is a keystroke or so behind, and pushing it would move the caret back.
+	/// </summary>
+	string sentText;
+
+	int sentSession = -1;
+
+	/// <summary>The <see cref="CodeEditUiState.BarSession"/> the path field was last focused for.</summary>
+	int focusedBar;
+
+	/// <summary>The <see cref="CodeEditUiState.TextSession"/> the text field was last focused for.</summary>
+	int focusedText = -1;
+
+	/// <summary>The editor, or something inside it, has the caret. A script control wraps its own text field.</summary>
+	bool EditorFocused => Editor is not null && InputFocus.Current is Panel focus && (focus == Editor || focus.IsAncestor( Editor ));
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		SyncText();
+		FocusFields();
+
+		if ( Navi.IsViewer )
+			return;
+
+		ViewModel.Tick();
+		Navi.Publish( ViewModel.Published );
+	}
+
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	/// <summary>
+	/// The host's copy gets the player's keyboard shortcuts, from whichever client they're on. Ctrl+S and the others come
+	/// even while the text has the caret.
+	/// </summary>
+	protected override void OnShortcut( string keys ) => ViewModel.Shortcut( keys );
+
+	/// <summary>
+	/// Ctrl+S and Ctrl+Shift+S typed in the text field. The field has the keys then, and they may not reach the shortcut
+	/// forwarding (<c>NaviInputCapture</c>), so they are caught here too, as actions that work from any client.
+	/// </summary>
+	public override void OnButtonTyped( ButtonEvent e )
+	{
+		if ( e.HasCtrl && !e.HasAlt && string.Equals( e.Button, "s", System.StringComparison.OrdinalIgnoreCase ) )
+		{
+			Navi.Act( e.HasShift ? CodeEditViewModel.SaveAsAction : CodeEditViewModel.SaveAction );
+			e.StopPropagation = true;
+			return;
+		}
+
+		base.OnButtonTyped( e );
+	}
+
+	/// <summary>
+	/// The player is closing the window while there are unsaved changes: the host's copy asks them in the window.
+	/// </summary>
+	protected override void OnCloseRequested() => ViewModel.CloseRequested();
+
+	void SyncText()
+	{
+		if ( Editor is null )
+			return;
+
+		var focused = EditorFocused;
+		if ( UiState.TextSession == sentSession && focused )
+			return;
+
+		sentSession = UiState.TextSession;
+		sentText = UiState.Text;
+
+		// The editor keeps the player's typing while it has the caret, and takes the host's text otherwise. Setting the
+		// source clears its undo history, so it is only set when it differs.
+		if ( Editor.Source != sentText )
+			Editor.Source = sentText;
+	}
+
+	/// <summary>
+	/// The text field reports every edit here. Only what changed goes to the host, as one or more edit actions: the
+	/// characters before and after that are the same are left out.
+	/// </summary>
+	void SourceEdited( string source )
+	{
+		var text = source ?? "";
+		var before = sentText ?? UiState.Text;
+		sentText = text;
+
+		if ( text == before )
+			return;
+
+		var start = 0;
+		var shortest = System.Math.Min( before.Length, text.Length );
+		while ( start < shortest && before[start] == text[start] )
+			start++;
+
+		var end = 0;
+		while ( end < shortest - start && before[before.Length - 1 - end] == text[text.Length - 1 - end] )
+			end++;
+
+		var removed = before.Length - start - end;
+		var inserted = text.Substring( start, text.Length - start - end );
+		var session = sentSession.ToString();
+
+		// The first action replaces what went, the rest add the rest of a long paste after it.
+		var at = start;
+		var offset = 0;
+		do
+		{
+			var chunk = inserted.Substring( offset, System.Math.Min( CodeEditViewModel.MaxEditInsert, inserted.Length - offset ) );
+			Navi.Act( CodeEditViewModel.EditAction, session, at.ToString(), (offset == 0 ? removed : 0).ToString(), chunk );
+			at += chunk.Length;
+			offset += chunk.Length;
+		} while ( offset < inserted.Length );
+	}
+
+	/// <summary>
+	/// The path field reports every edit here, as an action, so other players see the path being typed.
+	/// </summary>
+	void BarEdited( string text ) => Navi.Act( CodeEditViewModel.SetBarTextAction, text );
+
+	/// <summary>
+	/// Put the caret in the path field each time it opens, and in the text each time a document opens. Only where the
+	/// app runs for the player at the computer (offline, or the host's own seat): on a viewer it would take the keys of
+	/// whoever is watching, so a player on a client clicks the field.
+	/// </summary>
+	void FocusFields()
+	{
+		if ( !Navi.HasInput || Navi.IsViewer || UiState.Confirming )
+			return;
+
+		if ( UiState.BarOpen && UiState.BarSession != focusedBar && BarEntry is not null )
+		{
+			focusedBar = UiState.BarSession;
+			BarEntry.Focus();
+		}
+		else if ( !UiState.BarOpen && UiState.TextSession != focusedText && Editor is not null )
+		{
+			focusedText = UiState.TextSession;
+			Editor.FocusEditor();
+		}
+	}
+
+	/// <summary>
+	/// Typing doesn't bump the revision. The fields still follow the host's text, except where they have focus: the
+	/// player is typing there.
+	/// </summary>
+	protected override int BuildHash() =>
+		System.HashCode.Combine( UiState.Revision, UiState.TextSession, EditorFocused ? null : UiState.Text,
+			BarEntry is { HasFocus: true } ? null : UiState.BarText );
+}

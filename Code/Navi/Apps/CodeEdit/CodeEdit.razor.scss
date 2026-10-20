@@ -1,0 +1,206 @@
+@import "../../Themes/_paper-light.scss";
+
+@mixin codeedit-style
+{
+	CodeEdit
+	{
+		// The question is positioned against this panel.
+		position: relative;
+		width: 420px;
+		height: 300px;
+		flex-direction: column;
+		color: $ink-t;
+		background-color: $paper-bg;
+	}
+
+	.toolbar
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 2px;
+		padding: 4px 6px;
+		background-color: $surface-bg;
+		border-bottom: 1px solid $line-bc;
+
+		.name
+		{
+			flex-shrink: 1;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: 11px;
+			font-weight: 700;
+		}
+
+		.dirty
+		{
+			flex-shrink: 0;
+			margin-left: 4px;
+			font-size: 14px;
+			font-weight: 700;
+		}
+	}
+
+	.tool
+	{
+		flex-shrink: 0;
+		min-width: 22px;
+		height: 22px;
+		justify-content: center;
+		align-items: center;
+		font-size: 15px;
+		cursor: pointer;
+
+		&:hover
+		{
+			color: $paper-t;
+			background-color: $deep-bg;
+		}
+	}
+
+	.spacer
+	{
+		flex-grow: 1;
+	}
+
+	.bar
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 6px;
+		background-color: $surface2-bg;
+		border-bottom: 1px solid $line-bc;
+
+		> i
+		{
+			font-size: 14px;
+		}
+
+		.bar-label
+		{
+			flex-shrink: 0;
+			font-size: 11px;
+			font-weight: 700;
+		}
+
+		TextEntry
+		{
+			flex-grow: 1;
+			font-size: 11px;
+			background-color: $paper-bg;
+		}
+	}
+
+	.notice
+	{
+		flex-shrink: 0;
+		padding: 4px 8px;
+		font-size: 11px;
+		color: #ffffff;
+		background-color: #a0442c;
+		cursor: pointer;
+	}
+
+	.page
+	{
+		flex-grow: 1;
+		flex-basis: 0;
+		min-height: 0;
+		flex-direction: column;
+	}
+
+	.document
+	{
+		flex-grow: 1;
+		min-height: 0;
+		font-family: monospace;
+		font-size: 12px;
+	}
+
+	.status
+	{
+		flex-shrink: 0;
+		padding: 3px 8px;
+		font-size: 10px;
+		opacity: 0.8;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		border-top: 1px solid $line-bc;
+		background-color: $surface-bg;
+	}
+
+	.confirm-backdrop
+	{
+		position: absolute;
+		left: 0;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		justify-content: center;
+		align-items: center;
+		background-color: rgba( 0, 0, 0, 0.35 );
+	}
+
+	.confirm
+	{
+		width: 240px;
+		flex-direction: column;
+		gap: 6px;
+		padding: 10px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+		.confirm-text
+		{
+			font-size: 11px;
+		}
+
+		.confirm-buttons
+		{
+			flex-direction: row;
+			justify-content: flex-end;
+			gap: 6px;
+			margin-top: 4px;
+		}
+
+		.button
+		{
+			padding: 3px 10px;
+			font-size: 11px;
+			font-weight: 700;
+			border: 1px solid $line-bc;
+			cursor: pointer;
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $deep-bg;
+			}
+		}
+
+		.danger
+		{
+			color: #ffffff;
+			background-color: #a0442c;
+			border-color: #a0442c;
+		}
+	}
+}
+
+@include codeedit-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark { @include codeedit-style; }
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light { @include codeedit-style; }
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark { @include codeedit-style; }
