@@ -20,12 +20,12 @@
 		align-items: center;
 		gap: 6px;
 
-		TextEntry
+		.path
 		{
 			flex-grow: 1;
 			min-width: 0;
+			overflow: hidden;
 			font-size: 11px;
-			background-color: $paper-bg;
 		}
 	}
 

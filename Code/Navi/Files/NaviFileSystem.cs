@@ -63,7 +63,7 @@ public sealed class NaviFileSystem
 	/// <summary>
 	/// The folders a new inside drive starts with.
 	/// </summary>
-	public static IReadOnlyList<string> StartFolders { get; } = ["/Documents", "/Downloads", VolumesFolder, AppsFolder];
+	public static IReadOnlyList<string> StartFolders { get; } = ["/Documents", "/Downloads", "/Pictures", VolumesFolder, AppsFolder];
 
 	/// <summary>
 	/// How many symlinks one path may go through before it is taken for a loop.

@@ -1009,6 +1009,7 @@ public sealed class FilesViewModel
 			{
 				new( "/Documents", "Documents", "description", path == "/Documents" ),
 				new( "/Downloads", "Downloads", "download", path == "/Downloads" ),
+					new( "/Pictures", "Pictures", "image", path == "/Pictures" ),
 				new( trash ?? "/" + TrashName, "Trash", "delete", path == (trash ?? "/" + TrashName) ),
 			},
 			Drives = drives.Select( x => new PlaceItem( x.Path, x.Label, x.Removable ? "usb" : "storage", path == x.Path, x.Removable ) ).ToList(),

@@ -10,7 +10,8 @@
   "MinSize": "400,220",
   "Shared": false,
   "Permissions": [
-    "navi.camera.access"
+    "navi.camera.access",
+    "navi.files.access"
   ],
   "IsSystem": false,
   "__references": [],

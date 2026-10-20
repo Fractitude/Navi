@@ -19,6 +19,9 @@ public sealed class CameraViewModel
 	/// </summary>
 	const float AskInterval = 0.5f;
 
+	/// <summary>Where pictures are saved: the Pictures folder of the drive.</summary>
+	const string PicturesFolder = "/Pictures";
+
 	/// <summary>Where the last picture was saved, for the Copy path button. Not drawn, so not in the state.</summary>
 	string lastPhotoPath;
 
@@ -52,7 +55,7 @@ public sealed class CameraViewModel
 		_ = AskAsync();
 	}
 
-	/// <summary>The "Take picture" button: save the picture as a JPEG in the app's folder.</summary>
+	/// <summary>The "Take picture" button: save the picture as a JPEG in Pictures.</summary>
 	public void TakePhoto()
 	{
 		if ( UiState.Saving || !UiState.HasPicture )
@@ -68,8 +71,7 @@ public sealed class CameraViewModel
 		try
 		{
 			var photo = await navi.Camera.TakePhotoAsync();
-			var folder = await navi.Files.GetAppFolderAsync();
-			var path = await navi.Files.WriteBytesAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
+			var path = await navi.Files.WriteBytesAsync( $"{PicturesFolder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
 
 			lastPhotoPath = path;
 			Update( uiState => uiState with { Saving = false, HasPhoto = true, PhotoNotice = $"Saved {path[(path.LastIndexOf( '/' ) + 1)..]}" } );
@@ -88,7 +90,7 @@ public sealed class CameraViewModel
 	{
 		try
 		{
-			var opened = await navi.Files.OpenAsync( await navi.Files.GetAppFolderAsync() );
+			var opened = await navi.Files.OpenAsync( PicturesFolder );
 			Update( uiState => uiState with { PhotoNotice = opened ? "" : "The folder can't be opened." } );
 		}
 		catch ( System.Exception e )

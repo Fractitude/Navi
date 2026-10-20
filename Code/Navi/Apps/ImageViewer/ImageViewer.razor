@@ -3,17 +3,15 @@
 @namespace NaviApps
 
 @* A Navi app like any other: a plain panel, described by Assets/navi/apps/imageviewer.napp. It opens the pictures the *@
-@* player sends it from the file explorer, or a path typed in the field, and shows them scaled to the window. Not shared. *@
+@* player sends it from the file explorer, or picks in the file picker, and shows them scaled to the window. Not shared. *@
 
 <root>
 	<div class="bar">
-		<TextEntry @ref="PathEntry" Value=@( UiState.PathText ) MaxLength=@( 1024 )
-		           OnTextEdited=@PathEdited
-		           onsubmit=@( () => ViewModel.SubmitPath() )/>
-		<div class="button @( UiState.Loading ? "disabled" : "" )" @onclick=@( () => ViewModel.SubmitPath() )>
+		<div class="button @( UiState.Loading ? "disabled" : "" )" @onclick=@( () => ViewModel.ShowPicker() )>
 			<i>folder_open</i>
-			Open
+			Open...
 		</div>
+		<div class="path">@UiState.PathText</div>
 	</div>
 
 	@if ( UiState.Notice != "" )
@@ -30,7 +28,7 @@
 		{
 			<div class="empty">
 				<i>image</i>
-				<div class="text">No image. Open a .jpg or .png from the Files app, or type its path above.</div>
+				<div class="text">No image. Open a .jpg or .png from the Files app, or use Open... above.</div>
 			</div>
 		}
 	</div>
@@ -42,6 +40,8 @@
 			<div class="size">@UiState.SizeText</div>
 		</div>
 	}
+
+	<FilePicker Model=@ViewModel.Picker/>
 </root>
 
 @code
@@ -56,10 +56,6 @@
 	/// </summary>
 	ImageViewerUiState UiState => ViewModel.UiState;
 
-	TextEntry PathEntry;
-
-	void PathEdited( string text ) => ViewModel.SetPathText( text );
-
 	public override void Tick()
 	{
 		base.Tick();
@@ -67,9 +63,5 @@
 		ViewModel.Tick();
 	}
 
-	/// <summary>
-	/// Typing doesn't bump the revision. The path field follows the state again whenever a file is opened.
-	/// </summary>
-	protected override int BuildHash() =>
-		System.HashCode.Combine( ViewModel.Revision, PathEntry is { HasFocus: true } ? null : UiState.PathText );
+	protected override int BuildHash() => ViewModel.Revision;
 }

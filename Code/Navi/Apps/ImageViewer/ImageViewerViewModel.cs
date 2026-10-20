@@ -21,18 +21,21 @@ public sealed class ImageViewerViewModel
 
 	bool polling;
 	RealTimeSince sincePoll;
-	string pathTyped;
 	string title;
 
 	public ImageViewerViewModel( Navi navi )
 	{
 		this.navi = navi;
-		pathTyped = StartFolder + "/";
-		UiState = new() { PathText = pathTyped };
+		Picker = new( navi );
+		UiState = new();
 	}
 
 	public ImageViewerUiState UiState { get; private set; }
-	public int Revision => UiState.Revision;
+
+	/// <summary>The file picker the Open button shows. The panel draws it.</summary>
+	public FilePickerViewModel Picker { get; }
+
+	public int Revision => System.HashCode.Combine( UiState.Revision, Picker.Revision );
 
 	/// <summary>
 	/// The open image. Not part of the state: it is a texture, replaced whole when another file is opened.
@@ -56,20 +59,13 @@ public sealed class ImageViewerViewModel
 		}
 	}
 
-	/// <summary>What the path field holds, as the field reports it. Typing doesn't redraw the panel.</summary>
-	public void SetPathText( string text ) => pathTyped = text is { Length: > 1024 } ? text[..1024] : text ?? "";
-
-	/// <summary>The "Open" button or Enter in the path field.</summary>
-	public void SubmitPath()
+	/// <summary>The "Open..." button: pick a picture, starting in Pictures.</summary>
+	public void ShowPicker()
 	{
-		var to = pathTyped.Trim();
-		if ( to == "" || UiState.Loading )
+		if ( UiState.Loading )
 			return;
 
-		if ( !to.StartsWith( '/' ) )
-			to = StartFolder + "/" + to;
-
-		_ = LoadAsync( to );
+		Picker.Show( file => _ = LoadAsync( file ), StartFolder, "jpg", "jpeg", "png" );
 	}
 
 	/// <summary>
@@ -139,7 +135,6 @@ public sealed class ImageViewerViewModel
 			}
 
 			Picture = texture;
-			pathTyped = info.Path;
 			Update( uiState => uiState with
 			{
 				HasImage = true,

@@ -17,7 +17,7 @@ public sealed record ImageViewerUiState
 	/// <summary>The open image's size, like "640 x 480 px".</summary>
 	public string SizeText { get; init; } = "";
 
-	/// <summary>What the path field starts with. Typing changes the field, not this.</summary>
+	/// <summary>The open image's full path.</summary>
 	public string PathText { get; init; } = "";
 
 	/// <summary>Why the last file couldn't be opened. Empty when there is nothing to say.</summary>
