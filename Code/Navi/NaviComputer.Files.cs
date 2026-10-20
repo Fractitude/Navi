@@ -54,7 +54,7 @@ public sealed partial class NaviComputer
 
 		Files = new NaviFileSystem( root );
 		savedDrives.Clear();
-		savedDrives[root] = save is null || root.Migrated ? -1 : root.Version;
+		savedDrives[root] = save is null ? -1 : root.Version;
 		if ( save is not null )
 			NaviSaveData.CleanBlobs( root );
 		Files.EnsureLayout();

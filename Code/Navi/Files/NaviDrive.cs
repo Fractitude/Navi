@@ -41,17 +41,6 @@ public sealed class NaviFileNode
 	public NaviFileKind Kind { get; set; }
 
 	/// <summary>
-	/// Only read from drives saved before contents moved out of the index: <see cref="NaviDrive.FromSave"/> moves
-	/// it into the drive's pending contents. Always null in memory and in a new save.
-	/// </summary>
-	public string Text { get; set; }
-
-	/// <summary>
-	/// Like <see cref="Text"/>, for a binary file of the old layout.
-	/// </summary>
-	public byte[] Data { get; set; }
-
-	/// <summary>
 	/// A file's size in bytes. Its contents are not here: they are in the drive's blob for this entry
 	/// (<see cref="NaviDrive.ReadContent"/>).
 	/// </summary>
@@ -240,11 +229,6 @@ public sealed class NaviDrive
 	readonly List<(long Id, long Rev)> abandoned = new();
 
 	/// <summary>
-	/// The drive was read from the old layout and has to be saved in the new one.
-	/// </summary>
-	public bool Migrated { get; private set; }
-
-	/// <summary>
 	/// A file's contents. Empty if it has none or its blob is gone.
 	/// </summary>
 	public byte[] ReadContent( NaviFileNode node )
@@ -300,7 +284,6 @@ public sealed class NaviDrive
 				pending.Remove( id );
 		}
 
-		Migrated = false;
 		return old;
 	}
 
@@ -431,29 +414,6 @@ public sealed class NaviDrive
 	};
 
 	/// <summary>
-	/// A file of the old layout carried its contents in the index: move them to pending contents, to be saved as a blob.
-	/// A file of the new one has a blob on disk.
-	/// </summary>
-	void TakeContent( NaviFileNode node )
-	{
-		if ( node.Text is not null || node.Data is not null )
-		{
-			var bytes = node.Data ?? Encoding.UTF8.GetBytes( node.Text );
-			node.Binary = node.Data is not null;
-			node.Size = bytes.LongLength;
-			node.Rev = System.Math.Max( 1, node.Rev + 1 );
-			node.Text = null;
-			node.Data = null;
-			pending[node.Id] = bytes;
-			Migrated = true;
-		}
-		else if ( node.Rev > 0 )
-		{
-			committed[node.Id] = node.Rev;
-		}
-	}
-
-	/// <summary>
 	/// A drive from its save. Entries that don't fit the tree (no parent, a bad name, a name used twice, a loop) are
 	/// dropped, with what is in them. <paramref name="capacity"/> overrides the saved one when given; a drive that is
 	/// over it keeps its files but can't grow.
@@ -488,8 +448,9 @@ public sealed class NaviDrive
 				var created = node.Created;
 				var modified = node.Modified;
 
-				if ( node.Kind == NaviFileKind.File )
-					drive.TakeContent( node );
+				// A file's blob on disk is the one its saved revision names.
+				if ( node.Kind == NaviFileKind.File && node.Rev > 0 )
+					drive.committed[node.Id] = node.Rev;
 
 				drive.Add( node );
 				node.Created = created;

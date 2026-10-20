@@ -145,10 +145,8 @@ public static class NaviSaveData
 	// A drive is a folder: navi/saves/{slot}/drives/{drive}/index.{n}.json is the tree (names, folders, links, sizes and the
 	// revision of each file's blob, no contents), and blobs/{entry}-{revision} are the files' raw bytes. Nothing is
 	// overwritten: a changed file gets a new blob revision, and a save writes the next index.{n}.json once the blobs it
-	// names are written, then removes the older ones, so a crash leaves the previous index and the blobs it names. Drives saved as one drives/{drive}.json
-	// (contents inside) are read, and written in the new layout on the next save.
+	// names are written, then removes the older ones, so a crash leaves the previous index and the blobs it names.
 
-	static string LegacyDrivePathFor( string id ) => $"navi/saves/{Slot}/drives/{id}.json";
 	static string DriveFolderFor( string id ) => $"navi/saves/{Slot}/drives/{id}";
 	static string IndexPathFor( string id, long generation ) => $"{DriveFolderFor( id )}/index.{generation}.json";
 
@@ -172,8 +170,7 @@ public static class NaviSaveData
 
 	/// <summary>
 	/// A drive's tree in the current slot, or null if it has none. Each drive has its own folder, apart from its
-	/// computer's, so a removable drive keeps its files on any computer. Reads the old single-file layout too, which the
-	/// drive notes (<see cref="NaviDrive.Migrated"/>).
+	/// computer's, so a removable drive keeps its files on any computer.
 	/// </summary>
 	public static NaviDriveSave ReadDrive( string id )
 	{
@@ -181,11 +178,7 @@ public static class NaviSaveData
 			return null;
 
 		// The newest index that reads; one that doesn't is a save that was cut off.
-		var paths = IndexGenerations( data, id ).Select( x => IndexPathFor( id, x ) ).ToList();
-		if ( data.FileExists( LegacyDrivePathFor( id ) ) )
-			paths.Add( LegacyDrivePathFor( id ) );
-
-		foreach ( var path in paths )
+		foreach ( var path in IndexGenerations( data, id ).Select( x => IndexPathFor( id, x ) ) )
 		{
 			try
 			{
@@ -247,9 +240,6 @@ public static class NaviSaveData
 
 			foreach ( var (entry, rev) in drive.Committed( written ) )
 				DeleteBlob( data, id, entry, rev );
-
-			if ( data.FileExists( LegacyDrivePathFor( id ) ) )
-				data.DeleteFile( LegacyDrivePathFor( id ) );
 
 			return true;
 		}
