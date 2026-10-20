@@ -4,6 +4,7 @@
 {
 	FilePicker
 	{
+		display: none;
 		position: absolute;
 		left: 0;
 		top: 0;
@@ -11,6 +12,11 @@
 		height: 100%;
 		padding: 12px;
 		background-color: rgba(0, 0, 0, 0.5);
+
+		&.open
+		{
+			display: flex;
+		}
 
 		.dialog
 		{

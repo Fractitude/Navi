@@ -51,4 +51,9 @@
 	FilePickerUiState UiState => Model.UiState;
 
 	protected override int BuildHash() => Model?.Revision ?? 0;
+
+	/// <summary>
+	/// The panel itself is full size, so it is hidden (not just empty) while closed, or it would cover the app.
+	/// </summary>
+	protected override void OnAfterTreeRender( bool firstTime ) => SetClass( "open", Model?.UiState.IsOpen == true );
 }
