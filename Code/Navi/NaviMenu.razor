@@ -15,21 +15,35 @@
 	@foreach ( var item in Items )
 	{
 		var chosen = item;
+		var hasChildren = item.Children is { Count: > 0 };
 
 		@if ( item.Separator )
 		{
 			<div class="separator"></div>
 		}
 
-		<div class="item @( item.Enabled ? "" : "disabled" ) @( item.Danger ? "danger" : "" )" @onclick=@( () => Choose( chosen ) )>
-			@if ( !string.IsNullOrEmpty( item.Icon ) )
+		<div class="menu-entry">
+			<div class="item @( item.Enabled ? "" : "disabled" ) @( item.Danger ? "danger" : "" ) @( hasChildren && Open == item.Id ? "open" : "" )"
+			     @onmouseover=@( () => Hover( chosen ) )
+			     @onclick=@( () => Choose( chosen ) )>
+				@if ( !string.IsNullOrEmpty( item.Icon ) )
+				{
+					<i>@item.Icon</i>
+				}
+				<div class="item-label">@item.Label</div>
+				@if ( !string.IsNullOrEmpty( item.Keys ) )
+				{
+					<div class="keys">@item.Keys</div>
+				}
+				@if ( hasChildren )
+				{
+					<i class="chevron">chevron_right</i>
+				}
+			</div>
+
+			@if ( hasChildren && Open == item.Id )
 			{
-				<i>@item.Icon</i>
-			}
-			<div class="item-label">@item.Label</div>
-			@if ( !string.IsNullOrEmpty( item.Keys ) )
-			{
-				<div class="keys">@item.Keys</div>
+				<NaviMenu class="submenu" Items=@item.Children OnChoose=@OnChoose/>
 			}
 		</div>
 	}
@@ -52,11 +66,21 @@
 		AddClass( "navi-menu" );
 	}
 
+	/// <summary>The id of the item whose submenu is open, or null.</summary>
+	string Open;
+
+	void Hover( NaviMenuItem item )
+	{
+		Open = item.Children is { Count: > 0 } ? item.Id : null;
+	}
+
 	void Choose( NaviMenuItem item )
 	{
-		if ( item.Enabled )
+		if ( item.Children is { Count: > 0 } )
+			Open = Open == item.Id ? null : item.Id;
+		else if ( item.Enabled )
 			OnChoose?.Invoke( item.Id );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Heading, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
+	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
 }

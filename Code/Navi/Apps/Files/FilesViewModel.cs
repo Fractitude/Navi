@@ -688,8 +688,10 @@ public sealed class FilesViewModel
 		if ( selection.Count > 1 )
 		{
 			return ([
-				new( MakeAliasAction, "Make aliases", "shortcut" ),
-				new( MakeSymlinkAction, "Make symlinks", "link" ),
+				new( "make-link", "Make link", "link", Children: [
+					new( MakeAliasAction, "Make aliases", "shortcut" ),
+					new( MakeSymlinkAction, "Make symlinks", "link" ),
+				] ),
 				new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
 				new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
 				new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
@@ -708,8 +710,10 @@ public sealed class FilesViewModel
 		return ([
 			new( OpenAction, entry?.Kind == Navi.FileKind.Alias ? "Show original" : "Open", "folder_open", "Enter" ),
 			new( StartRenameAction, "Rename", "edit", "F2", canChange, Separator: true ),
-			new( MakeAliasAction, "Make alias", "shortcut" ),
-			new( MakeSymlinkAction, "Make symlink", "link" ),
+			new( "make-link", "Make link", "link", Children: [
+				new( MakeAliasAction, "Make alias", "shortcut" ),
+				new( MakeSymlinkAction, "Make symlink", "link" ),
+			] ),
 			new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
 			new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
 			new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
@@ -721,7 +725,7 @@ public sealed class FilesViewModel
 	/// </summary>
 	public void ChooseMenu( string id )
 	{
-		var item = menu.FirstOrDefault( x => x.Id == id );
+		var item = menu.SelectMany( x => x.Children is null ? [x] : x.Children ).FirstOrDefault( x => x.Id == id );
 		menu = [];
 		Rebuild();
 
