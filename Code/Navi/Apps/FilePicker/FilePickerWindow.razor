@@ -5,13 +5,14 @@
 @* The File Picker, a system app (Assets/navi/apps/filepicker.napp). The computer opens it when an app asks the player for *@
 @* a file (Navi.Files.PickAsync), and only the computer and this window talk: the app gets the file that is chosen and *@
 @* never sees a folder. It is opaque whatever the theme's Transparency and Blur. *@
+@* It is shared: in multiplayer the host's copy lists and answers, and every player sees what the user does in it. *@
 
 <root>
 	<div class="header">
-		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Root of the drive" @onclick=@( () => ViewModel.Home() )>
+		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Root of the drive" @onclick=@( () => Navi.Act( FilePickerViewModel.HomeAction ) )>
 			<i>home</i>
 		</div>
-		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Up one folder" @onclick=@( () => ViewModel.Up() )>
+		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Up one folder" @onclick=@( () => Navi.Act( FilePickerViewModel.UpAction ) )>
 			<i>arrow_upward</i>
 		</div>
 		<div class="path">@UiState.Path</div>
@@ -26,8 +27,8 @@
 		@foreach ( var row in UiState.Rows )
 		{
 			<div class="row @( row.Path == UiState.Selected ? "selected" : "" )"
-			     @onclick=@( () => ViewModel.Select( row.Path ) )
-			     @ondoubleclick=@( () => ViewModel.Activate( row.Path ) )>
+			     @onclick=@( () => Navi.Act( FilePickerViewModel.SelectAction, row.Path ) )
+			     @ondoubleclick=@( () => Navi.Act( FilePickerViewModel.ActivateAction, row.Path ) )>
 				<i class="icon">@row.Icon</i>
 				<div class="name">@row.Name</div>
 			</div>
@@ -35,19 +36,20 @@
 	</div>
 
 	<div class="footer">
-		<div class="button" @onclick=@( () => ViewModel.Cancel() )>Cancel</div>
-		<div class="button" @onclick=@( () => ViewModel.Confirm() )>Open</div>
+		<div class="button" @onclick=@( () => Navi.Act( FilePickerViewModel.CancelAction ) )>Cancel</div>
+		<div class="button" @onclick=@( () => Navi.Act( FilePickerViewModel.ConfirmAction ) )>Open</div>
 	</div>
 </root>
 
 @code
 {
 	/// <summary>
-	/// The picker's logic and its state. Made on first use, with the panel's Navi (the panel is a NaviApp).
+	/// The picker's logic and its state, in the host's copy only. Made on first use, with the panel's Navi (the panel is
+	/// a NaviApp).
 	/// </summary>
 	FilePickerViewModel ViewModel => field ??= new( Navi );
 
-	FilePickerUiState UiState => ViewModel.UiState;
+	FilePickerUiState UiState => Navi.IsViewer ? Navi.GetState<FilePickerUiState>() ?? FilePickerUiState.Empty : ViewModel.UiState;
 
 	bool started;
 
@@ -55,11 +57,16 @@
 	{
 		base.Tick();
 
+		if ( Navi.IsViewer )
+			return;
+
 		if ( !started )
 		{
 			started = true;
 			_ = StartAsync();
 		}
+
+		Navi.Publish( ViewModel.UiState );
 	}
 
 	/// <summary>
@@ -89,5 +96,7 @@
 		}
 	}
 
-	protected override int BuildHash() => ViewModel.Revision;
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	protected override int BuildHash() => UiState.Revision;
 }

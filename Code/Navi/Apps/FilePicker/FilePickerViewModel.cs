@@ -10,6 +10,9 @@ public sealed record FilePickerRow( string Name, string Path, bool IsFolder, str
 /// </summary>
 public sealed record FilePickerUiState
 {
+	/// <summary>What a viewer draws until the host's state arrives.</summary>
+	public static FilePickerUiState Empty { get; } = new();
+
 	/// <summary>Goes up whenever anything else here changes. The panel's BuildHash is this.</summary>
 	public int Revision { get; init; }
 
@@ -37,6 +40,13 @@ public sealed record FilePickerUiState
 /// </summary>
 public sealed class FilePickerViewModel
 {
+	public const string HomeAction = "home";
+	public const string UpAction = "up";
+	public const string SelectAction = "select";
+	public const string ActivateAction = "activate";
+	public const string ConfirmAction = "confirm";
+	public const string CancelAction = "cancel";
+
 	readonly Navi navi;
 	System.Action<string> onPicked;
 	System.Action onCancelled;
@@ -52,6 +62,26 @@ public sealed class FilePickerViewModel
 
 	void Update( System.Func<FilePickerUiState, FilePickerUiState> change ) =>
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
+
+	/// <summary>
+	/// A control the player pressed (<c>Navi.Act</c>), from any copy of the shared picker. Paths are checked against the
+	/// rows being shown, so an action can't point the picker anywhere the player couldn't click.
+	/// </summary>
+	public void Act( string action, string[] args )
+	{
+		if ( !UiState.IsOpen )
+			return;
+
+		switch ( action )
+		{
+			case HomeAction: Home(); break;
+			case UpAction: Up(); break;
+			case ConfirmAction: Confirm(); break;
+			case CancelAction: Cancel(); break;
+			case SelectAction when args is [var path] && UiState.Rows.Any( x => x.Path == path ): Select( path ); break;
+			case ActivateAction when args is [var path]: Activate( path ); break;
+		}
+	}
 
 	/// <summary>
 	/// Start listing. <paramref name="startFolder"/> is where it starts (the root when null or not a folder),

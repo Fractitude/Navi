@@ -8,7 +8,7 @@
   "CanMaximize": false,
   "CanResize": true,
   "MinSize": "320,240",
-  "Shared": false,
+  "Shared": true,
   "Permissions": [
     "navi.files.access"
   ],
