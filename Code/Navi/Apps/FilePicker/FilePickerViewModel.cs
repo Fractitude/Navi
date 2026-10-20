@@ -206,7 +206,7 @@ public sealed class FilePickerViewModel
 		return file.Name.ToLowerInvariant() switch
 		{
 			var x when x.EndsWith( ".jpg" ) || x.EndsWith( ".jpeg" ) || x.EndsWith( ".png" ) => "image",
-			var x when x.EndsWith( ".cs" ) || x.EndsWith( ".razor" ) || x.EndsWith( ".scss" ) => "code",
+			var x when NaviFileTypes.IsCode( x ) => "code",
 			_ => "description",
 		};
 	}
