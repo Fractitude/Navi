@@ -10,8 +10,8 @@ public sealed class CameraViewModel
 {
 	readonly Navi navi;
 
-	/// <summary>The picture's size in pixels: 16 by 9.</summary>
-	public const int PictureWidth = 320, PictureHeight = 180;
+	/// <summary>The picture's size in pixels: 16 by 9. The panel scales it to the window.</summary>
+	public const int PictureWidth = 640, PictureHeight = 360;
 
 	/// <summary>
 	/// How often the computer is asked for the picture, in seconds. It draws for a second after each ask, so this keeps it
@@ -47,6 +47,35 @@ public sealed class CameraViewModel
 			return;
 
 		_ = AskAsync();
+	}
+
+	/// <summary>The "Take picture" button: save the picture as a JPEG in the app's folder.</summary>
+	public void TakePhoto()
+	{
+		if ( UiState.Saving || !UiState.HasPicture )
+			return;
+
+		_ = TakePhotoAsync();
+	}
+
+	async Task TakePhotoAsync()
+	{
+		Update( uiState => uiState with { Saving = true, PhotoNotice = "" } );
+
+		try
+		{
+			// The computer's files hold text, so the photo is the JPEG's base64 text in a file named like a JPEG.
+			var photo = await navi.Camera.TakePhotoAsync();
+			var folder = await navi.Files.GetAppFolderAsync();
+			var path = await navi.Files.WriteTextAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
+
+			Update( uiState => uiState with { Saving = false, PhotoNotice = $"Saved {path}" } );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Camera: couldn't save the picture: {e.Message}" );
+			Update( uiState => uiState with { Saving = false, PhotoNotice = "The picture couldn't be saved." } );
+		}
 	}
 
 	/// <summary>The "Allow" button: ask the player for the camera permission.</summary>

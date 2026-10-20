@@ -62,7 +62,7 @@ public static class NaviPermissions
 		new( Notify, "Send notifications", "Show you notifications, which can play a sound.", "notifications" ),
 		new( Files, "Files", "See, change and delete every file on this computer.", "folder" ),
 		new( Messages, "Messages", "Read and send direct messages as the player using this computer.", "chat" ),
-		new( Camera, "Camera", "See what the camera on top of this computer's screen sees.", "videocam" ),
+		new( Camera, "Camera", "See through the computer's webcam.", "videocam" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );

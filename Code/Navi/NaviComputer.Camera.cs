@@ -22,6 +22,11 @@ public sealed partial class NaviComputer
 	/// </summary>
 	const int MaxCameraSize = 1024;
 
+	/// <summary>
+	/// The JPEG quality of a photo, 0 to 100.
+	/// </summary>
+	const int PhotoQuality = 90;
+
 	GameObject cameraObject;
 	CameraComponent cameraComponent;
 	Texture cameraTexture;
@@ -45,6 +50,20 @@ public sealed partial class NaviComputer
 		}
 
 		return cameraTexture;
+	}
+
+	/// <summary>
+	/// The JPEG of what the camera sees now, as base64 text. The camera is only on while an app asks for its picture.
+	/// </summary>
+	internal string TakeCameraPhoto()
+	{
+		if ( !cameraComponent.IsValid() || cameraTexture is null )
+			throw new System.InvalidOperationException( "The camera is off." );
+
+		using var bitmap = new Bitmap( cameraTexture.Width, cameraTexture.Height );
+		cameraComponent.RenderToBitmap( bitmap );
+
+		return System.Convert.ToBase64String( bitmap.ToJpg( PhotoQuality ) );
 	}
 
 	/// <summary>

@@ -5,8 +5,8 @@
   "Color": "#6ab0d8",
   "PanelType": "NaviApps.Camera",
   "CanMinimize": true,
-  "CanMaximize": false,
-  "CanResize": false,
+  "CanMaximize": true,
+  "CanResize": true,
   "Shared": false,
   "Permissions": [
     "navi.camera.access"

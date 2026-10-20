@@ -14,6 +14,12 @@ public sealed record CameraUiState
 	/// <summary>The player said no, or the camera could not be reached.</summary>
 	public string Notice { get; init; } = "";
 
+	/// <summary>A picture is being saved, so the button waits.</summary>
+	public bool Saving { get; init; }
+
+	/// <summary>What became of the last picture taken: where it was saved, or why not. Stays until the next one.</summary>
+	public string PhotoNotice { get; init; } = "";
+
 	/// <summary>The picture has arrived, so the panel shows it instead of the waiting text.</summary>
 	public bool HasPicture { get; init; }
 }

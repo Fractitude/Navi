@@ -28,10 +28,15 @@
 		}
 	</div>
 
-	@if ( UiState.Notice != "" )
-	{
-		<div class="message">@UiState.Notice</div>
-	}
+	<div class="bar">
+		<div class="button @( UiState.HasPicture && !UiState.Saving ? "" : "disabled" )"
+		     @onclick=@( () => ViewModel.TakePhoto() )>
+			<i>photo_camera</i>
+			Take picture
+		</div>
+
+		<div class="message">@( UiState.PhotoNotice != "" ? UiState.PhotoNotice : UiState.Notice )</div>
+	</div>
 </root>
 
 @code

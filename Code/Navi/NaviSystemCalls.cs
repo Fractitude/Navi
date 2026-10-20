@@ -67,10 +67,13 @@ public static class NaviSystemCalls
 		}
 
 		// The camera on top of the screen. Every client has its own, since it looks at the world around the screen.
-		if ( method == "camera.view" )
+		if ( method is "camera.view" or "camera.photo" )
 		{
 			Require( process, NaviPermissions.Camera );
-			return computer.GetCameraView( Arg<int>( args, 0, method ), Arg<int>( args, 1, method ) );
+
+			return method == "camera.view"
+				? computer.GetCameraView( Arg<int>( args, 0, method ), Arg<int>( args, 1, method ) )
+				: computer.TakeCameraPhoto();
 		}
 
 		// Direct messages. The host has them, and they are the seated player's.

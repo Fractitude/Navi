@@ -850,6 +850,13 @@ public sealed class Navi
 		/// picture is shown (the same texture comes back while the size stays).
 		/// </summary>
 		public Task<Texture> GetViewAsync( int width, int height ) => navi.CallAsync<Texture>( "camera.view", width, height );
+
+		/// <summary>
+		/// Take a picture with the camera: the JPEG of what it sees now, as base64 text, since the computer's files hold
+		/// text only (<see cref="FileCalls.WriteTextAsync"/>). Needs <see cref="Permission.Camera"/>, and the camera on:
+		/// <see cref="GetViewAsync"/> has to have been asked for a moment ago.
+		/// </summary>
+		public Task<string> TakePhotoAsync() => navi.CallAsync<string>( "camera.photo" );
 	}
 
 	/// <summary>
