@@ -221,27 +221,8 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<div class="menu" style="left: @( MenuLeft )px; top: @( MenuTop )px;">
-			@if ( UiState.MenuHeading is not null )
-			{
-				<div class="heading">@UiState.MenuHeading</div>
-			}
-
-			@foreach ( var item in UiState.Menu )
-			{
-				@if ( item.Separator )
-				{
-					<div class="separator"></div>
-				}
-
-				<div class="item @( item.Enabled ? "" : "disabled" )"
-				     @onclick=@( () => Navi.Act( FilesViewModel.ChooseMenuAction, item.Id ) )>
-					<i>@item.Icon</i>
-					<div class="item-label">@item.Label</div>
-					<div class="keys">@item.Keys</div>
-				</div>
-			}
-		</div>
+		<NaviMenu Heading=@UiState.MenuHeading Items=@UiState.Menu OnChoose=@( id => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px;"/>
 	}
 
 	@* A question before something that can't be undone, over the whole window so nothing else can be clicked. *@
@@ -453,7 +434,7 @@
 		Navi.Act( FilesViewModel.OpenMenuAction, path ?? "", at.x.ToString( culture ), at.y.ToString( culture ) );
 	}
 
-	const float MenuWidth = 190f, MenuItemHeight = 24f, MenuSeparatorHeight = 5f, MenuPadding = 6f;
+	const float MenuWidth = 190f, MenuItemHeight = 26f, MenuHeadingHeight = 22f, MenuSeparatorHeight = 5f, MenuPadding = 8f;
 
 	/// <summary>
 	/// Where the menu is drawn: where it was opened, moved left or up as far as it takes to stay inside the panel. Every
@@ -466,7 +447,7 @@
 		get
 		{
 			var height = MenuPadding + UiState.Menu.Count * MenuItemHeight + UiState.Menu.Count( x => x.Separator ) * MenuSeparatorHeight
-				+ (UiState.MenuHeading is null ? 0f : MenuItemHeight);
+				+ (UiState.MenuHeading is null ? 0f : MenuHeadingHeight);
 
 			return System.Math.Max( 0f, System.Math.Min( UiState.MenuY, PanelSize.y - height ) );
 		}

@@ -100,25 +100,9 @@
 
 	@if ( ContextApp is not null )
 	{
-		var pinnedToTaskbar = Computer.IsTaskbarPinned( ContextApp.Id );
-
 		@* Right-click menu, where the mouse was. *@
-		<div class="context menu" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;">
-			<div class="item"
-			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
-			     @onclick=@( ( PanelEvent e ) => OpenFromContext( e, ContextApp ) )><i>open_in_new</i>Open</div>
-
-			@if ( ContextApp.Permissions.Count > 0 && !ContextApp.IsSystem )
-			{
-				<div class="item"
-				     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
-				     @onclick=@( ( PanelEvent e ) => ReviewPermissions( e, ContextApp ) )><i>tune</i>Permissions...</div>
-			}
-
-			<div class="item"
-			     @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() )
-			     @onclick=@( ( PanelEvent e ) => ToggleTaskbarPin( e, ContextApp ) )><i>push_pin</i>@(pinnedToTaskbar ? "Unpin from taskbar" : "Pin to taskbar")</div>
-		</div>
+		<NaviMenu class="context" style="left: @(ContextPosition.x)px; top: @(ContextPosition.y)px;"
+		          Items=@ContextMenu( ContextApp ) OnChoose=@( id => ChooseContext( ContextApp, id ) )/>
 	}
 
 	<div class="footer">
@@ -261,28 +245,33 @@
 		ContextPosition = MousePosition * ScaleFromScreen;
 	}
 
-	void OpenFromContext( PanelEvent e, NaviAppInfo app )
+	List<NaviMenuItem> ContextMenu( NaviAppInfo app )
 	{
-		e.StopPropagation();
-		ContextApp = null;
-		OnOpen?.Invoke( app );
+		var items = new List<NaviMenuItem> { new( "open", "Open", "open_in_new" ) };
+
+		if ( app.Permissions.Count > 0 && !app.IsSystem )
+			items.Add( new( "permissions", "Permissions...", "tune" ) );
+
+		items.Add( new( "pin", Computer.IsTaskbarPinned( app.Id ) ? "Unpin from taskbar" : "Pin to taskbar", "push_pin" ) );
+		return items;
 	}
 
-	void ReviewPermissions( PanelEvent e, NaviAppInfo app )
+	void ChooseContext( NaviAppInfo app, string id )
 	{
-		e.StopPropagation();
 		ContextApp = null;
 
-		if ( Computer.CanUse )
+		if ( id == "open" )
+		{
+			OnOpen?.Invoke( app );
+			return;
+		}
+
+		if ( !Computer.CanUse )
+			return;
+
+		if ( id == "permissions" )
 			Computer.UserReviewPermissions( app.Id );
-	}
-
-	void ToggleTaskbarPin( PanelEvent e, NaviAppInfo app )
-	{
-		e.StopPropagation();
-		ContextApp = null;
-
-		if ( Computer.CanUse )
+		else if ( id == "pin" )
 			Computer.UserToggleTaskbarPin( app.Id );
 	}
 

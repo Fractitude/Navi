@@ -1,0 +1,55 @@
+@using Sandbox.UI
+@inherits Panel
+@namespace Sandbox
+
+@* The one right-click menu of the whole OS: the taskbar, the tray, the start menu and the apps all use it, so they look the *@
+@* same in every theme. The caller places it (position, and width if it wants one) and closes it when an item is chosen. *@
+@* Its styles are in NaviDesktop.razor.scss. *@
+
+<root class="navi-menu" @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() ) @onclick=@( ( PanelEvent e ) => e.StopPropagation() )>
+	@if ( Heading is not null )
+	{
+		<div class="heading">@Heading</div>
+	}
+
+	@foreach ( var item in Items )
+	{
+		var chosen = item;
+
+		@if ( item.Separator )
+		{
+			<div class="separator"></div>
+		}
+
+		<div class="item @( item.Enabled ? "" : "disabled" ) @( item.Danger ? "danger" : "" )" @onclick=@( () => Choose( chosen ) )>
+			@if ( !string.IsNullOrEmpty( item.Icon ) )
+			{
+				<i>@item.Icon</i>
+			}
+			<div class="item-label">@item.Label</div>
+			@if ( !string.IsNullOrEmpty( item.Keys ) )
+			{
+				<div class="keys">@item.Keys</div>
+			}
+		</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>The bar over the items, or null for none.</summary>
+	public string Heading { get; set; }
+
+	public IReadOnlyList<NaviMenuItem> Items { get; set; } = [];
+
+	/// <summary>Called with the item's id when the player picks an enabled item.</summary>
+	public System.Action<string> OnChoose { get; set; }
+
+	void Choose( NaviMenuItem item )
+	{
+		if ( item.Enabled )
+			OnChoose?.Invoke( item.Id );
+	}
+
+	protected override int BuildHash() => System.HashCode.Combine( Heading, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
+}

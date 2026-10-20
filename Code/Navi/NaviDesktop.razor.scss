@@ -11,6 +11,87 @@ NaviDesktop
 
 @mixin desktop-style
 {
+	// The OS's one right-click menu (NaviMenu). Whoever opens it places it.
+	.navi-menu
+	{
+		position: absolute;
+		flex-direction: column;
+		padding: 2px;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
+
+		.heading
+		{
+			padding: 3px 8px;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 1px;
+			color: $surface-t;
+			background-color: $mid-bg;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.separator
+		{
+			height: 1px;
+			margin: 2px 4px;
+			background-color: $line-bg;
+		}
+
+		.item
+		{
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+			padding: 4px 8px;
+			font-size: 12px;
+			font-weight: 700;
+			white-space: nowrap;
+			cursor: pointer;
+
+			> i
+			{
+				flex-shrink: 0;
+				font-size: 14px;
+			}
+
+			.item-label
+			{
+				flex-grow: 1;
+			}
+
+			.keys
+			{
+				flex-shrink: 0;
+				margin-left: 10px;
+				font-size: 10px;
+				font-weight: 400;
+				opacity: 0.6;
+			}
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+
+			&.danger:hover
+			{
+				background-color: #a0403a;
+			}
+
+			&.disabled
+			{
+				opacity: 0.35;
+				pointer-events: none;
+			}
+		}
+	}
+
 	// Glass's wallpaper: soft colored shapes for the glass to blur. They have no color until a Glass look gives them one.
 	.wallpaper
 	{
@@ -322,42 +403,12 @@ NaviDesktop
 			display: none;
 		}
 
-		// Right-click menu, above the icon.
-		.menu
+		// Right-click menu (NaviMenu), above the icon.
+		.taskbar-menu
 		{
-			position: absolute;
 			bottom: 44px;
 			left: 0;
-			flex-direction: column;
-			padding: 2px;
-			color: $ink-t;
-			background-color: $surface-bg;
-			border: 2px solid $ink-bc;
-			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
 			z-index: 100;
-
-			.item
-			{
-				flex-direction: row;
-				align-items: center;
-				gap: 6px;
-				padding: 4px 8px;
-				font-size: 12px;
-				font-weight: 700;
-				white-space: nowrap;
-				cursor: pointer;
-
-				i
-				{
-					font-size: 14px;
-				}
-
-				&:hover
-				{
-					color: $paper-t;
-					background-color: $ink-bg;
-				}
-			}
 		}
 	}
 
@@ -385,40 +436,10 @@ NaviDesktop
 		pointer-events: all;
 		z-index: 100;
 
-		// Right-click menu on an app, where the mouse was.
+		// Right-click menu on an app (NaviMenu), where the mouse was.
 		.context
 		{
-			position: absolute;
-			flex-direction: column;
-			padding: 2px;
-			color: $ink-t;
-			background-color: $surface-bg;
-			border: 2px solid $ink-bc;
-			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
 			z-index: 10;
-
-			.item
-			{
-				flex-direction: row;
-				align-items: center;
-				gap: 6px;
-				padding: 4px 8px;
-				font-size: 12px;
-				font-weight: 700;
-				white-space: nowrap;
-				cursor: pointer;
-
-				i
-				{
-					font-size: 14px;
-				}
-
-				&:hover
-				{
-					color: $paper-t;
-					background-color: $ink-bg;
-				}
-			}
 		}
 
 		.search
@@ -765,58 +786,12 @@ NaviDesktop
 			white-space: nowrap;
 		}
 
-		// Right-click menu, above the icon. The heading is the app's name, which the desktop writes.
-		.menu
+		// Right-click menu (NaviMenu), above the icon. The heading is the app's name, which the desktop writes.
+		.tray-menu
 		{
-			position: absolute;
 			bottom: 38px;
 			right: 0;
-			flex-direction: column;
-			padding: 2px;
-			color: $ink-t;
-			background-color: $surface-bg;
-			border: 2px solid $ink-bc;
-			box-shadow: 3px 3px 0 rgba( 0, 0, 0, 0.35 );
 			z-index: 100;
-
-			.heading
-			{
-				padding: 3px 8px;
-				font-size: 11px;
-				font-weight: 700;
-				letter-spacing: 1px;
-				color: $surface-t;
-				background-color: $mid-bg;
-				white-space: nowrap;
-			}
-
-			.item
-			{
-				flex-direction: row;
-				align-items: center;
-				gap: 6px;
-				padding: 4px 8px;
-				font-size: 12px;
-				font-weight: 700;
-				white-space: nowrap;
-				cursor: pointer;
-
-				i
-				{
-					font-size: 14px;
-				}
-
-				&:hover
-				{
-					color: $paper-t;
-					background-color: $ink-bg;
-				}
-
-				&.quit:hover
-				{
-					background-color: #a0403a;
-				}
-			}
 		}
 	}
 
@@ -1233,13 +1208,6 @@ NaviDesktop
 		border-radius: 16px;
 		box-shadow: 0 10px 28px $shadow;
 
-		.context
-		{
-			border: 1px solid $edge;
-			border-radius: 12px;
-			box-shadow: 0 10px 28px $shadow;
-		}
-
 		.search .textentry
 		{
 			border-radius: 10px;
@@ -1276,13 +1244,6 @@ NaviDesktop
 			border-radius: 2px;
 		}
 
-		.menu
-		{
-			border: 1px solid $edge;
-			border-radius: 12px;
-			box-shadow: 0 10px 28px $shadow;
-		}
-
 		.tooltip
 		{
 			color: #ffffff;
@@ -1307,17 +1268,6 @@ NaviDesktop
 			border-radius: 8px;
 		}
 
-		.menu
-		{
-			border: 1px solid $edge;
-			border-radius: 12px;
-			box-shadow: 0 10px 28px $shadow;
-
-			.heading
-			{
-				border-radius: 8px;
-			}
-		}
 	}
 
 	.notification
@@ -1381,9 +1331,16 @@ NaviDesktop
 		}
 	}
 
-	.menu .item, .start-menu .context .item
+	.navi-menu
 	{
-		border-radius: 8px;
+		border: 1px solid $edge;
+		border-radius: 12px;
+		box-shadow: 0 10px 28px $shadow;
+
+		.heading, .item
+		{
+			border-radius: 8px;
+		}
 	}
 
 	.window > .titlebar > .shield .tooltip
@@ -1429,7 +1386,7 @@ NaviDesktop
 // (clear-0: solid) to a good deal (clear-4). $base is the fill as the level's alpha is applied to it.
 @mixin glass-fill( $fill )
 {
-	.window, .taskbar, .menu, .start-menu, .toast, .notification-center
+	.window, .taskbar, .menu, .navi-menu, .start-menu, .toast, .notification-center
 	{
 		background-color: $fill;
 	}
@@ -1438,7 +1395,7 @@ NaviDesktop
 // The Blur setting: how strongly a window, the taskbar or a menu blurs what is behind it.
 @mixin glass-blur( $radius )
 {
-	.window, .taskbar, .menu, .start-menu, .toast, .notification-center
+	.window, .taskbar, .menu, .navi-menu, .start-menu, .toast, .notification-center
 	{
 		backdrop-filter-blur: $radius;
 	}

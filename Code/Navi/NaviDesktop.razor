@@ -183,23 +183,7 @@
 
 				@if ( MenuApp == app.Id )
 				{
-					<div class="menu">
-						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => OpenApp( app ) ))><i>open_in_new</i>@(process is null ? "Open" : "Show")</div>
-
-						@if ( app.Permissions.Count > 0 && !app.IsSystem )
-						{
-							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserReviewPermissions( app.Id ) ))>
-								<i>tune</i>Permissions...
-							</div>
-						}
-
-						<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserToggleTaskbarPin( app.Id ) ))><i>push_pin</i>@(Computer.IsTaskbarPinned( app.Id ) ? "Unpin from taskbar" : "Pin to taskbar")</div>
-
-						@if ( process is not null )
-						{
-							<div class="item" @onclick=@(( PanelEvent e ) => MenuAction( e, () => Computer.UserClose( app.Id ) ))><i>close</i>Close</div>
-						}
-					</div>
+					<NaviMenu class="taskbar-menu" Items=@TaskbarMenu( app, process ) OnChoose=@( id => TaskbarMenuChoose( app, id ) )/>
 				}
 			</div>
 		}
@@ -220,22 +204,7 @@
 
 					@if ( TrayMenuApp == id )
 					{
-						<div class="menu">
-							<div class="heading" @onclick=@(( PanelEvent e ) => e.StopPropagation())>@process.App.Name</div>
-
-							@foreach ( var item in tray.Items )
-							{
-								<div class="item" @onclick=@(( PanelEvent e ) => TrayMenuAction( e, process, item.Id ))>
-									@if ( !string.IsNullOrEmpty( item.Icon ) )
-									{
-										<i>@item.Icon</i>
-									}
-									@item.Label
-								</div>
-							}
-
-							<div class="item quit" @onclick=@(( PanelEvent e ) => TrayMenuAction( e, process, NaviComputer.QuitItem ))><i>power_settings_new</i>Quit</div>
-						</div>
+						<NaviMenu class="tray-menu" Heading=@process.App.Name Items=@TrayMenu( process ) OnChoose=@( item => OnTrayClick( process, item ) )/>
 					}
 				</div>
 			}
@@ -699,12 +668,6 @@
 		TrayMenuApp = id;
 	}
 
-	void TrayMenuAction( PanelEvent e, NaviProcess process, string item )
-	{
-		e.StopPropagation();
-		OnTrayClick( process, item );
-	}
-
 	/// <summary>
 	/// The player clicked a tray icon (<paramref name="item"/> empty) or one of its menu items, or Quit. A shared app hears it
 	/// on the host's copy. One that isn't shared runs on every client, so it hears it on this client's own copy.
@@ -735,14 +698,44 @@
 		string.IsNullOrEmpty( window.Title ) ? window.App.Name :
 		window.App.IsPrepackaged ? window.Title : $"{window.App.Name} {window.Title}";
 
-	/// <summary>
-	/// Run a taskbar menu item and close the menu. The click doesn't reach the icon, so it doesn't also open the app.
-	/// </summary>
-	void MenuAction( PanelEvent e, System.Action action )
+	/// <summary>The items of an app's taskbar menu.</summary>
+	List<NaviMenuItem> TaskbarMenu( NaviAppInfo app, NaviProcess process )
 	{
-		e.StopPropagation();
+		var items = new List<NaviMenuItem> { new( "open", process is null ? "Open" : "Show", "open_in_new" ) };
+
+		if ( app.Permissions.Count > 0 && !app.IsSystem )
+			items.Add( new( "permissions", "Permissions...", "tune" ) );
+
+		items.Add( new( "pin", Computer.IsTaskbarPinned( app.Id ) ? "Unpin from taskbar" : "Pin to taskbar", "push_pin" ) );
+
+		if ( process is not null )
+			items.Add( new( "close", "Close", "close" ) );
+
+		return items;
+	}
+
+	/// <summary>
+	/// The items of a tray menu: the app's own, then Quit, which the desktop always adds and an app can't remove.
+	/// </summary>
+	List<NaviMenuItem> TrayMenu( NaviProcess process )
+	{
+		var items = process.Tray.Items.Select( x => new NaviMenuItem( x.Id, x.Label, x.Icon ) ).ToList();
+		items.Add( new( NaviComputer.QuitItem, "Quit", "power_settings_new", Danger: true ) );
+		return items;
+	}
+
+	/// <summary>Run a taskbar menu item and close the menu.</summary>
+	void TaskbarMenuChoose( NaviAppInfo app, string id )
+	{
 		MenuApp = null;
-		action();
+
+		switch ( id )
+		{
+			case "open": OpenApp( app ); break;
+			case "permissions": Computer.UserReviewPermissions( app.Id ); break;
+			case "pin": Computer.UserToggleTaskbarPin( app.Id ); break;
+			case "close": Computer.UserClose( app.Id ); break;
+		}
 	}
 
 	void OnTitleDoubleClick( NaviWindow window, PanelEvent e )

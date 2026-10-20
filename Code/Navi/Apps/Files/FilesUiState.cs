@@ -28,12 +28,6 @@ public sealed record FileRow(
 	bool Cursor );
 
 /// <summary>
-/// An entry of the right-click menu. <see cref="Keys"/> is its keyboard shortcut, shown at the right, or empty. A
-/// <see cref="Separator"/> is a line before the item.
-/// </summary>
-public sealed record MenuItem( string Id, string Label, string Icon, string Keys = "", bool Enabled = true, bool Separator = false );
-
-/// <summary>
 /// A question over the window before something that can't be undone, such as emptying the trash. <see cref="Button"/>
 /// is the label of the button that goes ahead.
 /// </summary>
@@ -100,7 +94,7 @@ public sealed record FilesUiState
 	public int RenameSession { get; init; }
 
 	/// <summary>The right-click menu's items, or empty while it is closed.</summary>
-	public IReadOnlyList<MenuItem> Menu { get; init; } = [];
+	public IReadOnlyList<NaviMenuItem> Menu { get; init; } = [];
 
 	/// <summary>Over the menu when several entries are selected: how many. Null otherwise.</summary>
 	public string MenuHeading { get; init; }

@@ -103,7 +103,7 @@ public sealed class FilesViewModel
 	string notice;
 
 	/// <summary>The right-click menu while it is open (see <see cref="OpenMenu"/>), else empty.</summary>
-	IReadOnlyList<MenuItem> menu = [];
+	IReadOnlyList<NaviMenuItem> menu = [];
 
 	string menuHeading;
 	Vector2 menuAt;
@@ -654,7 +654,7 @@ public sealed class FilesViewModel
 	/// <summary>
 	/// What the menu offers for what is selected: one entry, several, or (nothing selected) the open folder.
 	/// </summary>
-	(IReadOnlyList<MenuItem> Items, string Heading) BuildMenu()
+	(IReadOnlyList<NaviMenuItem> Items, string Heading) BuildMenu()
 	{
 		var inTrash = IsTrash( path );
 		var canChange = CanChange( selection );
