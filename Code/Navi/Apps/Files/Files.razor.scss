@@ -415,6 +415,13 @@
 			text-align: center;
 		}
 
+		.thumbnail
+		{
+			width: 56px;
+			height: 40px;
+			object-fit: cover;
+		}
+
 		.badge
 		{
 			position: absolute;

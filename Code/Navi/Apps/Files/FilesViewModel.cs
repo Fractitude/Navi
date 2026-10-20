@@ -133,6 +133,79 @@ public sealed class FilesViewModel
 	{
 		if ( !polling && sincePoll > PollInterval )
 			_ = PollAsync();
+
+		if ( gridView && !loadingThumbnail )
+			_ = LoadNextThumbnailAsync();
+	}
+
+	/// <summary>The biggest picture decoded for a thumbnail, in bytes. Bigger ones keep the icon.</summary>
+	const int MaxThumbnailBytes = 8 * 1024 * 1024;
+
+	/// <summary>The longest side of a thumbnail, in pixels.</summary>
+	const int ThumbnailSize = 128;
+
+	/// <summary>Thumbnails by path, with the modified time they were made from. Textures, so not part of the state.</summary>
+	readonly Dictionary<string, (System.DateTimeOffset Modified, Texture Texture)> thumbnails = new();
+
+	/// <summary>Pictures that couldn't be decoded or were too big, by path, so they aren't tried again.</summary>
+	readonly Dictionary<string, System.DateTimeOffset> thumbnailFailed = new();
+
+	bool loadingThumbnail;
+
+	/// <summary>
+	/// The thumbnail of a picture in the open folder, or null while it is loading or if it has none. Textures live on the
+	/// host's copy, so a viewer gets none and draws the icon.
+	/// </summary>
+	public Texture ThumbnailOf( string path ) => thumbnails.TryGetValue( path, out var thumb ) ? thumb.Texture : null;
+
+	/// <summary>
+	/// Make the thumbnail of the next picture shown that doesn't have a current one. One at a time, so a folder of big
+	/// pictures doesn't stall the computer.
+	/// </summary>
+	async Task LoadNextThumbnailAsync()
+	{
+		var next = entries.FirstOrDefault( x => IsPicture( x.Name ) && shownPaths.Contains( x.Path ) && !x.IsFolder
+			&& (!thumbnails.TryGetValue( x.Path, out var made ) || made.Modified != x.Modified)
+			&& (!thumbnailFailed.TryGetValue( x.Path, out var failed ) || failed != x.Modified) );
+
+		if ( next is null )
+			return;
+
+		loadingThumbnail = true;
+		try
+		{
+			var bytes = next.Size <= MaxThumbnailBytes ? await navi.Files.ReadBytesAsync( next.Path ) : null;
+			Texture texture = null;
+			if ( bytes is { Length: > 0 } && bytes.Length <= MaxThumbnailBytes )
+			{
+				using var bitmap = Bitmap.CreateFromBytes( bytes );
+				if ( bitmap is { Width: > 0, Height: > 0 } )
+				{
+					var scale = System.Math.Min( 1f, ThumbnailSize / (float)System.Math.Max( bitmap.Width, bitmap.Height ) );
+					using var small = bitmap.Resize( System.Math.Max( 1, (int)(bitmap.Width * scale) ),
+						System.Math.Max( 1, (int)(bitmap.Height * scale) ), true );
+					texture = small.ToTexture();
+				}
+			}
+
+			if ( texture is null )
+			{
+				thumbnailFailed[next.Path] = next.Modified;
+			}
+			else
+			{
+				thumbnails[next.Path] = (next.Modified, texture);
+				UiState = UiState with { Revision = UiState.Revision + 1 };
+			}
+		}
+		catch ( System.Exception )
+		{
+			thumbnailFailed[next.Path] = next.Modified;
+		}
+		finally
+		{
+			loadingThumbnail = false;
+		}
 	}
 
 	async Task PollAsync()
@@ -992,6 +1065,10 @@ public sealed class FilesViewModel
 
 		shownPaths = shown.Take( MaxRows ).Select( x => x.Path ).ToList();
 		selection.RemoveAll( x => !shownPaths.Contains( x ) );
+
+		// Thumbnails of pictures that are no longer listed are let go.
+		foreach ( var gone in thumbnails.Keys.Where( x => !shownPaths.Contains( x ) ).ToList() )
+			thumbnails.Remove( gone );
 
 		var rows = shown.Take( MaxRows ).Select( x => new FileRow(
 			x.Path, x.Name, IconOf( x ), DetailOf( x ), x.Modified.ToLocalTime().ToString( "yyyy-MM-dd HH:mm" ),

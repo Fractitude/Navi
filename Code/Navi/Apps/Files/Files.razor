@@ -182,7 +182,14 @@
 				     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
 				     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
 				     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
-					<i class="icon">@row.Icon</i>
+					@if ( UiState.GridView && !Navi.IsViewer && ViewModel.ThumbnailOf( row.Path ) is { } thumbnail )
+					{
+						<Image class="thumbnail" Texture=@thumbnail/>
+					}
+					else
+					{
+						<i class="icon">@row.Icon</i>
+					}
 					<div class="name">@row.Name</div>
 					@if ( row.Badge != "" )
 					{
