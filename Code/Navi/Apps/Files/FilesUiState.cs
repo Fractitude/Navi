@@ -84,6 +84,9 @@ public sealed record FilesUiState
 	public bool CanPaste { get; init; }
 	public bool ShowHidden { get; init; }
 
+	/// <summary>Entries are drawn as a grid of icons instead of a list of rows.</summary>
+	public bool GridView { get; init; }
+
 	/// <summary>The entry being renamed (or just made), or null. The rename bar shows while it is set.</summary>
 	public string RenamePath { get; init; }
 

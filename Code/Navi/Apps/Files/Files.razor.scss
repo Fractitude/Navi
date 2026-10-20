@@ -383,6 +383,46 @@
 		}
 	}
 
+	// Grid view: the same rows as tiles, icon over name, wrapping across the list.
+	.list.grid
+	{
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-content: flex-start;
+		padding: 4px;
+		gap: 2px;
+	}
+
+	.row.tile
+	{
+		position: relative;
+		width: 64px;
+		flex-direction: column;
+		justify-content: flex-start;
+		gap: 2px;
+		padding: 4px 2px;
+
+		.icon
+		{
+			font-size: 30px;
+		}
+
+		.name
+		{
+			flex-grow: 0;
+			flex-basis: auto;
+			width: 100%;
+			text-align: center;
+		}
+
+		.badge
+		{
+			position: absolute;
+			top: 2px;
+			right: 2px;
+		}
+	}
+
 	.menu-backdrop
 	{
 		position: absolute;

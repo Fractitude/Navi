@@ -42,6 +42,7 @@ public sealed class FilesViewModel
 	public const string CutAction = "cut";
 	public const string PasteAction = "paste";
 	public const string ToggleHiddenAction = "toggle-hidden";
+	public const string ToggleGridAction = "toggle-grid";
 	public const string EjectAction = "eject";
 	public const string DismissNoticeAction = "dismiss-notice";
 	public const string SelectAllAction = "select-all";
@@ -97,6 +98,7 @@ public sealed class FilesViewModel
 	List<string> shownPaths = new();
 
 	bool showHidden;
+	bool gridView;
 	string notice;
 
 	/// <summary>The right-click menu while it is open (see <see cref="OpenMenu"/>), else empty.</summary>
@@ -260,6 +262,7 @@ public sealed class FilesViewModel
 			case CutAction: Copy( cut: true ); break;
 			case PasteAction: _ = PasteAsync(); break;
 			case ToggleHiddenAction: ToggleHidden(); break;
+			case ToggleGridAction: ToggleGrid(); break;
 			case EjectAction when arg is not null: _ = EjectAsync( arg ); break;
 			case DismissNoticeAction: Notify( null ); break;
 		}
@@ -885,6 +888,12 @@ public sealed class FilesViewModel
 		Rebuild();
 	}
 
+	void ToggleGrid()
+	{
+		gridView = !gridView;
+		Rebuild();
+	}
+
 	void ToggleHidden()
 	{
 		showHidden = !showHidden;
@@ -1026,6 +1035,7 @@ public sealed class FilesViewModel
 			HasSelection = selection.Count > 0,
 			CanPaste = clipboard is not null && !inTrash,
 			ShowHidden = showHidden,
+			GridView = gridView,
 			RenamePath = renamePath,
 			Menu = menu,
 			MenuHeading = menu.Count > 0 ? menuHeading : null,
