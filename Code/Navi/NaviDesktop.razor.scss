@@ -46,14 +46,17 @@ NaviDesktop
 		.menu-entry
 		{
 			position: relative;
+			flex-shrink: 0;
 			flex-direction: column;
 		}
 
 		.submenu
 		{
+			position: absolute;
 			left: 100%;
 			top: -2px;
-			min-width: 150px;
+			width: 160px;
+			margin-left: 2px;
 			z-index: 5;
 		}
 
@@ -64,6 +67,7 @@ NaviDesktop
 
 		.item
 		{
+			flex-shrink: 0;
 			flex-direction: row;
 			align-items: center;
 			gap: 6px;
