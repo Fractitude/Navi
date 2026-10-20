@@ -105,6 +105,8 @@ public sealed class NaviAppSnapshot
 	public bool CanMaximize { get; set; }
 	public bool CanResize { get; set; }
 	public float AspectRatio { get; set; }
+	public float MinWidth { get; set; }
+	public float MinHeight { get; set; }
 	public bool Headless { get; set; }
 	public List<NaviWindowDefinitionSnapshot> Windows { get; set; } = new();
 	public bool Shared { get; set; }

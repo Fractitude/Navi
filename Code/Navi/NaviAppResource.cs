@@ -104,6 +104,12 @@ public sealed class NaviAppResource : GameResource
 	[Property] public Vector2 AspectRatio { get; set; }
 
 	/// <summary>
+	/// The smallest size the player can resize the main window's content to (below the title bar), in pixels. Zero for the
+	/// desktop's own minimum.
+	/// </summary>
+	[Property] public Vector2 MinSize { get; set; }
+
+	/// <summary>
 	/// In multiplayer, every player sees the same app: it runs on the host, and other clients only draw what it publishes.
 	/// The app must be written for it, with <c>Navi.Publish</c>, <c>Navi.GetState</c> and <c>Navi.Act</c>. Without it, each
 	/// client runs its own copy, so players see different things in the window.

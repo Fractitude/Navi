@@ -49,6 +49,18 @@ public sealed class NaviWindowInfo
 	/// <summary>
 	/// <paramref name="ratio"/> if it is a usable width over height, between 1:10 and 10:1, else 0.
 	/// </summary>
+	/// <summary>
+	/// <paramref name="size"/> as a minimum window content size: each side finite and between 0 and 4000.
+	/// </summary>
+	internal static Vector2 CleanMin( Vector2 size ) => new(
+		float.IsFinite( size.x ) ? System.Math.Clamp( size.x, 0f, 4000f ) : 0f,
+		float.IsFinite( size.y ) ? System.Math.Clamp( size.y, 0f, 4000f ) : 0f );
+
+	/// <summary>
+	/// The smallest size the window's content can be resized to, in pixels, or zero for the desktop's own minimum.
+	/// </summary>
+	public Vector2 MinSize { get; init; }
+
 	internal static float CleanRatio( float ratio ) => float.IsFinite( ratio ) && ratio is >= 0.1f and <= 10f ? ratio : 0f;
 
 	internal NaviWindowDefinitionSnapshot ToSnapshot() => new()
@@ -81,6 +93,11 @@ public sealed class NaviAppInfo
 	/// Width over height that the main window's content keeps when resized, or 0 for any shape.
 	/// </summary>
 	public float AspectRatio { get; init; }
+
+	/// <summary>
+	/// The smallest size the main window's content can be resized to, or zero. See <see cref="NaviAppResource.MinSize"/>.
+	/// </summary>
+	public Vector2 MinSize { get; init; }
 
 	/// <summary>
 	/// Starts without a window, in the system tray. See <see cref="NaviAppResource.Headless"/>.
@@ -145,6 +162,7 @@ public sealed class NaviAppInfo
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
 		AspectRatio = AspectRatio,
+		MinSize = MinSize,
 		PanelType = PanelType,
 	};
 
@@ -181,6 +199,7 @@ public sealed class NaviAppInfo
 			CanMaximize = resource.CanMaximize,
 			CanResize = resource.CanResize,
 			AspectRatio = NaviWindowInfo.RatioOf( resource.AspectRatio ),
+			MinSize = NaviWindowInfo.CleanMin( resource.MinSize ),
 			Headless = resource.Headless,
 			Windows = ReadWindows( resource.Windows?.Select( x =>
 				(x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true,
@@ -241,6 +260,8 @@ public sealed class NaviAppInfo
 		CanMaximize = CanMaximize,
 		CanResize = CanResize,
 		AspectRatio = AspectRatio,
+		MinWidth = MinSize.x,
+		MinHeight = MinSize.y,
 		Headless = Headless,
 		Windows = Windows.Select( x => x.ToSnapshot() ).ToList(),
 		Shared = Shared,
@@ -274,6 +295,7 @@ public sealed class NaviAppInfo
 			CanMaximize = app.CanMaximize,
 			CanResize = app.CanResize,
 			AspectRatio = NaviWindowInfo.CleanRatio( app.AspectRatio ),
+			MinSize = NaviWindowInfo.CleanMin( new Vector2( app.MinWidth, app.MinHeight ) ),
 			Headless = app.Headless,
 			Windows = ReadWindows( app.Windows?.Select( x =>
 				(x?.Id, x?.Title, x?.PanelType, x?.CanMinimize ?? true, x?.CanMaximize ?? true, x?.CanResize ?? true, x?.AspectRatio ?? 0f) ) ),

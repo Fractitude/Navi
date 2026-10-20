@@ -293,6 +293,14 @@
 	/// </summary>
 	[Property] public Vector2 MinWindowSize { get; set; } = new( 160f, 60f );
 
+	/// <summary>
+	/// The smallest size the window being dragged can be resized to: the app's own minimum for its content, plus the
+	/// window's chrome, but never under <see cref="MinWindowSize"/>.
+	/// </summary>
+	Vector2 MinSizeOf( NaviWindow window ) => new(
+		System.MathF.Max( MinWindowSize.x, window.Info.MinSize.x + dragChrome.x ),
+		System.MathF.Max( MinWindowSize.y, window.Info.MinSize.y + dragChrome.y ) );
+
 	record Corner( string Name, Vector2 Direction );
 
 	static readonly Corner[] Corners =
@@ -1002,8 +1010,8 @@
 				{
 					var snapX = dragDirection.x == 0 ? null : SnapLines( screen, true, dragStartPosition.y, dragStartPosition.y + dragStartSize.y );
 					var snapY = dragDirection.y == 0 ? null : SnapLines( screen, false, dragStartPosition.x, dragStartPosition.x + dragStartSize.x );
-					var (x, width) = ResizeAxis( dragDirection.x, delta.x, dragStartPosition.x, dragStartSize.x, MinWindowSize.x, bounds.x, snapX );
-					var (y, height) = ResizeAxis( dragDirection.y, delta.y, dragStartPosition.y, dragStartSize.y, MinWindowSize.y, bounds.y, snapY );
+					var (x, width) = ResizeAxis( dragDirection.x, delta.x, dragStartPosition.x, dragStartSize.x, MinSizeOf( dragging ).x, bounds.x, snapX );
+					var (y, height) = ResizeAxis( dragDirection.y, delta.y, dragStartPosition.y, dragStartSize.y, MinSizeOf( dragging ).y, bounds.y, snapY );
 					dragging.Position = new Vector2( x, y );
 					dragging.Size = new Vector2( width, height );
 				}

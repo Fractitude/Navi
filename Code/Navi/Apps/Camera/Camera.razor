@@ -45,7 +45,7 @@
 			Copy path
 		</div>
 
-		<div class="message">@( UiState.PhotoNotice != "" ? UiState.PhotoNotice : UiState.Notice )</div>
+		<div class="message">@Shortened( UiState.PhotoNotice != "" ? UiState.PhotoNotice : UiState.Notice )</div>
 	</div>
 </root>
 
@@ -67,6 +67,15 @@
 
 		ViewModel.Tick();
 	}
+
+	/// <summary>
+	/// The longest the status line is, in characters. A longer one is cut from the start and begins with an ellipsis,
+	/// because the end of it (a file name) is what matters, and a long line must not push the buttons away.
+	/// </summary>
+	const int MaxMessage = 28;
+
+	static string Shortened( string text ) =>
+		text.Length > MaxMessage ? "…" + text[^(MaxMessage - 1)..] : text;
 
 	protected override int BuildHash() => ViewModel.Revision;
 }

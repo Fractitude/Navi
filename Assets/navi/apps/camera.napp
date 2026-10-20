@@ -7,6 +7,7 @@
   "CanMinimize": true,
   "CanMaximize": true,
   "CanResize": true,
+  "MinSize": "400,220",
   "Shared": false,
   "Permissions": [
     "navi.camera.access"

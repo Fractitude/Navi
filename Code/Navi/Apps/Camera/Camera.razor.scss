@@ -81,6 +81,8 @@
 		.button
 		{
 			flex-direction: row;
+			flex-shrink: 0;
+			white-space: nowrap;
 			gap: 4px;
 
 			i
@@ -99,7 +101,10 @@
 	.message
 	{
 		flex-grow: 1;
+		flex-shrink: 1;
 		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
 		font-size: 12px;
 	}
 }
