@@ -19,10 +19,10 @@
 		<div class="notice">@UiState.Notice</div>
 	}
 
-	<div class="screen">
+	<div class="screen" @ref="Screen">
 		@if ( UiState.HasImage )
 		{
-			<Image class="picture" Texture=@ViewModel.Picture/>
+			<Image class="picture" @ref="PictureView" Texture=@ViewModel.Picture/>
 		}
 		else
 		{
@@ -54,11 +54,111 @@
 	/// </summary>
 	ImageViewerUiState UiState => ViewModel.UiState;
 
+	/// <summary>The black area the picture is shown in.</summary>
+	Panel Screen;
+
+	/// <summary>The panel drawing the picture. Made again whenever the page is rebuilt.</summary>
+	Image PictureView;
+
+	/// <summary>The biggest zoom, as a multiple of the size that fits the window.</summary>
+	const float MaxZoom = 16f;
+
+	/// <summary>How much one notch of the wheel zooms by.</summary>
+	const float WheelZoom = 1.15f;
+
+	// The view is the player's own: it is not part of the app's state and is not shared.
+	float zoom = 1f;
+	Vector2 pan;
+	Texture shownPicture;
+	Image styledView;
+	float styledZoom;
+	Vector2 styledPan;
+	Vector2 styledSize;
+	bool dragging;
+	Vector2 lastMouse;
+
 	public override void Tick()
 	{
 		base.Tick();
 
 		ViewModel.Tick();
+		UpdateView();
+	}
+
+	Vector2 ScreenSize => Screen is { IsValid: true } ? Screen.Box.Rect.Size * Screen.ScaleFromScreen : Vector2.Zero;
+
+	/// <summary>
+	/// Zoom with the wheel, keeping the point under the mouse where it is.
+	/// </summary>
+	public override void OnMouseWheel( Vector2 value )
+	{
+		if ( Screen is not { IsValid: true, HasHovered: true } || !UiState.HasImage || value.y == 0 )
+		{
+			base.OnMouseWheel( value );
+			return;
+		}
+
+		// Scrolling up zooms in.
+		var newZoom = System.Math.Clamp( zoom * System.MathF.Pow( WheelZoom, -value.y ), 1f, MaxZoom );
+		var fromCentre = Screen.MousePosition * Screen.ScaleFromScreen - ScreenSize * 0.5f;
+		pan = (pan - fromCentre) * (newZoom / zoom) + fromCentre;
+		zoom = newZoom;
+		ClampPan();
+	}
+
+	void ClampPan()
+	{
+		// The picture can't be taken further than its own edge reaching the middle of the window.
+		var limit = ScreenSize * 0.5f * zoom;
+		pan = new Vector2( System.Math.Clamp( pan.x, -limit.x, limit.x ), System.Math.Clamp( pan.y, -limit.y, limit.y ) );
+	}
+
+	/// <summary>
+	/// Pan while the left button is held after pressing it on the picture, then put the picture where the zoom and pan
+	/// say.
+	/// </summary>
+	void UpdateView()
+	{
+		if ( Screen is not { IsValid: true } )
+			return;
+
+		if ( ViewModel.Picture != shownPicture )
+		{
+			shownPicture = ViewModel.Picture;
+			zoom = 1f;
+			pan = Vector2.Zero;
+		}
+
+		var mouse = Screen.MousePosition * Screen.ScaleFromScreen;
+		var held = UiState.HasImage && Screen.HasActive;
+
+		if ( held && dragging )
+		{
+			pan += mouse - lastMouse;
+			ClampPan();
+		}
+
+		dragging = held;
+		lastMouse = mouse;
+
+		if ( PictureView is not { IsValid: true } )
+			return;
+
+		var size = ScreenSize;
+		if ( PictureView == styledView && zoom == styledZoom && pan == styledPan && size == styledSize )
+			return;
+
+		styledView = PictureView;
+		styledZoom = zoom;
+		styledPan = pan;
+		styledSize = size;
+
+		var style = PictureView.Style;
+		style.Position = PositionMode.Absolute;
+		style.Width = Length.Pixels( size.x * zoom );
+		style.Height = Length.Pixels( size.y * zoom );
+		style.Left = Length.Pixels( (size.x - size.x * zoom) * 0.5f + pan.x );
+		style.Top = Length.Pixels( (size.y - size.y * zoom) * 0.5f + pan.y );
 	}
 
 	protected override int BuildHash() => ViewModel.Revision;
