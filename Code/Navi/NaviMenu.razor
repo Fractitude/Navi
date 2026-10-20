@@ -44,7 +44,7 @@
 			@if ( hasChildren && Open == item.Id )
 			{
 				@* Drawn here, not as another NaviMenu: a component can't include itself. So a submenu has no submenus. *@
-				<div class="navi-menu submenu">
+				<div class="navi-menu submenu @( SubmenuLeft ? "left" : "right" )">
 					@foreach ( var child in item.Children )
 					{
 						var picked = child;
@@ -71,6 +71,9 @@
 {
 	/// <summary>The bar over the items, or null for none.</summary>
 	public string Heading { get; set; }
+
+	/// <summary>Open submenus to the menu's left, for a menu too near the right edge of what it may draw in.</summary>
+	public bool SubmenuLeft { get; set; }
 
 	public IReadOnlyList<NaviMenuItem> Items { get; set; } = [];
 
@@ -100,5 +103,5 @@
 			OnChoose?.Invoke( item.Id );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
+	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, SubmenuLeft, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
 }

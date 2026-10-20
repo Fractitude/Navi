@@ -221,7 +221,7 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<NaviMenu Heading=@UiState.MenuHeading Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		<NaviMenu Heading=@UiState.MenuHeading SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
 		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px;"/>
 	}
 
@@ -434,7 +434,7 @@
 		Navi.Act( FilesViewModel.OpenMenuAction, path ?? "", at.x.ToString( culture ), at.y.ToString( culture ) );
 	}
 
-	const float MenuWidth = 190f, MenuItemHeight = 26f, MenuHeadingHeight = 22f, MenuSeparatorHeight = 5f, MenuPadding = 8f;
+	const float MenuWidth = 190f, SubmenuWidth = 166f, MenuItemHeight = 26f, MenuHeadingHeight = 22f, MenuSeparatorHeight = 5f, MenuPadding = 8f;
 
 	/// <summary>
 	/// Where the menu is drawn: where it was opened, moved left or up as far as it takes to stay inside the panel. Every
