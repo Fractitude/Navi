@@ -140,6 +140,22 @@
 	protected override void OnShortcut( string keys ) => ViewModel.Shortcut( keys );
 
 	/// <summary>
+	/// Ctrl+S and Ctrl+Shift+S typed in the text field. The field has the keys then, and they may not reach the shortcut
+	/// forwarding (<c>NaviInputCapture</c>), so they are caught here too, as actions that work from any client.
+	/// </summary>
+	public override void OnButtonTyped( ButtonEvent e )
+	{
+		if ( e.HasCtrl && !e.HasAlt && string.Equals( e.Button, "s", System.StringComparison.OrdinalIgnoreCase ) )
+		{
+			Navi.Act( e.HasShift ? TextEditViewModel.SaveAsAction : TextEditViewModel.SaveAction );
+			e.StopPropagation = true;
+			return;
+		}
+
+		base.OnButtonTyped( e );
+	}
+
+	/// <summary>
 	/// The player is closing the window while there are unsaved changes: the host's copy asks them in the window.
 	/// </summary>
 	protected override void OnCloseRequested() => ViewModel.CloseRequested();
