@@ -397,6 +397,20 @@ public sealed class FilesViewModel
 		GoTo( forward.Pop() );
 	}
 
+	/// <summary>
+	/// Take a folder that no longer exists, and the ones inside it, out of the history, so Back and Forward skip it.
+	/// </summary>
+	void ForgetPath( string gone )
+	{
+		foreach ( var stack in new[] { back, forward } )
+		{
+			var kept = stack.Reverse().Where( x => !IsWithin( x, gone ) ).ToList();
+			stack.Clear();
+			foreach ( var x in kept )
+				stack.Push( x );
+		}
+	}
+
 	public void GoUp()
 	{
 		if ( path != "/" )
@@ -901,6 +915,8 @@ public sealed class FilesViewModel
 
 			if ( done is null )
 				break;
+
+			ForgetPath( entry );
 		}
 
 		await RefreshAsync();
