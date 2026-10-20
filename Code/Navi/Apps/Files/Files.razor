@@ -221,7 +221,7 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<NaviMenu Heading=@UiState.MenuHeading SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		<NaviMenu Heading=@UiState.MenuHeading InlineSubmenus=@( MenuHeight > PanelSize.y ) SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
 		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px; @MenuScroll"/>
 	}
 

@@ -44,7 +44,7 @@
 			@if ( hasChildren && Open == item.Id )
 			{
 				@* Drawn here, not as another NaviMenu: a component can't include itself. So a submenu has no submenus. *@
-				<div class="navi-menu submenu @( SubmenuLeft ? "left" : "right" )">
+				<div class="navi-menu submenu @( InlineSubmenus ? "inline" : SubmenuLeft ? "left" : "right" )">
 					@foreach ( var child in item.Children )
 					{
 						var picked = child;
@@ -75,6 +75,9 @@
 	/// <summary>Open submenus to the menu's left, for a menu too near the right edge of what it may draw in.</summary>
 	public bool SubmenuLeft { get; set; }
 
+	/// <summary>Open submenus under their item, indented, instead of beside it: for a menu that scrolls, which would clip them.</summary>
+	public bool InlineSubmenus { get; set; }
+
 	public IReadOnlyList<NaviMenuItem> Items { get; set; } = [];
 
 	/// <summary>Called with the item's id when the player picks an enabled item.</summary>
@@ -103,5 +106,5 @@
 			OnChoose?.Invoke( item.Id );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, SubmenuLeft, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
+	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, SubmenuLeft, InlineSubmenus, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
 }
