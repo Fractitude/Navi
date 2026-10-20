@@ -18,6 +18,11 @@ public sealed partial class NaviComputer
 	const float CameraOffset = 2f;
 
 	/// <summary>
+	/// How far the camera is tipped down from looking straight out of the screen, in degrees.
+	/// </summary>
+	const float CameraPitch = 15f;
+
+	/// <summary>
 	/// The largest picture an app can ask for, in pixels on a side.
 	/// </summary>
 	const int MaxCameraSize = 1024;
@@ -94,9 +99,9 @@ public sealed partial class NaviComputer
 			cameraComponent.FieldOfView = 75;
 		}
 
-		// The screen faces forward, so the camera looks the same way from the middle of its top edge.
+		// The screen faces forward, so the camera looks out of it from the middle of its top edge, tipped down.
 		var (center, size) = ScreenRect( panel );
-		var local = new Transform( center + Vector3.Up * (size.y * 0.5f) + Vector3.Forward * CameraOffset );
+		var local = new Transform( center + Vector3.Up * (size.y * 0.5f) + Vector3.Forward * CameraOffset, Rotation.FromPitch( CameraPitch ) );
 
 		if ( cameraObject.LocalTransform != local )
 			cameraObject.LocalTransform = local;
