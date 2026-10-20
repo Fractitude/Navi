@@ -153,6 +153,17 @@ public sealed class NaviInputCapture : Component
 	Transform playerView;
 	MouseVisibility playerMouse;
 
+	/// <summary>
+	/// Tag of the player's body. The camera stops drawing it while seated, so it isn't in the way inside the head. Its
+	/// shadow stays.
+	/// </summary>
+	const string PlayerTag = "player";
+
+	/// <summary>
+	/// The camera didn't exclude <see cref="PlayerTag"/> before the seat, so the seat added it and removes it again.
+	/// </summary>
+	bool hidesPlayer;
+
 	record ControllerState( PlayerController Controller, bool Input, bool Look, bool Camera, bool ThirdPerson );
 	readonly List<ControllerState> controllers = new();
 	readonly List<WorldInput> worldInputs = new();
@@ -287,7 +298,11 @@ public sealed class NaviInputCapture : Component
 		if ( state == State.Idle )
 		{
 			if ( Scene.Camera is { } camera )
+			{
 				playerView = camera.WorldTransform;
+				hidesPlayer = !camera.RenderExcludeTags.Has( PlayerTag );
+				camera.RenderExcludeTags.Add( PlayerTag );
+			}
 
 			playerMouse = Mouse.Visibility;
 			WidenReach();
@@ -315,6 +330,11 @@ public sealed class NaviInputCapture : Component
 
 	void End()
 	{
+		if ( hidesPlayer && Scene.Camera is { } camera )
+			camera.RenderExcludeTags.Remove( PlayerTag );
+
+		hidesPlayer = false;
+
 		foreach ( var c in controllers )
 		{
 			if ( !c.Controller.IsValid() ) continue;
