@@ -1,12 +1,11 @@
 namespace NaviApps;
 
 /// <summary>
-/// The bar under the toolbar where a path is typed: to open a file, or to save as one. None while it is closed.
+/// The bar under the toolbar where a path is typed to save as a file. None while it is closed.
 /// </summary>
 public enum TextEditBar
 {
 	None,
-	Open,
 	SaveAs,
 }
 

@@ -40,6 +40,7 @@ public sealed class TextEditViewModel
 	public const int MaxEditInsert = 3000;
 
 	const string StartFolder = "/Documents";
+	static readonly string[] OpenTypes = ["txt", "md", "json", "log", "cfg", "ini", "csv"];
 	const string DefaultExtension = ".txt";
 	const string UntitledName = "Untitled";
 
@@ -84,6 +85,9 @@ public sealed class TextEditViewModel
 	bool? guardingClose;
 
 	bool polling;
+
+	/// <summary>The File Picker is open for this app, so Open doesn't ask for a second one.</summary>
+	bool picking;
 	RealTimeSince sincePoll;
 
 	TextEditUiState published;
@@ -215,7 +219,7 @@ public sealed class TextEditViewModel
 		{
 			case EditAction when args.Length == 4: Edit( args[0], args[1], args[2], args[3] ); break;
 			case NewAction: AskToDiscard( NewDocument ); break;
-			case OpenAction: OpenBar( TextEditBar.Open ); break;
+			case OpenAction: AskToDiscard( PickAsync ); break;
 			case SaveAction: _ = SaveAsync(); break;
 			case SaveAsAction: OpenBar( TextEditBar.SaveAs ); break;
 			case CancelBarAction: CloseBar(); break;
@@ -244,7 +248,7 @@ public sealed class TextEditViewModel
 		switch ( keys )
 		{
 			case "ctrl+n": AskToDiscard( NewDocument ); break;
-			case "ctrl+o": OpenBar( TextEditBar.Open ); break;
+			case "ctrl+o": AskToDiscard( PickAsync ); break;
 			case "ctrl+s": _ = SaveAsync(); break;
 			case "ctrl+shift+s": OpenBar( TextEditBar.SaveAs ); break;
 		}
@@ -323,6 +327,32 @@ public sealed class TextEditViewModel
 	{
 		UiState = UiState with { Text = text, TextSession = UiState.TextSession + 1 };
 		Rebuild();
+	}
+
+	/// <summary>
+	/// Ask the computer for a file: it opens the File Picker, a window of its own, in Documents. Nothing happens if the
+	/// player closes it.
+	/// </summary>
+	async Task PickAsync()
+	{
+		if ( picking )
+			return;
+
+		picking = true;
+		try
+		{
+			var file = await navi.Files.PickAsync( OpenTypes, StartFolder );
+			if ( file is not null )
+				await LoadAsync( file );
+		}
+		catch ( System.Exception e )
+		{
+			Notify( Describe( e ) );
+		}
+		finally
+		{
+			picking = false;
+		}
 	}
 
 	/// <summary>
@@ -406,9 +436,7 @@ public sealed class TextEditViewModel
 	void OpenBar( TextEditBar which )
 	{
 		bar = which;
-		var text = which == TextEditBar.SaveAs
-			? path ?? Join( StartFolder, UntitledName.ToLowerInvariant() + DefaultExtension )
-			: Join( FolderOf( path ?? Join( StartFolder, "x" ) ), "" );
+		var text = path ?? Join( StartFolder, UntitledName.ToLowerInvariant() + DefaultExtension );
 
 		UiState = UiState with { BarText = text, BarSession = UiState.BarSession + 1 };
 		Rebuild();
@@ -432,12 +460,6 @@ public sealed class TextEditViewModel
 		var to = PathOf( UiState.BarText );
 		if ( to is null )
 			return;
-
-		if ( bar == TextEditBar.Open )
-		{
-			AskToDiscard( () => LoadAsync( to ) );
-			return;
-		}
 
 		if ( bar != TextEditBar.SaveAs )
 			return;

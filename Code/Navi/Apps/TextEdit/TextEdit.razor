@@ -33,12 +33,12 @@
 	@if ( UiState.BarOpen )
 	{
 		<div class="bar">
-			<i>@( UiState.Bar == TextEditBar.Open ? "folder_open" : "save_as" )</i>
-			<div class="bar-label">@( UiState.Bar == TextEditBar.Open ? "Open" : "Save as" )</div>
+			<i>save_as</i>
+			<div class="bar-label">Save as</div>
 			<TextEntry @ref="BarEntry" Value=@( UiState.BarText ) MaxLength=@( 1024 )
 			           OnTextEdited=@BarEdited
 			           onsubmit=@( () => Navi.Act( TextEditViewModel.SubmitBarAction ) )/>
-			<div class="tool" tooltip=@( UiState.Bar == TextEditBar.Open ? "Open" : "Save" )
+			<div class="tool" tooltip="Save"
 			     @onclick=@( () => Navi.Act( TextEditViewModel.SubmitBarAction ) )>
 				<i>check</i>
 			</div>
