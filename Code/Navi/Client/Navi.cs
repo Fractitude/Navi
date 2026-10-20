@@ -130,6 +130,7 @@ public sealed class Navi
 		Notifications = new NotificationCalls( this );
 		Files = new FileCalls( this );
 		Messages = new MessageCalls( this );
+		Camera = new CameraCalls( this );
 		Input = new InputState( this );
 	}
 
@@ -177,6 +178,11 @@ public sealed class Navi
 	/// The direct messages of the player at the computer.
 	/// </summary>
 	public MessageCalls Messages { get; }
+
+	/// <summary>
+	/// The camera on top of the computer's screen.
+	/// </summary>
+	public CameraCalls Camera { get; }
 
 	/// <summary>
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
@@ -516,6 +522,11 @@ public sealed class Navi
 		/// Read and send the direct messages of the player at the computer (<see cref="MessageCalls"/>).
 		/// </summary>
 		public const string Messages = "navi.messages.access";
+
+		/// <summary>
+		/// See through the camera on top of the computer's screen (<see cref="CameraCalls"/>).
+		/// </summary>
+		public const string Camera = "navi.camera.access";
 	}
 
 	/// <summary>
@@ -827,6 +838,19 @@ public sealed class Navi
 	/// An installed app, and whether the player muted its notifications.
 	/// </summary>
 	public sealed record NotificationApp( string AppId, bool Muted );
+
+	/// <summary>
+	/// The camera on top of the computer's screen. The computer owns it; an app only gets the picture.
+	/// </summary>
+	public sealed class CameraCalls( Navi navi )
+	{
+		/// <summary>
+		/// The picture the camera sees, as a texture of the given size in pixels. Needs <see cref="Permission.Camera"/>.
+		/// The computer draws into it only while apps keep asking, so call this again about every half a second while the
+		/// picture is shown (the same texture comes back while the size stays).
+		/// </summary>
+		public Task<Texture> GetViewAsync( int width, int height ) => navi.CallAsync<Texture>( "camera.view", width, height );
+	}
 
 	/// <summary>
 	/// Notifications: the computer shows them in a banner, with the app's name and icon, and keeps them in its notification

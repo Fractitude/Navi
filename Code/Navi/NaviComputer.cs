@@ -729,6 +729,7 @@ public sealed partial class NaviComputer : Component
 		UpdateSolid();
 		UpdateNetwork();
 		UpdateNotificationArrivals();
+		UpdateCamera();
 
 		if ( !IsAuthority )
 			return;
@@ -753,6 +754,8 @@ public sealed partial class NaviComputer : Component
 			solidCollider.Destroy();
 
 		solidCollider = null;
+
+		DestroyCamera();
 
 		// On clients this runs when the computer goes out of range too, and the stand-in must stay for that. The host's
 		// computer is never out of range, so here it was really turned off.

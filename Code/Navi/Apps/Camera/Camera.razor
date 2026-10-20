@@ -1,0 +1,57 @@
+@using Sandbox.UI
+@inherits NaviApp
+@namespace NaviApps
+
+@* A Navi app like any other: a plain panel, described by Assets/navi/apps/camera.napp. The computer owns the camera on top *@
+@* of its screen and draws it into a texture; the app asks for that texture and shows it. Not shared: every client has *@
+@* its own camera, so the picture is the one from the screen in front of that player. *@
+
+<root>
+	<div class="screen">
+		@if ( UiState.NeedsPermission )
+		{
+			<div class="notice">
+				<i>videocam_off</i>
+				<div class="text">Camera needs permission to see through the screen's camera.</div>
+				<div class="button" @onclick=@( () => ViewModel.Allow() )>Allow camera</div>
+			</div>
+		}
+		else if ( UiState.HasPicture )
+		{
+			<Image class="picture" Texture=@ViewModel.Picture/>
+		}
+		else
+		{
+			<div class="notice">
+				<div class="text">Starting camera...</div>
+			</div>
+		}
+	</div>
+
+	@if ( UiState.Notice != "" )
+	{
+		<div class="message">@UiState.Notice</div>
+	}
+</root>
+
+@code
+{
+	/// <summary>
+	/// The app's logic and its state. Made on first use, with the panel's Navi (the panel is a NaviApp).
+	/// </summary>
+	CameraViewModel ViewModel => field ??= new( Navi );
+
+	/// <summary>
+	/// What is drawn above. Read only.
+	/// </summary>
+	CameraUiState UiState => ViewModel.UiState;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		ViewModel.Tick();
+	}
+
+	protected override int BuildHash() => ViewModel.Revision;
+}

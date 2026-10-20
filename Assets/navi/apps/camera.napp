@@ -1,0 +1,17 @@
+{
+  "Title": "Camera",
+  "Description": "See through the camera on top of the screen.",
+  "Icon": "videocam",
+  "Color": "#6ab0d8",
+  "PanelType": "NaviApps.Camera",
+  "CanMinimize": true,
+  "CanMaximize": false,
+  "CanResize": false,
+  "Shared": false,
+  "Permissions": [
+    "navi.camera.access"
+  ],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}

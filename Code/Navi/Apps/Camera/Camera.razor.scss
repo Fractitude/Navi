@@ -1,0 +1,92 @@
+@import "../../Themes/_paper-light.scss";
+
+@mixin camera-style
+{
+	Camera
+	{
+		width: 332px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
+	}
+
+	.screen
+	{
+		width: 320px;
+		height: 180px;
+		justify-content: center;
+		align-items: center;
+		background-color: black;
+		border: 2px solid $deep-bc;
+	}
+
+	.picture
+	{
+		width: 100%;
+		height: 100%;
+	}
+
+	.notice
+	{
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		padding: 12px;
+		color: $paper-t;
+
+		i
+		{
+			font-size: 32px;
+		}
+
+		.text
+		{
+			font-size: 12px;
+			text-align: center;
+		}
+	}
+
+	.button
+	{
+		height: 26px;
+		padding: 0 12px;
+		justify-content: center;
+		align-items: center;
+		font-size: 12px;
+		font-weight: 700;
+		color: $paper-t;
+		background-color: $ink-bg;
+		border: 1px solid $deep-bc;
+		cursor: pointer;
+
+		&:hover
+		{
+			border-color: $paper-bc;
+		}
+	}
+
+	.message
+	{
+		font-size: 12px;
+	}
+}
+
+@include camera-style;
+
+@import "../../Themes/_paper-dark.scss";
+.theme-paper.scheme-dark
+{
+	@include camera-style;
+}
+
+@import "../../Themes/_glass-light.scss";
+.theme-glass.scheme-light
+{
+	@include camera-style;
+}
+
+@import "../../Themes/_glass-dark.scss";
+.theme-glass.scheme-dark
+{
+	@include camera-style;
+}
