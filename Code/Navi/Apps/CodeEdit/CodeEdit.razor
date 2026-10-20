@@ -37,13 +37,6 @@
 			<i>@( UiState.LightTheme ? "dark_mode" : "light_mode" )</i>
 		</div>
 
-		<div class="spacer"></div>
-
-		<div class="name">@UiState.Name</div>
-		@if ( UiState.Dirty )
-		{
-			<div class="dirty" tooltip="Not saved">•</div>
-		}
 	</div>
 
 	@if ( UiState.BarOpen )
