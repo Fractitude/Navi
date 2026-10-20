@@ -43,7 +43,25 @@
 
 			@if ( hasChildren && Open == item.Id )
 			{
-				<NaviMenu class="submenu" Items=@item.Children OnChoose=@OnChoose/>
+				@* Drawn here, not as another NaviMenu: a component can't include itself. So a submenu has no submenus. *@
+				<div class="navi-menu submenu">
+					@foreach ( var child in item.Children )
+					{
+						var picked = child;
+
+						<div class="item @( child.Enabled ? "" : "disabled" )" @onclick=@( () => Choose( picked ) )>
+							@if ( !string.IsNullOrEmpty( child.Icon ) )
+							{
+								<i>@child.Icon</i>
+							}
+							<div class="item-label">@child.Label</div>
+							@if ( !string.IsNullOrEmpty( child.Keys ) )
+							{
+								<div class="keys">@child.Keys</div>
+							}
+						</div>
+					}
+				</div>
 			}
 		</div>
 	}

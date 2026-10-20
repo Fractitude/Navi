@@ -53,10 +53,10 @@ NaviDesktop
 		.submenu
 		{
 			position: absolute;
-			left: 100%;
-			top: -2px;
+			// Just past the menu's right edge: the menu is the entry's width, and a percentage left is not trusted here.
+			right: -164px;
+			top: -4px;
 			width: 160px;
-			margin-left: 2px;
 			z-index: 5;
 		}
 
