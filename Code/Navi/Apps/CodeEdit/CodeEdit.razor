@@ -175,6 +175,9 @@
 		if ( origin.x == 0f && origin.y == 0f )
 			return;
 
+		// How far each popup was moved this frame, for the ones placed beside another.
+		var moved = new Dictionary<Popup, Vector2>();
+
 		foreach ( var popup in root.Children.OfType<Popup>() )
 		{
 			// The editor's popups: a completion list, its detail beside it, hover text and parameter help.
@@ -183,10 +186,15 @@
 				continue;
 
 			var scale = source.ScaleFromScreen;
+
+			// A popup beside another is anchored to where the engine laid that one out, not to where it was moved.
+			if ( source is Popup beside && moved.TryGetValue( beside, out var by ) )
+				anchor = new Rect( anchor.Position + by / scale, anchor.Size );
+
 			var bounds = new Rect( Vector2.Zero, root.Box.Rect.Size * scale );
 			var shifted = new Rect( anchor.Position - origin, anchor.Size ) * scale;
-			var wanted = PlaceBeside( shifted, popup.Box.Rect.Size * scale, bounds, popup.HasClass( "right-top" ),
-				popup.PopupSourceOffset );
+			var wanted = PlaceBeside( shifted, popup.Box.Rect.Size * scale, bounds,
+				popup.HasClass( "right-top" ), popup.Position.ToString().StartsWith( "Above" ), popup.PopupSourceOffset );
 
 			// Where the engine put it: its left and top.
 			var left = popup.Style.Left is { } l ? l.Value : 0f;
@@ -195,15 +203,16 @@
 			var move = new PanelTransform();
 			move.AddTranslate( wanted.x - left, wanted.y - top );
 			popup.Style.Transform = move;
+			moved[popup] = new Vector2( wanted.x - left, wanted.y - top );
 		}
 	}
 
 	/// <summary>
-	/// Where a popup of this size goes next to the anchor, as the engine does it (it keeps that to itself): below it, or
-	/// above if there's no room, or (<paramref name="beside"/>) to its right, or left if there's no room; kept inside
+	/// Where a popup of this size goes next to the anchor, as the engine does it (it keeps that to itself): below it (or above, for hover text), or
+	/// the other side if there's no room, or (<paramref name="beside"/>) to its right, or left if there's no room; kept inside
 	/// <paramref name="bounds"/>.
 	/// </summary>
-	static Vector2 PlaceBeside( Rect anchor, Vector2 size, Rect bounds, bool beside, float offset )
+	static Vector2 PlaceBeside( Rect anchor, Vector2 size, Rect bounds, bool beside, bool above, float offset )
 	{
 		float x, y;
 		if ( beside )
@@ -213,6 +222,14 @@
 				x = anchor.Left - offset - size.x;
 
 			y = anchor.Top;
+		}
+		else if ( above )
+		{
+			y = anchor.Top - offset - size.y;
+			if ( y < bounds.Top && anchor.Bottom + offset + size.y <= bounds.Bottom )
+				y = anchor.Bottom + offset;
+
+			x = anchor.Left;
 		}
 		else
 		{
