@@ -35,6 +35,16 @@
 			Take picture
 		</div>
 
+		<div class="button" @onclick=@( () => ViewModel.OpenFolder() )>
+			<i>folder_open</i>
+			Open folder
+		</div>
+
+		<div class="button @( UiState.HasPhoto ? "" : "disabled" )" @onclick=@( () => ViewModel.CopyPath() )>
+			<i>content_copy</i>
+			Copy path
+		</div>
+
 		<div class="message">@( UiState.PhotoNotice != "" ? UiState.PhotoNotice : UiState.Notice )</div>
 	</div>
 </root>

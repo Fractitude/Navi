@@ -138,6 +138,10 @@ public sealed class FilesViewModel
 		polling = true;
 		try
 		{
+			// A folder another app asked to open here (Navi.Files.OpenAsync).
+			foreach ( var opened in await navi.Files.TakeOpenedAsync() )
+				OpenPath( opened );
+
 			var version = await navi.Files.GetVersionAsync();
 			if ( version != knownVersion )
 			{

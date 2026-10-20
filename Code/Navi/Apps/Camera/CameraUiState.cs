@@ -17,8 +17,11 @@ public sealed record CameraUiState
 	/// <summary>A picture is being saved, so the button waits.</summary>
 	public bool Saving { get; init; }
 
-	/// <summary>What became of the last picture taken: where it was saved, or why not. Stays until the next one.</summary>
+	/// <summary>What became of the last button pressed: that the picture was saved or the path copied, or why not.</summary>
 	public string PhotoNotice { get; init; } = "";
+
+	/// <summary>A picture has been taken, so its path can be copied.</summary>
+	public bool HasPhoto { get; init; }
 
 	/// <summary>The picture has arrived, so the panel shows it instead of the waiting text.</summary>
 	public bool HasPicture { get; init; }

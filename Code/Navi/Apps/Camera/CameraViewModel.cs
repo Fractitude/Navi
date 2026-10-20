@@ -19,6 +19,9 @@ public sealed class CameraViewModel
 	/// </summary>
 	const float AskInterval = 0.5f;
 
+	/// <summary>Where the last picture was saved, for the Copy path button. Not drawn, so not in the state.</summary>
+	string lastPhotoPath;
+
 	RealTimeSince sinceAsked = float.MaxValue;
 	bool asking;
 	bool denied;
@@ -68,13 +71,41 @@ public sealed class CameraViewModel
 			var folder = await navi.Files.GetAppFolderAsync();
 			var path = await navi.Files.WriteBytesAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
 
-			Update( uiState => uiState with { Saving = false, PhotoNotice = $"Saved {path}" } );
+			lastPhotoPath = path;
+			Update( uiState => uiState with { Saving = false, HasPhoto = true, PhotoNotice = "Picture saved." } );
 		}
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"Camera: couldn't save the picture: {e.Message}" );
 			Update( uiState => uiState with { Saving = false, PhotoNotice = "The picture couldn't be saved." } );
 		}
+	}
+
+	/// <summary>The "Open folder" button: show the folder the pictures are saved in, in the Files app.</summary>
+	public void OpenFolder() => _ = OpenFolderAsync();
+
+	async Task OpenFolderAsync()
+	{
+		try
+		{
+			var opened = await navi.Files.OpenAsync( await navi.Files.GetAppFolderAsync() );
+			Update( uiState => uiState with { PhotoNotice = opened ? "" : "The folder can't be opened." } );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Camera: couldn't open the folder: {e.Message}" );
+			Update( uiState => uiState with { PhotoNotice = "The folder can't be opened." } );
+		}
+	}
+
+	/// <summary>The "Copy path" button: put the last picture's path on the clipboard.</summary>
+	public void CopyPath()
+	{
+		if ( lastPhotoPath is null )
+			return;
+
+		Sandbox.UI.Clipboard.SetText( lastPhotoPath );
+		Update( uiState => uiState with { PhotoNotice = "Path copied." } );
 	}
 
 	/// <summary>The "Allow" button: ask the player for the camera permission.</summary>

@@ -171,8 +171,11 @@ public static class NaviFileCalls
 				var path = Arg( args, 0, method );
 				Check( files, process, path, followLast: true );
 				var at = files.Resolve( path );
+
+				// A folder opens in the Files app, which takes it as it takes a file waiting for it.
 				if ( at.Node.Kind == NaviFileKind.Folder )
-					throw new NaviFileException( NaviFileError.IsAFolder, at.Path );
+					return NaviAppRegistry.Find( "navi/apps/files.napp" ) is { } explorer && computer.IsInstalled( explorer )
+						&& computer.OpenFileWith( explorer, at.Path );
 
 				if ( at.Node.Kind != NaviFileKind.File )
 					throw new NaviFileException( NaviFileError.NotFound, at.Path );
