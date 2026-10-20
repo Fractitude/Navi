@@ -8,7 +8,10 @@
 
 <root>
 	<div class="header">
-		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" @onclick=@( () => ViewModel.Up() )>
+		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Root of the drive" @onclick=@( () => ViewModel.Home() )>
+			<i>home</i>
+		</div>
+		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" tooltip="Up one folder" @onclick=@( () => ViewModel.Up() )>
 			<i>arrow_upward</i>
 		</div>
 		<div class="path">@UiState.Path</div>

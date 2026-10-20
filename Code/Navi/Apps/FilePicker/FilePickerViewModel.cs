@@ -74,6 +74,9 @@ public sealed class FilePickerViewModel
 		onCancelled?.Invoke();
 	}
 
+	/// <summary>The home button: the root of the drive.</summary>
+	public void Home() => _ = ListAsync( "/" );
+
 	public void Up()
 	{
 		var path = UiState.Path.TrimEnd( '/' );
