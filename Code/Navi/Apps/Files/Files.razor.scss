@@ -299,6 +299,15 @@
 		background-color: $paper-bg;
 	}
 
+	// The selection band of a drag selection, inside the scrolling list.
+	.band
+	{
+		position: absolute;
+		pointer-events: none;
+		background-color: rgba( 0, 0, 0, 0.12 );
+		border: 1px solid $ink-bc;
+	}
+
 	.empty
 	{
 		padding: 16px;

@@ -168,7 +168,9 @@
 		}
 
 		@* A click on the list itself, not on an entry, clears the selection; a right-click there opens the folder's menu. *@
-		<div class="list @( UiState.GridView ? "grid" : "" )" @onclick=@( () => Navi.Act( FilesViewModel.SelectAction ) )
+		<div class="list @( UiState.GridView ? "grid" : "" )" @ref="List"
+		     @onmousedown=@( ( PanelEvent e ) => StartBand( e ) )
+		     @onclick=@( () => ClickList() )
 		     @onrightclick=@( ( PanelEvent e ) => RightClick( null, e ) )>
 			@if ( UiState.ListEmpty )
 			{
@@ -201,6 +203,11 @@
 						<div class="modified">@row.Modified</div>
 					}
 				</div>
+			}
+
+			@if ( bandMoved )
+			{
+				<div class="band" style="left: @( BandRect.x )px; top: @( BandRect.y )px; width: @( BandRect.z )px; height: @( BandRect.w )px;"></div>
 			}
 		</div>
 
@@ -267,6 +274,34 @@
 
 	TextEntry RenameEntry;
 
+	Panel List;
+
+	// Drag selection: pressing on the empty list and dragging draws a band and selects the entries it touches. The points
+	// are in the list's content, in screen pixels, so the band stays on its entries while the list scrolls.
+	bool bandActive;
+	bool bandMoved;
+
+	/// <summary>The drag just ended: the click that follows its release is ignored.</summary>
+	bool bandEnded;
+	Vector2 bandStart;
+	Vector2 bandEnd;
+	HashSet<string> bandBase = new();
+	string bandSent;
+
+	/// <summary>Where the pointer is in the list's content (screen pixels).</summary>
+	Vector2 ListPoint => List.MousePosition + List.ScrollOffset;
+
+	/// <summary>The band as left, top, width, height in the panel's pixels.</summary>
+	Vector4 BandRect
+	{
+		get
+		{
+			var from = Vector2.Min( bandStart, bandEnd ) * ScaleFromScreen;
+			var size = (Vector2.Max( bandStart, bandEnd ) - Vector2.Min( bandStart, bandEnd )) * ScaleFromScreen;
+			return new Vector4( from.x, from.y, size.x, size.y );
+		}
+	}
+
 	/// <summary>The <see cref="FilesUiState.RenameSession"/> the rename field was last focused for.</summary>
 	int focusedRename;
 
@@ -276,11 +311,90 @@
 	/// <summary>The breadcrumb trail is wider than its box, so its start is cut off.</summary>
 	bool crumbsClipped;
 
+	/// <summary>
+	/// The left button went down on the list itself, not on an entry: a drag from here selects. With Ctrl held, what was
+	/// selected stays selected.
+	/// </summary>
+	void StartBand( PanelEvent e )
+	{
+		if ( List is null || e is not MousePanelEvent { MouseButton: MouseButtons.Left } || e.Target != List )
+			return;
+
+		var ctrl = e is MousePanelEvent { HasCtrl: true } || Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" );
+		bandActive = true;
+		bandMoved = false;
+		bandEnded = false;
+		bandStart = bandEnd = ListPoint;
+		bandSent = null;
+		bandBase = ctrl ? UiState.Rows.Where( x => x.Selected ).Select( x => x.Path ).ToHashSet() : new();
+	}
+
+	/// <summary>
+	/// The click that ends a drag lands on the list too, and mustn't clear what the band selected.
+	/// </summary>
+	void ClickList()
+	{
+		if ( bandEnded )
+		{
+			bandEnded = false;
+			return;
+		}
+
+		Navi.Act( FilesViewModel.SelectAction );
+	}
+
+	/// <summary>
+	/// While the button is held, follow the pointer and select the entries the band touches. Only a change is sent.
+	/// </summary>
+	void UpdateBand()
+	{
+		if ( !bandActive )
+			return;
+
+		if ( List is null || !List.IsValid || !List.HasActive )
+		{
+			bandActive = false;
+			bandEnded = bandMoved;
+			bandMoved = false;
+			return;
+		}
+
+		bandEnd = ListPoint;
+		if ( !bandMoved && (bandEnd - bandStart).Length < 4f )
+			return;
+
+		bandMoved = true;
+
+		var min = Vector2.Min( bandStart, bandEnd );
+		var max = Vector2.Max( bandStart, bandEnd );
+		var offset = List.Box.Rect.Position - List.ScrollOffset;
+		var rows = List.Children.Where( x => x.HasClass( "row" ) ).ToList();
+		var hit = new List<string>( bandBase );
+
+		for ( var i = 0; i < rows.Count && i < UiState.Rows.Count; i++ )
+		{
+			var rect = rows[i].Box.Rect;
+			var left = rect.Left - offset.x;
+			var top = rect.Top - offset.y;
+			if ( left < max.x && left + rect.Width > min.x && top < max.y && top + rect.Height > min.y )
+				hit.Add( UiState.Rows[i].Path );
+		}
+
+		hit = hit.Distinct().ToList();
+		var key = string.Join( "|", hit );
+		if ( key == bandSent )
+			return;
+
+		bandSent = key;
+		Navi.Act( FilesViewModel.SelectManyAction, hit.ToArray() );
+	}
+
 	public override void Tick()
 	{
 		base.Tick();
 
 		FocusRename();
+		UpdateBand();
 		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )
@@ -305,6 +419,7 @@
 	void ClickRow( string path, PanelEvent e )
 	{
 		e.StopPropagation();
+		bandEnded = false;
 
 		// A click on a world panel (WorldInput) comes without the modifier keys (HasCtrl and HasShift are always false
 		// there), so the keyboard is asked too.
@@ -382,5 +497,5 @@
 	/// </summary>
 	protected override int BuildHash() =>
 		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText,
-			crumbsClipped );
+			crumbsClipped, bandMoved ? BandRect : default );
 }

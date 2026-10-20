@@ -24,6 +24,7 @@ public sealed class FilesViewModel
 	public const string OpenPathAction = "open-path";
 	public const string OpenAction = "open";
 	public const string SelectAction = "select";
+	public const string SelectManyAction = "select-many";
 	public const string BackAction = "back";
 	public const string ForwardAction = "forward";
 	public const string UpAction = "up";
@@ -316,6 +317,7 @@ public sealed class FilesViewModel
 			case OpenPathAction when arg is not null: OpenPath( arg ); break;
 			case OpenAction when arg is not null: _ = OpenAsync( arg ); break;
 			case SelectAction: Select( arg, args is { Length: > 1 } ? args[1] : "" ); break;
+			case SelectManyAction: SelectMany( args ); break;
 			case SelectAllAction: SelectAll(); break;
 			case BackAction: GoBack(); break;
 			case ForwardAction: GoForward(); break;
@@ -513,6 +515,18 @@ public sealed class FilesViewModel
 		selection.Clear();
 		selection.AddRange( shownPaths.Skip( System.Math.Min( a, b ) ).Take( System.Math.Abs( a - b ) + 1 ) );
 		anchor = from;
+	}
+
+	/// <summary>
+	/// A drag selection: select exactly these entries (those not listed are ignored), and nothing else.
+	/// </summary>
+	void SelectMany( string[] paths )
+	{
+		renamePath = null;
+		selection.Clear();
+		selection.AddRange( (paths ?? []).Where( shownPaths.Contains ).Distinct() );
+		anchor = cursor = selection.Count > 0 ? selection[^1] : cursor;
+		Rebuild();
 	}
 
 	public void SelectAll()
