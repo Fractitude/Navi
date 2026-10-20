@@ -76,7 +76,7 @@
 				return;
 			}
 
-			await Navi.Window.SetTitleAsync( $"Choose a file for {request.Item1}" );
+			await Navi.Window.SetTitleAsync( "Choose a file" );
 			ViewModel.Show(
 				path => _ = Navi.CallAsync( "picker.choose", path ),
 				() => _ = Navi.CallAsync( "picker.cancel" ),
