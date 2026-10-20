@@ -45,7 +45,9 @@ public sealed class NaviInputCapture : Component
 	/// and the name the app gets. Ctrl, Shift and Alt held with one go before it, e.g. "ctrl+shift+n". Escape isn't one: it
 	/// stands the player up.
 	/// </summary>
-	public static IReadOnlyList<(string Key, string Name)> ShortcutKeys { get; } =
+	public static IReadOnlyList<(string Key, string Name)> ShortcutKeys => shortcutKeyList;
+
+	static readonly (string Key, string Name)[] shortcutKeyList =
 	[
 		.."abcdefghijklmnopqrstuvwxyz0123456789".Select( x => (x.ToString(), x.ToString()) ),
 		("ENTER", "enter"), ("BACKSPACE", "backspace"), ("DEL", "delete"), ("TAB", "tab"), ("SPACE", "space"),
@@ -56,7 +58,7 @@ public sealed class NaviInputCapture : Component
 		("MOUSE4", "mouse4"), ("MOUSE5", "mouse5"),
 	];
 
-	static readonly HashSet<string> shortcutNames = ShortcutKeys.Select( x => x.Name ).ToHashSet();
+	static readonly HashSet<string> shortcutNameSet = shortcutKeyList.Select( x => x.Name ).ToHashSet();
 
 	/// <summary>
 	/// Is <paramref name="keys"/> a shortcut as apps get them: "ctrl+", "shift+", "alt+" in that order, then a key name?
@@ -73,7 +75,7 @@ public sealed class NaviInputCapture : Component
 				rest = rest[modifier.Length..];
 		}
 
-		return shortcutNames.Contains( rest );
+		return shortcutNameSet.Contains( rest );
 	}
 
 	/// <summary>
