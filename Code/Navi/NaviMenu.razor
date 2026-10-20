@@ -6,7 +6,7 @@
 @* same in every theme. The caller places it (position, and width if it wants one) and closes it when an item is chosen. *@
 @* Its styles are in NaviDesktop.razor.scss. *@
 
-<root class="navi-menu" @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() ) @onclick=@( ( PanelEvent e ) => e.StopPropagation() )>
+<root @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() ) @onclick=@( ( PanelEvent e ) => e.StopPropagation() )>
 	@if ( Heading is not null )
 	{
 		<div class="heading">@Heading</div>
@@ -44,6 +44,13 @@
 
 	/// <summary>Called with the item's id when the player picks an enabled item.</summary>
 	public System.Action<string> OnChoose { get; set; }
+
+	// Added here, not on <root>: the class a caller passes (its placement) would replace the root's own.
+	protected override void OnAfterTreeRender( bool firstTime )
+	{
+		base.OnAfterTreeRender( firstTime );
+		AddClass( "navi-menu" );
+	}
 
 	void Choose( NaviMenuItem item )
 	{
