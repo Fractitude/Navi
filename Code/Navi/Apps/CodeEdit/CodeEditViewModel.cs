@@ -56,6 +56,12 @@ public sealed class CodeEditViewModel
 	public const string CancelConfirmAction = "cancel-confirm";
 	public const string ConfirmOtherAction = "confirm-other";
 	public const string DismissNoticeAction = "dismiss-notice";
+	public const string ToggleThemeAction = "toggle-theme";
+
+	/// <summary>The file in the app's own folder that holds what the player chose, as JSON.</summary>
+	const string PreferencesName = "preferences.json";
+
+	const string ThemeKey = "theme";
 
 	// The document.
 
@@ -100,6 +106,7 @@ public sealed class CodeEditViewModel
 	{
 		this.navi = navi ?? throw new System.ArgumentNullException( nameof(navi) );
 		Rebuild();
+		_ = LoadPreferencesAsync();
 	}
 
 	public CodeEditUiState UiState { get; private set; } = new();
@@ -229,6 +236,7 @@ public sealed class CodeEditViewModel
 			case ConfirmOtherAction when confirmedOther is not null: _ = AnswerAsync( confirmedOther ); break;
 			case CancelConfirmAction: _ = AnswerAsync( null ); break;
 			case DismissNoticeAction: Notify( null ); break;
+			case ToggleThemeAction: _ = SetThemeAsync( !UiState.LightTheme ); break;
 		}
 	}
 
@@ -251,6 +259,65 @@ public sealed class CodeEditViewModel
 			case "ctrl+o": AskToDiscard( PickAsync ); break;
 			case "ctrl+s": _ = SaveAsync(); break;
 			case "ctrl+shift+s": OpenBar( CodeEditBar.SaveAs ); break;
+		}
+	}
+
+	// Preferences.
+
+	/// <summary>
+	/// Take the theme the player chose last from the app's folder. The first time there is nothing there, so the
+	/// editor follows the computer's color scheme (a dark computer gets the dark editor).
+	/// </summary>
+	async Task LoadPreferencesAsync()
+	{
+		var light = false;
+		try
+		{
+			var file = Join( await navi.Files.GetAppFolderAsync(), PreferencesName );
+			var chosen = await navi.Files.GetInfoAsync( file ) is { IsFolder: false }
+				? Json.Deserialize<Dictionary<string, string>>( await navi.Files.ReadTextAsync( file ) )
+				: null;
+
+			if ( chosen is not null && chosen.TryGetValue( ThemeKey, out var theme ) && theme is "light" or "dark" )
+				light = theme == "light";
+			else
+				light = (await navi.Settings.GetThemeAsync()).Scheme == Navi.ColorScheme.Light;
+		}
+		catch ( System.Exception )
+		{
+			// Unreadable preferences: the dark editor, and the next choice writes them again.
+		}
+
+		UiState = UiState with { LightTheme = light, ThemeKnown = true };
+		Rebuild();
+	}
+
+	async Task SetThemeAsync( bool light )
+	{
+		UiState = UiState with { LightTheme = light, ThemeKnown = true };
+		Rebuild();
+
+		try
+		{
+			var folder = await navi.Files.GetAppFolderAsync();
+			if ( await navi.Files.GetInfoAsync( folder ) is null )
+			{
+				// A folder at a time: Navi.Files makes one level.
+				var made = "";
+				foreach ( var part in folder.Split( '/', System.StringSplitOptions.RemoveEmptyEntries ) )
+				{
+					made += "/" + part;
+					if ( await navi.Files.GetInfoAsync( made ) is null )
+						await navi.Files.CreateFolderAsync( made );
+				}
+			}
+
+			await navi.Files.WriteTextAsync( Join( folder, PreferencesName ),
+				Json.Serialize( new Dictionary<string, string> { [ThemeKey] = light ? "light" : "dark" } ) );
+		}
+		catch ( System.Exception e )
+		{
+			Notify( Describe( e ) );
 		}
 	}
 

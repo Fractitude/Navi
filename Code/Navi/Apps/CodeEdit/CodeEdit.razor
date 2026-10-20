@@ -29,8 +29,12 @@
 		<div class="tool @( Editor is { CanRedo: true } ? "" : "disabled" )" tooltip="Redo (Ctrl+Y)" @onclick=@Redo>
 			<i>redo</i>
 		</div>
-		<div class="tool" tooltip="@( lightTheme ? "Dark theme" : "Light theme" )" @onclick=@ToggleTheme>
-			<i>@( lightTheme ? "dark_mode" : "light_mode" )</i>
+
+		<div class="divider"></div>
+
+		<div class="tool" tooltip="@( UiState.LightTheme ? "Dark theme" : "Light theme" )"
+		     @onclick=@( () => Navi.Act( CodeEditViewModel.ToggleThemeAction ) )>
+			<i>@( UiState.LightTheme ? "dark_mode" : "light_mode" )</i>
 		</div>
 
 		<div class="spacer"></div>
@@ -110,8 +114,8 @@
 	ScriptControl Editor;
 	TextEntry BarEntry;
 
-	/// <summary>The editor is drawn light. Only this panel's view, not the document: it isn't shared.</summary>
-	bool lightTheme;
+	/// <summary>The theme the editor was last given, so it is only set again when it changes.</summary>
+	bool? appliedLight;
 
 	static readonly ScriptControl.ThemeDefinition LightTheme = ScriptControl.ThemeDefinition.Default with
 	{
@@ -152,11 +156,17 @@
 
 	void Redo() => Editor?.Redo();
 
-	void ToggleTheme()
+	/// <summary>
+	/// Give the editor the saved theme, once it is known and whenever it changes. The preference is the app's, so every
+	/// player at a shared computer sees the same one.
+	/// </summary>
+	void ApplyTheme()
 	{
-		lightTheme = !lightTheme;
-		if ( Editor is not null )
-			Editor.Theme = lightTheme ? LightTheme : ScriptControl.ThemeDefinition.Default;
+		if ( Editor is null || !UiState.ThemeKnown || appliedLight == UiState.LightTheme )
+			return;
+
+		appliedLight = UiState.LightTheme;
+		Editor.Theme = UiState.LightTheme ? LightTheme : ScriptControl.ThemeDefinition.Default;
 	}
 
 	/// <summary>
@@ -185,6 +195,7 @@
 		SyncText();
 		FocusFields();
 		FixPopups();
+		ApplyTheme();
 
 		if ( Navi.IsViewer )
 			return;
@@ -394,5 +405,5 @@
 	/// </summary>
 	protected override int BuildHash() =>
 		System.HashCode.Combine( UiState.Revision, UiState.TextSession, EditorFocused ? null : UiState.Text,
-			BarEntry is { HasFocus: true } ? null : UiState.BarText, Editor?.CanUndo, Editor?.CanRedo, lightTheme );
+			BarEntry is { HasFocus: true } ? null : UiState.BarText, Editor?.CanUndo, Editor?.CanRedo );
 }

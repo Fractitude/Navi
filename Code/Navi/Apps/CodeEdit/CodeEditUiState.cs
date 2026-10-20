@@ -31,6 +31,12 @@ public sealed record CodeEditUiState
 	/// </summary>
 	public int TextSession { get; init; }
 
+	/// <summary>The editor is drawn light. Saved in the app's preferences.</summary>
+	public bool LightTheme { get; init; }
+
+	/// <summary>The theme is read from the preferences (or the computer's color scheme), so the panel can use it.</summary>
+	public bool ThemeKnown { get; init; }
+
 	/// <summary>The file's name, or "Untitled" for a document never saved.</summary>
 	public string Name { get; init; } = "Untitled";
 
