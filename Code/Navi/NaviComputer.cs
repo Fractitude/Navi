@@ -1454,7 +1454,7 @@ public sealed partial class NaviComputer : Component
 			RememberPlacement( window );
 
 		// A file asked for is answered with nothing when the picker or the app that asked goes away.
-		if ( pickRequest is { } request && (id == NaviAppRegistry.FilePickerApp || id == request.Caller.App.Id) )
+		if ( pickRequest is { } pending && (id == NaviAppRegistry.FilePickerApp || id == pending.Caller.App.Id) )
 			EndPick( null, closePicker: id != NaviAppRegistry.FilePickerApp );
 
 		running.RemoveAll( x => x.App.Id == id );
