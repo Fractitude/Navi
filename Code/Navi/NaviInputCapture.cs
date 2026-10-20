@@ -153,7 +153,7 @@ public sealed class NaviInputCapture : Component
 	Transform playerView;
 	MouseVisibility playerMouse;
 
-	record ControllerState( PlayerController Controller, bool Input, bool Look, bool Camera );
+	record ControllerState( PlayerController Controller, bool Input, bool Look, bool Camera, bool ThirdPerson );
 	readonly List<ControllerState> controllers = new();
 	readonly List<WorldInput> worldInputs = new();
 
@@ -294,10 +294,11 @@ public sealed class NaviInputCapture : Component
 
 			foreach ( var pc in Scene.GetAllComponents<PlayerController>().Where( x => !x.IsProxy ) )
 			{
-				controllers.Add( new ControllerState( pc, pc.UseInputControls, pc.UseLookControls, pc.UseCameraControls ) );
+				controllers.Add( new ControllerState( pc, pc.UseInputControls, pc.UseLookControls, pc.UseCameraControls, pc.ThirdPerson ) );
 				pc.UseInputControls = false;
 				pc.UseLookControls = false;
 				pc.UseCameraControls = false;
+				pc.ThirdPerson = false;
 			}
 
 			// Off while the camera flies, or clicks go to whatever the view's centre passes over. UpdateCursor turns them back on.
@@ -320,6 +321,7 @@ public sealed class NaviInputCapture : Component
 			c.Controller.UseInputControls = c.Input;
 			c.Controller.UseLookControls = c.Look;
 			c.Controller.UseCameraControls = c.Camera;
+			c.Controller.ThirdPerson = c.ThirdPerson;
 		}
 
 		foreach ( var wi in worldInputs )
