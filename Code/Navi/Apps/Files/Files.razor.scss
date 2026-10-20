@@ -470,12 +470,17 @@
 
 		.heading
 		{
-			height: 20px;
+			height: 22px;
 			align-items: center;
 			padding: 0 8px;
-			font-size: 10px;
+			font-size: 11px;
 			font-weight: 700;
-			opacity: 0.6;
+			letter-spacing: 1px;
+			color: $surface-t;
+			background-color: $mid-bg;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
 		}
 
 		.separator
@@ -487,12 +492,12 @@
 
 		.item
 		{
-			height: 20px;
+			height: 24px;
 			flex-direction: row;
 			align-items: center;
 			gap: 6px;
 			padding: 0 8px;
-			font-size: 11px;
+			font-size: 12px;
 			font-weight: 700;
 			white-space: nowrap;
 			cursor: pointer;
@@ -512,7 +517,7 @@
 			.keys
 			{
 				flex-shrink: 0;
-				font-size: 9px;
+				font-size: 10px;
 				font-weight: 400;
 				opacity: 0.6;
 			}
