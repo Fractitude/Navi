@@ -309,7 +309,8 @@ public sealed class NaviInputCapture : Component
 
 			foreach ( var pc in Scene.GetAllComponents<PlayerController>().Where( x => !x.IsProxy ) )
 			{
-				controllers.Add( new ControllerState( pc, pc.UseInputControls, pc.UseLookControls, pc.UseCameraControls, pc.ThirdPerson ) );
+				controllers.Add( new ControllerState( pc, pc.UseInputControls, pc.UseLookControls, pc.UseCameraControls,
+					pc.ThirdPerson ) );
 				pc.UseInputControls = false;
 				pc.UseLookControls = false;
 				pc.UseCameraControls = false;
