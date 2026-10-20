@@ -201,6 +201,7 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Notifications.SetMutedAsync( appId, muted )` | Mute another app's notifications, or unmute them | `navi.settings.change` |
 | `Navi.Files.ListAsync( path )`, `GetInfoAsync`, `ReadTextAsync`, `WriteTextAsync`, `ReadBytesAsync`, `WriteBytesAsync`, `CreateFolderAsync` | Files and folders. See "Files" | `navi.files.access`, except in the app's own folder |
 | `Navi.Files.CreateSymlinkAsync`, `CreateAliasAsync`, `ResolveAliasAsync`, `MoveAsync`, `CopyAsync`, `TrashAsync`, `DeleteAsync` | Links, moving, the trash | the same |
+| `Navi.Files.PickAsync( fileTypes, startFolder )` | Ask the player for a file in the system File Picker, a window of its own. Returns the path (or null), and the app may read that one file | none |
 | `Navi.Files.RestoreAsync( path )`, `EjectAsync( path )` | Put back from the trash; take out a removable drive | `navi.files.access` |
 | `Navi.Files.GetAppFolderAsync()`, `GetDrivesAsync()`, `GetVersionAsync()`, `GetTrashPathAsync()` | The app's own folder, the drives, a version to poll | |
 | `Navi.Files.OpenAsync( path )`, `TakeOpenedAsync()` | Open a file with the app for its kind; take the files opened with this app. See "Files" | a path the app can reach |

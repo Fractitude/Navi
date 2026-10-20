@@ -1,0 +1,90 @@
+@using Sandbox.UI
+@inherits NaviApp
+@namespace NaviApps
+
+@* The File Picker, a system app (Assets/navi/apps/filepicker.napp). The computer opens it when an app asks the player for *@
+@* a file (Navi.Files.PickAsync), and only the computer and this window talk: the app gets the file that is chosen and *@
+@* never sees a folder. It is opaque whatever the theme's Transparency and Blur. *@
+
+<root>
+	<div class="header">
+		<div class="tool @( UiState.Path == "/" ? "disabled" : "" )" @onclick=@( () => ViewModel.Up() )>
+			<i>arrow_upward</i>
+		</div>
+		<div class="path">@UiState.Path</div>
+	</div>
+
+	@if ( UiState.Notice != "" )
+	{
+		<div class="notice">@UiState.Notice</div>
+	}
+
+	<div class="list">
+		@foreach ( var row in UiState.Rows )
+		{
+			<div class="row @( row.Path == UiState.Selected ? "selected" : "" )"
+			     @onclick=@( () => ViewModel.Select( row.Path ) )
+			     @ondoubleclick=@( () => ViewModel.Activate( row.Path ) )>
+				<i class="icon">@row.Icon</i>
+				<div class="name">@row.Name</div>
+			</div>
+		}
+	</div>
+
+	<div class="footer">
+		<div class="button" @onclick=@( () => ViewModel.Cancel() )>Cancel</div>
+		<div class="button" @onclick=@( () => ViewModel.Confirm() )>Open</div>
+	</div>
+</root>
+
+@code
+{
+	/// <summary>
+	/// The picker's logic and its state. Made on first use, with the panel's Navi (the panel is a NaviApp).
+	/// </summary>
+	FilePickerViewModel ViewModel => field ??= new( Navi );
+
+	FilePickerUiState UiState => ViewModel.UiState;
+
+	bool started;
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( !started )
+		{
+			started = true;
+			_ = StartAsync();
+		}
+	}
+
+	/// <summary>
+	/// Ask the computer what this picker is for, then list. The computer closes the window by itself when the answer is
+	/// in, so a cancel here only has to tell it.
+	/// </summary>
+	async System.Threading.Tasks.Task StartAsync()
+	{
+		try
+		{
+			if ( await Navi.CallAsync( "picker.request" ) is not System.ValueTuple<string, string[], string> request )
+			{
+				await Navi.Window.CloseAsync();
+				return;
+			}
+
+			await Navi.Window.SetTitleAsync( $"Choose a file for {request.Item1}" );
+			ViewModel.Show(
+				path => _ = Navi.CallAsync( "picker.choose", path ),
+				() => _ = Navi.CallAsync( "picker.cancel" ),
+				request.Item3, request.Item2 );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"File Picker: couldn't start: {e.Message}" );
+			await Navi.Window.CloseAsync();
+		}
+	}
+
+	protected override int BuildHash() => ViewModel.Revision;
+}

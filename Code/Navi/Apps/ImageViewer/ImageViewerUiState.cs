@@ -23,6 +23,9 @@ public sealed record ImageViewerUiState
 	/// <summary>Why the last file couldn't be opened. Empty when there is nothing to say.</summary>
 	public string Notice { get; init; } = "";
 
+	/// <summary>The File Picker is open for this app, so Open waits.</summary>
+	public bool Picking { get; init; }
+
 	/// <summary>A file is being read, so Open waits.</summary>
 	public bool Loading { get; init; }
 }

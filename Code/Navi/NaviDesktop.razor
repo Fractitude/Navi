@@ -16,7 +16,8 @@
 		{
 			var app = window.App;
 			var info = window.Info;
-			var state = (window == Computer.FocusedWindow ? "focused " : "") + (window.IsMinimized ? "minimized " : "") + (window.IsMaximized ? "maximized" : "");
+			var state = (window == Computer.FocusedWindow ? "focused " : "") + (window.IsMinimized ? "minimized " : "") + (window.IsMaximized ? "maximized " : "")
+					+ (app.Id == NaviAppRegistry.FilePickerApp ? "opaque" : "");
 
 			@* Position and size are set every frame in UpdateWindows, so dragging doesn't rebuild the tree. *@
 			<div @key=@window.Key class="window @state" @onmousedown=@(() => Computer.UserFocus( app.Id, window.Id ))>

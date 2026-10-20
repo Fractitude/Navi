@@ -26,16 +26,12 @@ public sealed class ImageViewerViewModel
 	public ImageViewerViewModel( Navi navi )
 	{
 		this.navi = navi;
-		Picker = new( navi );
 		UiState = new();
 	}
 
 	public ImageViewerUiState UiState { get; private set; }
 
-	/// <summary>The file picker the Open button shows. The panel draws it.</summary>
-	public FilePickerViewModel Picker { get; }
-
-	public int Revision => System.HashCode.Combine( UiState.Revision, Picker.Revision );
+	public int Revision => UiState.Revision;
 
 	/// <summary>
 	/// The open image. Not part of the state: it is a texture, replaced whole when another file is opened.
@@ -59,13 +55,36 @@ public sealed class ImageViewerViewModel
 		}
 	}
 
-	/// <summary>The "Open..." button: pick a picture, starting in Pictures.</summary>
+	/// <summary>
+	/// The "Open..." button: ask the computer for a picture. It opens the File Picker, a window of its own, in Pictures.
+	/// </summary>
 	public void ShowPicker()
 	{
-		if ( UiState.Loading )
+		if ( UiState.Loading || UiState.Picking )
 			return;
 
-		Picker.Show( file => _ = LoadAsync( file ), StartFolder, "jpg", "jpeg", "png" );
+		_ = PickAsync();
+	}
+
+	async Task PickAsync()
+	{
+		Update( uiState => uiState with { Picking = true, Notice = "" } );
+
+		string file;
+		try
+		{
+			file = await navi.Files.PickAsync( ["jpg", "jpeg", "png"], StartFolder );
+		}
+		catch ( System.Exception e )
+		{
+			Update( uiState => uiState with { Picking = false } );
+			Fail( Describe( e ) );
+			return;
+		}
+
+		Update( uiState => uiState with { Picking = false } );
+		if ( file is not null )
+			await LoadAsync( file );
 	}
 
 	/// <summary>

@@ -76,6 +76,32 @@ public static class NaviSystemCalls
 				: computer.TakeCameraPhoto();
 		}
 
+		// The system file picker: any app may ask the player for a file, and gets only the one chosen. The File Picker
+		// window itself answers with the picker.* calls, which no other app may make.
+		if ( method == "files.pick" )
+			return await computer.PickFileAsync( process, Opt<string[]>( args, 0, [] ), Opt( args, 1, "/" ) );
+
+		if ( method.StartsWith( "picker." ) )
+		{
+			if ( self != NaviAppRegistry.FilePickerApp || !computer.IsAuthority )
+				throw new System.NotSupportedException( $"Navi has no call '{method}'." );
+
+			switch ( method )
+			{
+				case "picker.request":
+					return computer.PickRequest is { } request
+						? (request.Caller.App.Name, request.Types.ToArray(), request.StartFolder)
+						: null;
+
+				case "picker.choose":
+					return computer.AnswerPick( Arg<string>( args, 0, method ) );
+
+				case "picker.cancel":
+					computer.CancelPick();
+					return null;
+			}
+		}
+
 		// Direct messages. The host has them, and they are the seated player's.
 		if ( method.StartsWith( "messages." ) )
 			return NaviMessageCalls.Run( computer, process, method, args );

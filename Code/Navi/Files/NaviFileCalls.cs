@@ -44,21 +44,21 @@ public static class NaviFileCalls
 			{
 				var path = Arg( args, 0, method );
 				var follow = Opt( args, 1, true );
-				Check( files, process, path, follow );
+				Check( files, process, path, follow, read: true );
 				return files.TryResolve( path, follow ) is { } at ? Describe( files, at ) : null;
 			}
 
 			case "files.read":
 			{
 				var path = Arg( args, 0, method );
-				Check( files, process, path, followLast: true );
+				Check( files, process, path, followLast: true, read: true );
 				return files.ReadText( path );
 			}
 
 			case "files.read-bytes":
 			{
 				var path = Arg( args, 0, method );
-				Check( files, process, path, followLast: true );
+				Check( files, process, path, followLast: true, read: true );
 				return files.ReadBytes( path );
 			}
 
@@ -215,20 +215,23 @@ public static class NaviFileCalls
 		}
 	}
 
-	static bool Allowed( NaviProcess process, string path ) =>
-		NaviFileSystem.IsWithin( path, NaviComputer.AppFolderOf( process.App.Id ) );
+	/// <summary>
+	/// The app's own folder, and for reading only, the files the player chose for it in the file picker.
+	/// </summary>
+	static bool Allowed( NaviProcess process, string path, bool read = false ) =>
+		NaviFileSystem.IsWithin( path, NaviComputer.AppFolderOf( process.App.Id ) ) || (read && process.PickedFiles.Contains( path ));
 
 	/// <summary>
 	/// Throw <see cref="NaviPermissions.Missing"/> unless the app may use <paramref name="path"/>: as written, and where it
 	/// leads. For a path that doesn't exist yet, where its folder leads.
 	/// </summary>
-	static void Check( NaviFileSystem files, NaviProcess process, string path, bool followLast )
+	static void Check( NaviFileSystem files, NaviProcess process, string path, bool followLast, bool read = false )
 	{
 		if ( process.HasPermission( NaviPermissions.Files ) )
 			return;
 
 		var normalized = NaviFileSystem.Normalize( path );
-		if ( !Allowed( process, normalized ) )
+		if ( !Allowed( process, normalized, read ) )
 			throw NaviPermissions.Missing( NaviPermissions.Files );
 
 		string real;
@@ -239,7 +242,7 @@ public static class NaviFileCalls
 		else
 			return; // Nothing there to reach: the call fails on its own.
 
-		if ( !Allowed( process, real ) )
+		if ( !Allowed( process, real, read ) )
 			throw NaviPermissions.Missing( NaviPermissions.Files );
 	}
 

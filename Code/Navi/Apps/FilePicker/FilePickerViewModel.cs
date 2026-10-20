@@ -31,15 +31,15 @@ public sealed record FilePickerUiState
 }
 
 /// <summary>
-/// A file picker dialog any app can show inside its own panel: it lists the computer's folders with the app's own Navi
-/// calls (so the app needs <c>navi.files.access</c>), and tells the app which file the player chose. It never sees a
-/// file's content. The app owns one, calls <see cref="Show"/>, and draws it with <c>&lt;FilePicker Model=... /&gt;</c>.
-/// Without a start folder it opens at the root, <c>/</c>.
+/// What the File Picker window does: it lists the computer's folders and tells the computer which file the player chose.
+/// The File Picker is a system app, so it has the files; an app that wants a file asks the computer
+/// (<c>Navi.Files.PickAsync</c>) and never sees the folders. The panel is <c>FilePickerWindow.razor</c>.
 /// </summary>
 public sealed class FilePickerViewModel
 {
 	readonly Navi navi;
 	System.Action<string> onPicked;
+	System.Action onCancelled;
 	string[] extensions = [];
 
 	public FilePickerViewModel( Navi navi )
@@ -54,19 +54,25 @@ public sealed class FilePickerViewModel
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
 
 	/// <summary>
-	/// Open the dialog. <paramref name="startFolder"/> is where it starts (the root when null or not a folder),
-	/// <paramref name="fileTypes"/> the extensions shown without the dot (every file when empty), and
-	/// <paramref name="picked"/> is called with the path of the file the player chose.
+	/// Start listing. <paramref name="startFolder"/> is where it starts (the root when null or not a folder),
+	/// <paramref name="fileTypes"/> the extensions shown without the dot (every file when empty),
+	/// <paramref name="picked"/> is called with the path of the file the player chose and <paramref name="cancelled"/>
+	/// when they gave up.
 	/// </summary>
-	public void Show( System.Action<string> picked, string startFolder = "/", params string[] fileTypes )
+	public void Show( System.Action<string> picked, System.Action cancelled, string startFolder, params string[] fileTypes )
 	{
 		onPicked = picked;
+		onCancelled = cancelled;
 		extensions = fileTypes?.Select( x => x.ToLowerInvariant() ).ToArray() ?? [];
 		Update( uiState => uiState with { IsOpen = true, Selected = "", Notice = "" } );
 		_ = ListAsync( startFolder ?? "/" );
 	}
 
-	public void Cancel() => Update( uiState => uiState with { IsOpen = false, Rows = [], Selected = "" } );
+	public void Cancel()
+	{
+		Update( uiState => uiState with { IsOpen = false, Rows = [], Selected = "" } );
+		onCancelled?.Invoke();
+	}
 
 	public void Up()
 	{

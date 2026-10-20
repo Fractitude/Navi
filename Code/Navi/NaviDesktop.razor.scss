@@ -1522,3 +1522,25 @@ NaviDesktop.wallpaper-glass.scheme-dark
 .theme-glass.blur-2 { @include glass-blur( 14px ); }
 .theme-glass.blur-3 { @include glass-blur( 26px ); }
 .theme-glass.blur-4 { @include glass-blur( 44px ); }
+
+// The File Picker window is never see-through or blurred, whatever the Transparency and Blur settings: it is the OS asking,
+// and what is behind it would show through the file names. These come after the levels above and are more specific.
+.theme-glass.scheme-light.clear-0 .window.opaque, .theme-glass.scheme-light.clear-1 .window.opaque,
+.theme-glass.scheme-light.clear-2 .window.opaque, .theme-glass.scheme-light.clear-3 .window.opaque,
+.theme-glass.scheme-light.clear-4 .window.opaque
+{
+	background-color: rgba( 244, 247, 255, 1 );
+}
+
+.theme-glass.scheme-dark.clear-0 .window.opaque, .theme-glass.scheme-dark.clear-1 .window.opaque,
+.theme-glass.scheme-dark.clear-2 .window.opaque, .theme-glass.scheme-dark.clear-3 .window.opaque,
+.theme-glass.scheme-dark.clear-4 .window.opaque
+{
+	background-color: rgba( 26, 29, 48, 1 );
+}
+
+.theme-glass.blur-1 .window.opaque, .theme-glass.blur-2 .window.opaque,
+.theme-glass.blur-3 .window.opaque, .theme-glass.blur-4 .window.opaque
+{
+	backdrop-filter-blur: 0px;
+}

@@ -2,33 +2,15 @@
 
 @mixin filepicker-style
 {
-	FilePicker
+	FilePickerWindow
 	{
-		display: none;
-		position: absolute;
-		left: 0;
-		top: 0;
-		width: 100%;
-		height: 100%;
-		padding: 12px;
-		background-color: rgba(0, 0, 0, 0.5);
-
-		&.open
-		{
-			display: flex;
-		}
-
-		.dialog
-		{
-			flex-grow: 1;
-			min-height: 0;
-			flex-direction: column;
-			padding: 6px;
-			gap: 6px;
-			color: $ink-t;
-			background-color: $paper-bg;
-			border: 2px solid $deep-bc;
-		}
+		width: 420px;
+		height: 340px;
+		flex-direction: column;
+		padding: 6px;
+		gap: 6px;
+		color: $ink-t;
+		background-color: $paper-bg;
 
 		.header
 		{

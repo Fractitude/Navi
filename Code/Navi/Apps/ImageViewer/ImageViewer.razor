@@ -7,7 +7,7 @@
 
 <root>
 	<div class="bar">
-		<div class="button @( UiState.Loading ? "disabled" : "" )" @onclick=@( () => ViewModel.ShowPicker() )>
+		<div class="button @( UiState.Loading || UiState.Picking ? "disabled" : "" )" @onclick=@( () => ViewModel.ShowPicker() )>
 			<i>folder_open</i>
 			Open...
 		</div>
@@ -40,8 +40,6 @@
 			<div class="size">@UiState.SizeText</div>
 		</div>
 	}
-
-	<FilePicker Model=@ViewModel.Picker/>
 </root>
 
 @code

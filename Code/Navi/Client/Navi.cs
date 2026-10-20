@@ -1031,6 +1031,16 @@ public sealed class Navi
 		/// </summary>
 		public Task<string> GetAppFolderAsync() => navi.CallAsync<string>( "files.app-folder" );
 
+		/// <summary>
+		/// Ask the player to choose a file, in a File Picker window of the computer's own (not of this app). Returns its
+		/// path, or null if they cancelled. The app can then read that file, with or without <see cref="Permission.Files"/>,
+		/// and gets no look at any other. <paramref name="fileTypes"/> are the extensions shown, without the dot (every
+		/// file when empty). The picker opens at <paramref name="startFolder"/>, or at "/" without one. One picker is open
+		/// at a time: asking while one is open throws.
+		/// </summary>
+		public async Task<string> PickAsync( IEnumerable<string> fileTypes = null, string startFolder = "/" ) =>
+			await navi.CallAsync( "files.pick", fileTypes?.ToArray() ?? Array.Empty<string>(), startFolder ?? "/" ) as string;
+
 		public async Task<IReadOnlyList<DriveInfo>> GetDrivesAsync()
 		{
 			var drives = await navi.CallAsync<(string, string, string, long, long, bool)[]>( "files.drives" );

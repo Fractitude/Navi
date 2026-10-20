@@ -1,0 +1,18 @@
+{
+  "Title": "File Picker",
+  "Description": "Choose a file for an app. The computer opens it when an app asks.",
+  "Icon": "folder_open",
+  "Color": "#6f8fb0",
+  "PanelType": "NaviApps.FilePickerWindow",
+  "CanMinimize": false,
+  "CanMaximize": false,
+  "CanResize": true,
+  "MinSize": "320,240",
+  "Shared": false,
+  "Permissions": [
+    "navi.files.access"
+  ],
+  "IsSystem": true,
+  "__references": [],
+  "__version": 0
+}

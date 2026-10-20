@@ -22,6 +22,12 @@ public sealed class NaviProcess
 	/// </summary>
 	public bool IsRoot { get; init; }
 
+	/// <summary>
+	/// Files the player chose for the app in the file picker: paths with symlinks followed. The app may read them whatever
+	/// its permissions. They last as long as the app runs.
+	/// </summary>
+	public HashSet<string> PickedFiles { get; } = new();
+
 	public bool HasPermission( string permission ) => IsRoot || Permissions.Contains( permission );
 
 	readonly List<NaviWindow> windows = new();
@@ -1003,7 +1009,7 @@ public sealed partial class NaviComputer : Component
 	/// <summary>
 	/// Installed apps, sorted by name.
 	/// </summary>
-	public IEnumerable<NaviAppInfo> Installed => NaviAppRegistry.All.Where( IsInstalled );
+	public IEnumerable<NaviAppInfo> Installed => NaviAppRegistry.All.Where( x => x.Id != NaviAppRegistry.FilePickerApp && IsInstalled( x ) );
 
 	/// <summary>
 	/// The apps on the taskbar: the pinned ones in the player's order, then the running ones that have a window and aren't
@@ -1347,7 +1353,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public bool Launch( string id )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || id == NaviAppRegistry.FilePickerApp )
 			return false;
 
 		if ( GetProcess( id ) is not null )
@@ -1446,6 +1452,10 @@ public sealed partial class NaviComputer : Component
 
 		foreach ( var window in process.Windows )
 			RememberPlacement( window );
+
+		// A file asked for is answered with nothing when the picker or the app that asked goes away.
+		if ( pickRequest is { } request && (id == NaviAppRegistry.FilePickerApp || id == request.Caller.App.Id) )
+			EndPick( null, closePicker: id != NaviAppRegistry.FilePickerApp );
 
 		running.RemoveAll( x => x.App.Id == id );
 

@@ -329,6 +329,12 @@ public static class NaviAppRegistry
 	/// </summary>
 	public const string SettingsApp = BuiltInFolder + "settings.napp";
 
+	/// <summary>
+	/// Id of the built-in File Picker, the window the computer opens when an app asks the player for a file. It is
+	/// never in the start menu and no app can launch it.
+	/// </summary>
+	public const string FilePickerApp = BuiltInFolder + "filepicker.napp";
+
 	static HashSet<string> systemAppFolders = new( System.StringComparer.OrdinalIgnoreCase ) { BuiltInFolder };
 
 	/// <summary>
