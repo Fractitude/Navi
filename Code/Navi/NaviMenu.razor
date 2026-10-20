@@ -26,7 +26,7 @@
 
 			<div class="item @( item.Enabled ? "" : "disabled" ) @( item.Danger ? "danger" : "" ) @( hasChildren && Open == item.Id ? "open" : "" )"
 			     @onmouseover=@( ( PanelEvent e ) => Hover( chosen, e ) )
-			     @onclick=@( () => Choose( chosen ) )>
+			     @onclick=@( ( PanelEvent e ) => Choose( chosen, e ) )>
 				@if ( !string.IsNullOrEmpty( item.Icon ) )
 				{
 					<i>@item.Icon</i>
@@ -99,23 +99,62 @@
 	/// <summary>Where the open submenu starts, in the menu's pixels: level with its item, whatever the scrolling.</summary>
 	float SubmenuTop;
 
+	const float OpenDelay = 0.3f;
+
+	// The submenu the pointer is waiting on, and for how long.
+	NaviMenuItem pending;
+	float pendingTop;
+	RealTimeSince sincePending;
+
 	void Hover( NaviMenuItem item, PanelEvent e )
 	{
 		if ( item.Children is not { Count: > 0 } )
 		{
+			pending = null;
 			Open = null;
 			return;
 		}
 
-		// The menu's border (2) and the submenu's own border and padding (4) are between the two tops.
-		SubmenuTop = (e.This.Box.Rect.Top - Box.Rect.Top) * ScaleFromScreen - 6f;
-		Open = item.Id;
+		if ( Open == item.Id || pending == item )
+			return;
+
+		pending = item;
+		pendingTop = Top( e.This );
+		sincePending = 0;
 	}
 
-	void Choose( NaviMenuItem item )
+	/// <summary>Where a submenu opened from this item starts, in the menu's pixels: level with it, whatever the scrolling.</summary>
+	float Top( Panel item )
+	{
+		// The menu's border (2) and the submenu's own border and padding (4) are between the two tops.
+		return (item.Box.Rect.Top - Box.Rect.Top) * ScaleFromScreen - 6f;
+	}
+
+	public override void Tick()
+	{
+		base.Tick();
+
+		if ( pending is null || sincePending < OpenDelay )
+			return;
+
+		Open = pending.Id;
+		SubmenuTop = pendingTop;
+		pending = null;
+	}
+
+	/// <summary>A click opens a submenu at once, without the wait a hover has.</summary>
+	void Choose( NaviMenuItem item, PanelEvent e = null )
 	{
 		if ( item.Children is { Count: > 0 } )
+		{
+			pending = null;
+
+			if ( e is not null )
+				SubmenuTop = Top( e.This );
+
+			Open = item.Id;
 			return;
+		}
 
 		if ( item.Enabled )
 			OnChoose?.Invoke( item.Id );
