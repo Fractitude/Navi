@@ -1,0 +1,22 @@
+{
+  "Title": "Image Viewer",
+  "Description": "Look at pictures.",
+  "Icon": "image",
+  "Color": "#7aa88a",
+  "PanelType": "NaviApps.ImageViewer",
+  "CanMinimize": true,
+  "CanMaximize": true,
+  "CanResize": true,
+  "Shared": false,
+  "Permissions": [
+    "navi.files.access"
+  ],
+  "FileTypes": [
+    "jpg",
+    "jpeg",
+    "png"
+  ],
+  "IsSystem": false,
+  "__references": [],
+  "__version": 0
+}
