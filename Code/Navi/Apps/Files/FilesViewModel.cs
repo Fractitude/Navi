@@ -409,6 +409,12 @@ public sealed class FilesViewModel
 			foreach ( var x in kept )
 				stack.Push( x );
 		}
+
+		// The breadcrumbs also reach forward to the deepest folder visited.
+		if ( IsWithin( trail, gone ) )
+			trail = path;
+
+		Rebuild();
 	}
 
 	public void GoUp()
