@@ -167,43 +167,45 @@
 			</div>
 		}
 
-		@* A click on the list itself, not on an entry, clears the selection; a right-click there opens the folder's menu. *@
-		<div class="list @( UiState.GridView ? "grid" : "" )" @ref="List"
-		     @onmousedown=@( ( PanelEvent e ) => StartBand( e ) )
-		     @onclick=@( () => ClickList() )
-		     @onrightclick=@( ( PanelEvent e ) => RightClick( null, e ) )>
-			@if ( UiState.ListEmpty )
-			{
-				<div class="empty">@UiState.EmptyText</div>
-			}
+		<div class="list-area">
+			@* A click on the list itself, not on an entry, clears the selection; a right-click there opens the folder's menu. *@
+			<div class="list @( UiState.GridView ? "grid" : "" )" @ref="List"
+			     @onmousedown=@( ( PanelEvent e ) => StartBand( e ) )
+			     @onclick=@( () => ClickList() )
+			     @onrightclick=@( ( PanelEvent e ) => RightClick( null, e ) )>
+				@if ( UiState.ListEmpty )
+				{
+					<div class="empty">@UiState.EmptyText</div>
+				}
 
-			@foreach ( var row in UiState.Rows )
-			{
-				<div class="row @( UiState.GridView ? "tile" : "" ) @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" )
-				     @( row.Cursor ? "cursor" : "" )"
-				     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
-				     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
-				     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
-					@if ( UiState.GridView && !Navi.IsViewer && ViewModel.ThumbnailOf( row.Path ) is { } thumbnail )
-					{
-						<Image class="thumbnail" Texture=@thumbnail/>
-					}
-					else
-					{
-						<i class="icon">@row.Icon</i>
-					}
-					<div class="name">@row.Name</div>
-					@if ( row.Badge != "" )
-					{
-						<div class="badge">@row.Badge</div>
-					}
-					@if ( !UiState.GridView )
-					{
-						<div class="detail">@row.Detail</div>
-						<div class="modified">@row.Modified</div>
-					}
-				</div>
-			}
+				@foreach ( var row in UiState.Rows )
+				{
+					<div class="row @( UiState.GridView ? "tile" : "" ) @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" )
+					     @( row.Cursor ? "cursor" : "" )"
+					     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
+					     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
+					     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
+						@if ( UiState.GridView && !Navi.IsViewer && ViewModel.ThumbnailOf( row.Path ) is { } thumbnail )
+						{
+							<Image class="thumbnail" Texture=@thumbnail/>
+						}
+						else
+						{
+							<i class="icon">@row.Icon</i>
+						}
+						<div class="name">@row.Name</div>
+						@if ( row.Badge != "" )
+						{
+							<div class="badge">@row.Badge</div>
+						}
+						@if ( !UiState.GridView )
+						{
+							<div class="detail">@row.Detail</div>
+							<div class="modified">@row.Modified</div>
+						}
+					</div>
+				}
+			</div>
 
 			@if ( bandMoved )
 			{
@@ -291,13 +293,22 @@
 	/// <summary>Where the pointer is in the list's content (screen pixels).</summary>
 	Vector2 ListPoint => List.MousePosition + List.ScrollOffset;
 
-	/// <summary>The band as left, top, width, height in the panel's pixels.</summary>
+	/// <summary>
+	/// The band as left, top, width, height in the panel's pixels, from the top left of the visible list and cut off at its
+	/// edges. It is drawn over the list, not inside it, so scrolling and the list's padding don't move it.
+	/// </summary>
 	Vector4 BandRect
 	{
 		get
 		{
-			var from = Vector2.Min( bandStart, bandEnd ) * ScaleFromScreen;
-			var size = (Vector2.Max( bandStart, bandEnd ) - Vector2.Min( bandStart, bandEnd )) * ScaleFromScreen;
+			if ( List is null )
+				return default;
+
+			var from = Vector2.Max( Vector2.Min( bandStart, bandEnd ) - List.ScrollOffset, Vector2.Zero );
+			var to = Vector2.Min( Vector2.Max( bandStart, bandEnd ) - List.ScrollOffset, List.Box.Rect.Size );
+			var size = Vector2.Max( to - from, Vector2.Zero );
+			from *= ScaleFromScreen;
+			size *= ScaleFromScreen;
 			return new Vector4( from.x, from.y, size.x, size.y );
 		}
 	}
