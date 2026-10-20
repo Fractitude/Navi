@@ -7,24 +7,25 @@
 @* Its styles are in NaviDesktop.razor.scss. *@
 
 <root @onmousedown=@( ( PanelEvent e ) => e.StopPropagation() ) @onclick=@( ( PanelEvent e ) => e.StopPropagation() )>
-	@if ( Heading is not null )
-	{
-		<div class="heading">@Heading</div>
-	}
-
-	@foreach ( var item in Items )
-	{
-		var chosen = item;
-		var hasChildren = item.Children is { Count: > 0 };
-
-		@if ( item.Separator )
+	@* The items scroll in here when the menu has a MaxHeight. The submenu is outside it, so the scrolling doesn't clip it. *@
+	<div class="menu-items" style="@( MaxHeight > 0 ? $"max-height: {MaxHeight}px; overflow-y: scroll;" : "" )">
+		@if ( Heading is not null )
 		{
-			<div class="separator"></div>
+			<div class="heading">@Heading</div>
 		}
 
-		<div class="menu-entry">
+		@foreach ( var item in Items )
+		{
+			var chosen = item;
+			var hasChildren = item.Children is { Count: > 0 };
+
+			@if ( item.Separator )
+			{
+				<div class="separator"></div>
+			}
+
 			<div class="item @( item.Enabled ? "" : "disabled" ) @( item.Danger ? "danger" : "" ) @( hasChildren && Open == item.Id ? "open" : "" )"
-			     @onmouseover=@( () => Hover( chosen ) )
+			     @onmouseover=@( ( PanelEvent e ) => Hover( chosen, e ) )
 			     @onclick=@( () => Choose( chosen ) )>
 				@if ( !string.IsNullOrEmpty( item.Icon ) )
 				{
@@ -40,26 +41,26 @@
 					<i class="chevron">chevron_right</i>
 				}
 			</div>
+		}
+	</div>
 
-			@if ( hasChildren && Open == item.Id )
+	@if ( OpenItem is { Children: { Count: > 0 } } open )
+	{
+		@* Drawn here, not as another NaviMenu: a component can't include itself. So a submenu has no submenus. *@
+		<div class="navi-menu submenu @( SubmenuLeft ? "left" : "right" )" style="top: @( SubmenuTop )px;">
+			@foreach ( var child in open.Children )
 			{
-				@* Drawn here, not as another NaviMenu: a component can't include itself. So a submenu has no submenus. *@
-				<div class="navi-menu submenu @( InlineSubmenus ? "inline" : SubmenuLeft ? "left" : "right" )">
-					@foreach ( var child in item.Children )
-					{
-						var picked = child;
+				var picked = child;
 
-						<div class="item @( child.Enabled ? "" : "disabled" )" @onclick=@( () => Choose( picked ) )>
-							@if ( !string.IsNullOrEmpty( child.Icon ) )
-							{
-								<i>@child.Icon</i>
-							}
-							<div class="item-label">@child.Label</div>
-							@if ( !string.IsNullOrEmpty( child.Keys ) )
-							{
-								<div class="keys">@child.Keys</div>
-							}
-						</div>
+				<div class="item @( child.Enabled ? "" : "disabled" )" @onclick=@( () => Choose( picked ) )>
+					@if ( !string.IsNullOrEmpty( child.Icon ) )
+					{
+						<i>@child.Icon</i>
+					}
+					<div class="item-label">@child.Label</div>
+					@if ( !string.IsNullOrEmpty( child.Keys ) )
+					{
+						<div class="keys">@child.Keys</div>
 					}
 				</div>
 			}
@@ -75,8 +76,8 @@
 	/// <summary>Open submenus to the menu's left, for a menu too near the right edge of what it may draw in.</summary>
 	public bool SubmenuLeft { get; set; }
 
-	/// <summary>Open submenus under their item, indented, instead of beside it: for a menu that scrolls, which would clip them.</summary>
-	public bool InlineSubmenus { get; set; }
+	/// <summary>The height, in pixels, the items may take before they scroll. Zero for no limit.</summary>
+	public float MaxHeight { get; set; }
 
 	public IReadOnlyList<NaviMenuItem> Items { get; set; } = [];
 
@@ -93,18 +94,32 @@
 	/// <summary>The id of the item whose submenu is open, or null.</summary>
 	string Open;
 
-	void Hover( NaviMenuItem item )
+	NaviMenuItem OpenItem => Open is null ? null : Items.FirstOrDefault( x => x.Id == Open );
+
+	/// <summary>Where the open submenu starts, in the menu's pixels: level with its item, whatever the scrolling.</summary>
+	float SubmenuTop;
+
+	void Hover( NaviMenuItem item, PanelEvent e )
 	{
-		Open = item.Children is { Count: > 0 } ? item.Id : null;
+		if ( item.Children is not { Count: > 0 } )
+		{
+			Open = null;
+			return;
+		}
+
+		// The menu's border (2) and the submenu's own border and padding (4) are between the two tops.
+		SubmenuTop = (e.This.Box.Rect.Top - Box.Rect.Top) * ScaleFromScreen - 6f;
+		Open = item.Id;
 	}
 
 	void Choose( NaviMenuItem item )
 	{
 		if ( item.Children is { Count: > 0 } )
-			Open = Open == item.Id ? null : item.Id;
-		else if ( item.Enabled )
+			return;
+
+		if ( item.Enabled )
 			OnChoose?.Invoke( item.Id );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, SubmenuLeft, InlineSubmenus, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
+	protected override int BuildHash() => System.HashCode.Combine( Heading, Open, SubmenuLeft, MaxHeight, Items?.Count, Items is null ? 0 : string.Join( '|', Items.Select( x => $"{x.Id}{x.Label}{x.Enabled}" ) ).GetHashCode() );
 }

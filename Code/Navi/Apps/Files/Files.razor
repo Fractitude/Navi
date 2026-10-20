@@ -221,8 +221,8 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<NaviMenu Heading=@UiState.MenuHeading InlineSubmenus=@( MenuHeight > PanelSize.y ) SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
-		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px; @MenuScroll"/>
+		<NaviMenu Heading=@UiState.MenuHeading MaxHeight=@MenuMaxHeight SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px;"/>
 	}
 
 	@* A question before something that can't be undone, over the whole window so nothing else can be clicked. *@
@@ -447,11 +447,8 @@
 	float MenuHeight => MenuPadding + UiState.Menu.Count * MenuItemHeight + UiState.Menu.Count( x => x.Separator ) * MenuSeparatorHeight
 		+ (UiState.MenuHeading is null ? 0f : MenuHeadingHeight);
 
-	/// <summary>
-	/// Style that makes a menu taller than the panel scroll instead of running off it, or empty when it fits. A scrolling
-	/// menu clips its submenu, which is why it is only on when it has to be.
-	/// </summary>
-	string MenuScroll => MenuHeight > PanelSize.y ? $"max-height: {PanelSize.y}px; overflow-y: scroll;" : "";
+	/// <summary>How tall the menu's items may be: the panel, less the menu's border and padding. Past that they scroll.</summary>
+	float MenuMaxHeight => MenuHeight > PanelSize.y ? PanelSize.y - 8f : 0f;
 
 	Vector2 PanelSize => Box.Rect.Size * ScaleFromScreen;
 

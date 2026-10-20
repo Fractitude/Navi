@@ -42,22 +42,18 @@ NaviDesktop
 			background-color: $line-bg;
 		}
 
-		// An item and, beside it, its submenu.
-		.menu-entry
+		.menu-items
 		{
-			position: relative;
-			flex-shrink: 0;
 			flex-direction: column;
 		}
 
 		.submenu
 		{
 			position: absolute;
-			top: -4px;
 			width: 160px;
 			z-index: 5;
 
-			// Just past the menu's edge: the menu is the entry's width, and a percentage left is not trusted here.
+			// Just past the menu's edge: a percentage left is not trusted here, so it is the submenu's own width.
 			&.right
 			{
 				right: -164px;
@@ -66,19 +62,6 @@ NaviDesktop
 			&.left
 			{
 				left: -164px;
-			}
-
-			// Under its item, in the menu's own flow.
-			&.inline
-			{
-				position: relative;
-				top: 0;
-				width: auto;
-				padding: 0 0 0 14px;
-				background-color: transparent;
-				border: 0;
-				border-radius: 0;
-				box-shadow: none;
 			}
 		}
 
