@@ -247,7 +247,7 @@ public sealed partial class NaviComputer
 	static string Describe( NaviFileLocation at ) => at.Node.Kind switch
 	{
 		NaviFileKind.Folder => $"{NaviFileSystem.DisplayName( at )}/",
-		NaviFileKind.File => $"{NaviFileSystem.DisplayName( at )}  ({NaviDrive.Bytes( at.Node.Text )} B)",
+		NaviFileKind.File => $"{NaviFileSystem.DisplayName( at )}  ({NaviDrive.Size( at.Node )} B)",
 		NaviFileKind.Symlink => $"{NaviFileSystem.DisplayName( at )} -> {at.Node.Target}",
 		_ => $"{NaviFileSystem.DisplayName( at )} => alias of {at.Node.Target}",
 	};

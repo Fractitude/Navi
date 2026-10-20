@@ -58,9 +58,9 @@ public sealed partial class NaviComputer
 	}
 
 	/// <summary>
-	/// The JPEG of what the camera sees now, as base64 text. The camera is only on while an app asks for its picture.
+	/// The JPEG file of what the camera sees now. The camera is only on while an app asks for its picture.
 	/// </summary>
-	internal string TakeCameraPhoto()
+	internal byte[] TakeCameraPhoto()
 	{
 		if ( !cameraComponent.IsValid() || cameraTexture is null )
 			throw new System.InvalidOperationException( "The camera is off." );
@@ -68,7 +68,7 @@ public sealed partial class NaviComputer
 		using var bitmap = new Bitmap( cameraTexture.Width, cameraTexture.Height );
 		cameraComponent.RenderToBitmap( bitmap );
 
-		return System.Convert.ToBase64String( bitmap.ToJpg( PhotoQuality ) );
+		return bitmap.ToJpg( PhotoQuality );
 	}
 
 	/// <summary>

@@ -852,11 +852,11 @@ public sealed class Navi
 		public Task<Texture> GetViewAsync( int width, int height ) => navi.CallAsync<Texture>( "camera.view", width, height );
 
 		/// <summary>
-		/// Take a picture with the camera: the JPEG of what it sees now, as base64 text, since the computer's files hold
-		/// text only (<see cref="FileCalls.WriteTextAsync"/>). Needs <see cref="Permission.Camera"/>, and the camera on:
+		/// Take a picture with the camera: the JPEG file of what it sees now
+		/// (<see cref="FileCalls.WriteBytesAsync"/> saves it). Needs <see cref="Permission.Camera"/>, and the camera on:
 		/// <see cref="GetViewAsync"/> has to have been asked for a moment ago.
 		/// </summary>
-		public Task<string> TakePhotoAsync() => navi.CallAsync<string>( "camera.photo" );
+		public Task<byte[]> TakePhotoAsync() => navi.CallAsync<byte[]>( "camera.photo" );
 	}
 
 	/// <summary>
@@ -1064,6 +1064,17 @@ public sealed class Navi
 		/// </summary>
 		public Task<string> WriteTextAsync( string path, string text ) =>
 			navi.CallAsync<string>( "files.write", path, text ?? "" );
+
+		/// <summary>
+		/// Read a file's contents as bytes: a binary file's data, or a text file's text as UTF-8.
+		/// </summary>
+		public Task<byte[]> ReadBytesAsync( string path ) => navi.CallAsync<byte[]>( "files.read-bytes", path );
+
+		/// <summary>
+		/// Write a binary file (a picture, say), making it or replacing what is in it. Returns its path.
+		/// </summary>
+		public Task<string> WriteBytesAsync( string path, byte[] data ) =>
+			navi.CallAsync<string>( "files.write-bytes", path, data ?? [] );
 
 		public Task<string> CreateFolderAsync( string path ) => navi.CallAsync<string>( "files.create-folder", path );
 

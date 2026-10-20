@@ -55,6 +55,20 @@ public static class NaviFileCalls
 				return files.ReadText( path );
 			}
 
+			case "files.read-bytes":
+			{
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true );
+				return files.ReadBytes( path );
+			}
+
+			case "files.write-bytes":
+			{
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true );
+				return files.WriteBytes( path, Opt( args, 1, System.Array.Empty<byte>() ) ).Path;
+			}
+
 			case "files.write":
 			{
 				var path = Arg( args, 0, method );
@@ -236,7 +250,7 @@ public static class NaviFileCalls
 		NaviFileSystem.DisplayName( at ),
 		at.Path,
 		(int)at.Node.Kind,
-		at.Node.Kind == NaviFileKind.File ? NaviDrive.Bytes( at.Node.Text ) : 0,
+		at.Node.Kind == NaviFileKind.File ? NaviDrive.Size( at.Node ) : 0,
 		at.Node.Created,
 		at.Node.Modified,
 		(at.Node.Target ?? "", at.Node.TrashedFrom ?? "", at.Drive.ChildCount( at.Node ), at.Node.Id == NaviDrive.RootId)

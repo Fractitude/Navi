@@ -64,10 +64,9 @@ public sealed class CameraViewModel
 
 		try
 		{
-			// The computer's files hold text, so the photo is the JPEG's base64 text in a file named like a JPEG.
 			var photo = await navi.Camera.TakePhotoAsync();
 			var folder = await navi.Files.GetAppFolderAsync();
-			var path = await navi.Files.WriteTextAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
+			var path = await navi.Files.WriteBytesAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
 
 			Update( uiState => uiState with { Saving = false, PhotoNotice = $"Saved {path}" } );
 		}

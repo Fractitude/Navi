@@ -41,9 +41,14 @@ public sealed class NaviFileNode
 	public NaviFileKind Kind { get; set; }
 
 	/// <summary>
-	/// A file's contents. Text only for now.
+	/// A text file's contents. A file has either this or <see cref="Data"/>.
 	/// </summary>
 	public string Text { get; set; }
+
+	/// <summary>
+	/// A binary file's contents (a picture, say), saved as base64 in the drive's JSON. Null for a text file.
+	/// </summary>
+	public byte[] Data { get; set; }
 
 	/// <summary>
 	/// A symlink's target path, absolute or relative to its folder. An alias's target path when it was made, used if
@@ -190,8 +195,13 @@ public sealed class NaviDrive
 	}
 
 	public static long Cost( NaviFileNode node ) =>
-		NodeOverhead + Bytes( node.Name ) + Bytes( node.Text ) + Bytes( node.Target ) + Bytes( node.TargetDrive )
+		NodeOverhead + Bytes( node.Name ) + Size( node ) + Bytes( node.Target ) + Bytes( node.TargetDrive )
 		+ Bytes( node.TrashedFrom );
+
+	/// <summary>
+	/// A file's size in bytes: its binary contents, or its text as UTF-8.
+	/// </summary>
+	public static long Size( NaviFileNode node ) => node.Data?.LongLength ?? Bytes( node.Text );
 
 	public static long Bytes( string text ) => string.IsNullOrEmpty( text ) ? 0 : Encoding.UTF8.GetByteCount( text );
 

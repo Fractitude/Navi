@@ -323,6 +323,21 @@ public sealed class NaviFileSystem
 	}
 
 	/// <summary>
+	/// A file's contents as bytes: a binary file's data, or a text file's text as UTF-8.
+	/// </summary>
+	public byte[] ReadBytes( string path )
+	{
+		var file = Resolve( path );
+		if ( file.Node.Kind == NaviFileKind.Folder )
+			throw new NaviFileException( NaviFileError.IsAFolder, file.Path );
+
+		if ( file.Node.Kind != NaviFileKind.File )
+			throw new NaviFileException( NaviFileError.NotFound, file.Path );
+
+		return file.Node.Data ?? System.Text.Encoding.UTF8.GetBytes( file.Node.Text ?? "" );
+	}
+
+	/// <summary>
 	/// Where an alias points now: its target entry's path, or the path it was made with if that entry's drive isn't
 	/// mounted or it is gone. Null when neither leads anywhere.
 	/// </summary>
@@ -344,9 +359,16 @@ public sealed class NaviFileSystem
 	/// <summary>
 	/// Write a text file, making it or replacing what is in it. A symlink at the path writes its target.
 	/// </summary>
-	public NaviFileLocation WriteText( string path, string text )
+	public NaviFileLocation WriteText( string path, string text ) => Write( path, text ?? "", null );
+
+	/// <summary>
+	/// Write a binary file, making it or replacing what is in it. A symlink at the path writes its target.
+	/// </summary>
+	public NaviFileLocation WriteBytes( string path, byte[] data ) => Write( path, null, data ?? [] );
+
+	NaviFileLocation Write( string path, string text, byte[] data )
 	{
-		text ??= "";
+		var size = data?.LongLength ?? NaviDrive.Bytes( text );
 		var (folder, name) = ResolveNew( path );
 
 		if ( folder.Drive.Child( folder.Node, name ) is { } existing )
@@ -358,12 +380,20 @@ public sealed class NaviFileSystem
 			if ( file.Node.Kind != NaviFileKind.File )
 				throw new NaviFileException( NaviFileError.AlreadyExists, file.Path );
 
-			file.Drive.EnsureRoom( NaviDrive.Bytes( text ) - NaviDrive.Bytes( file.Node.Text ), 0, file.Path );
-			file.Drive.Edit( file.Node, x => x.Text = text );
+			file.Drive.EnsureRoom( size - NaviDrive.Size( file.Node ), 0, file.Path );
+			file.Drive.Edit( file.Node, x =>
+			{
+				x.Text = text;
+				x.Data = data;
+			} );
 			return file;
 		}
 
-		return Create( folder, name, NaviFileKind.File, NaviDrive.Bytes( text ), x => x.Text = text );
+		return Create( folder, name, NaviFileKind.File, size, x =>
+		{
+			x.Text = text;
+			x.Data = data;
+		} );
 	}
 
 	public NaviFileLocation CreateFolder( string path )
@@ -492,6 +522,7 @@ public sealed class NaviFileSystem
 		folder.Drive.Edit( copy, x =>
 		{
 			x.Text = node.Text;
+			x.Data = node.Data;
 			x.Target = node.Target;
 			x.TargetDrive = node.TargetDrive;
 			x.TargetNode = node.TargetNode;
