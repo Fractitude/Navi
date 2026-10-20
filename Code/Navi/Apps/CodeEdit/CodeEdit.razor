@@ -123,6 +123,7 @@
 
 		SyncText();
 		FocusFields();
+		FixPopups();
 
 		if ( Navi.IsViewer )
 			return;
@@ -159,6 +160,72 @@
 	/// The player is closing the window while there are unsaved changes: the host's copy asks them in the window.
 	/// </summary>
 	protected override void OnCloseRequested() => ViewModel.CloseRequested();
+
+	/// <summary>
+	/// The editor's completion, hover and signature popups are put where the caret is, but the engine works out where
+	/// as if the root panel started at 0,0. A world panel's root starts at minus half its size, so they all land in the
+	/// root's top left corner. This moves each by the difference, with a transform, which the engine leaves alone.
+	/// </summary>
+	void FixPopups()
+	{
+		if ( Editor is null || FindRootPanel() is not { } root )
+			return;
+
+		var origin = root.Box.Rect.Position;
+		if ( origin.x == 0f && origin.y == 0f )
+			return;
+
+		foreach ( var popup in root.Children.OfType<Popup>() )
+		{
+			// The editor's popups: a completion list, its detail beside it, hover text and parameter help.
+			if ( !popup.HasClass( "script-control-popup" ) || popup.AnchorRect is not { } anchor
+				|| popup.PopupSource is not { } source )
+				continue;
+
+			var scale = source.ScaleFromScreen;
+			var bounds = new Rect( Vector2.Zero, root.Box.Rect.Size * scale );
+			var shifted = new Rect( anchor.Position - origin, anchor.Size ) * scale;
+			var wanted = PlaceBeside( shifted, popup.Box.Rect.Size * scale, bounds, popup.HasClass( "right-top" ),
+				popup.PopupSourceOffset );
+
+			// Where the engine put it: its left and top.
+			var left = popup.Style.Left is { } l ? l.Value : 0f;
+			var top = popup.Style.Top is { } t ? t.Value : 0f;
+
+			var move = new PanelTransform();
+			move.AddTranslate( wanted.x - left, wanted.y - top );
+			popup.Style.Transform = move;
+		}
+	}
+
+	/// <summary>
+	/// Where a popup of this size goes next to the anchor, as the engine does it (it keeps that to itself): below it, or
+	/// above if there's no room, or (<paramref name="beside"/>) to its right, or left if there's no room; kept inside
+	/// <paramref name="bounds"/>.
+	/// </summary>
+	static Vector2 PlaceBeside( Rect anchor, Vector2 size, Rect bounds, bool beside, float offset )
+	{
+		float x, y;
+		if ( beside )
+		{
+			x = anchor.Right + offset;
+			if ( x + size.x > bounds.Right && anchor.Left - offset - size.x >= bounds.Left )
+				x = anchor.Left - offset - size.x;
+
+			y = anchor.Top;
+		}
+		else
+		{
+			y = anchor.Bottom + offset;
+			if ( y + size.y > bounds.Bottom && anchor.Top - offset - size.y >= bounds.Top )
+				y = anchor.Top - offset - size.y;
+
+			x = anchor.Left;
+		}
+
+		return new Vector2( System.Math.Clamp( x, bounds.Left, System.Math.Max( bounds.Left, bounds.Right - size.x ) ),
+			System.Math.Clamp( y, bounds.Top, System.Math.Max( bounds.Top, bounds.Bottom - size.y ) ) );
+	}
 
 	void SyncText()
 	{
