@@ -220,7 +220,7 @@ An app with something to lose, like unsaved changes, calls `Navi.Window.SetClose
 
 An app gets the player's keyboard shortcuts in `NaviApp.OnShortcut( string keys )` while its window is in front and the player sits at the computer: `"ctrl+c"`, `"delete"`, `"f2"`, `"shift+down"`.
 
-- **The keys.** "ctrl+", "shift+" and "alt+" in that order, then the key: a letter or digit, `enter`, `backspace`, `delete`, `tab`, `space`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `f1` to `f12` (`NaviInputCapture.ShortcutKeys`). Escape is never one: it stands the player up.
+- **The keys.** "ctrl+", "shift+" and "alt+" in that order, then the key: a letter or digit, `enter`, `backspace`, `delete`, `tab`, `space`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `f1` to `f12`, `mouse4`, `mouse5` (`NaviInputCapture.ShortcutKeys`). Escape is never one: it stands the player up.
 - **Not while typing.** While a `TextEntry` has the keys, only Ctrl with a letter or digit the field doesn't use itself (not A, C, X, V, Z or Y) is sent, e.g. Ctrl+S, so typing in a field doesn't trigger the others (`NaviInputCapture.PassesTextField`). Nothing is sent while the lock's password is typed.
 - **Where they go.** A shared app gets them on the host's copy, from whichever client the player is on (`NaviComputer.UserShortcut`, which checks the caller is the user and the window is the one in front). Any other app gets them on the player's own copy, like its clicks.
 - **Not tested with a real keyboard** in this version: the delivery was tested with `UserShortcut`, and the key names were checked against the engine's.

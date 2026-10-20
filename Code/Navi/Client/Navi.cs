@@ -56,7 +56,7 @@ public abstract class NaviApp : Panel
 	/// <summary>
 	/// The player pressed a keyboard shortcut while this app's window was in front, e.g. "ctrl+c", "delete", "f2" or
 	/// "shift+down": "ctrl+", "shift+" and "alt+" in that order, then the key (a letter or digit, "enter", "backspace",
-	/// "delete", "tab", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1" to "f12"). While
+	/// "delete", "tab", "space", "up", "down", "left", "right", "home", "end", "pageup", "pagedown", "f1" to "f12", "mouse4", "mouse5"). While
 	/// a text field has the keys, only Ctrl with a letter or digit the field doesn't use (not A, C, X, V, Z or Y) comes,
 	/// e.g. "ctrl+s". Never Escape, which stands the player up. A shared app gets it on the host's
 	/// copy, any other app on the player's own, like clicks.

@@ -53,6 +53,7 @@ public sealed class NaviInputCapture : Component
 		("HOME", "home"), ("END", "end"), ("PGUP", "pageup"), ("PGDN", "pagedown"),
 		.."123456789".Select( x => ("F" + x, "f" + x) ),
 		("F10", "f10"), ("F11", "f11"), ("F12", "f12"),
+		("MOUSE4", "mouse4"), ("MOUSE5", "mouse5"),
 	];
 
 	static readonly HashSet<string> shortcutNames = ShortcutKeys.Select( x => x.Name ).ToHashSet();

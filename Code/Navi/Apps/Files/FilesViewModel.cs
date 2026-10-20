@@ -640,6 +640,8 @@ public sealed class FilesViewModel
 			case "backspace" or "alt+up": GoUp(); break;
 			case "alt+left": GoBack(); break;
 			case "alt+right": GoForward(); break;
+			case "mouse4": GoBack(); break;
+			case "mouse5": GoForward(); break;
 		}
 	}
 
