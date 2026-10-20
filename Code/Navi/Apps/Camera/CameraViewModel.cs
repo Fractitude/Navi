@@ -72,7 +72,7 @@ public sealed class CameraViewModel
 			var path = await navi.Files.WriteBytesAsync( $"{folder}/photo-{System.DateTime.Now:yyyyMMdd-HHmmss}.jpg", photo );
 
 			lastPhotoPath = path;
-			Update( uiState => uiState with { Saving = false, HasPhoto = true, PhotoNotice = "Picture saved." } );
+			Update( uiState => uiState with { Saving = false, HasPhoto = true, PhotoNotice = $"Saved {path[(path.LastIndexOf( '/' ) + 1)..]}" } );
 		}
 		catch ( System.Exception e )
 		{
