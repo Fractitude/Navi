@@ -1147,6 +1147,22 @@ public sealed class Navi
 		public Task<bool> OpenAsync( string path ) => navi.CallAsync<bool>( "files.open", path );
 
 		/// <summary>
+		/// Open a file with the app <paramref name="appId"/> instead of the computer's first choice. It must be one of
+		/// <see cref="GetOpenersAsync"/>; False if it isn't.
+		/// </summary>
+		public Task<bool> OpenWithAsync( string path, string appId ) => navi.CallAsync<bool>( "files.open", path, appId );
+
+		/// <summary>
+		/// The installed apps that can open this file, the computer's first choice first: their ids, titles and icons.
+		/// None for a folder, or a kind of file no app opens.
+		/// </summary>
+		public async Task<IReadOnlyList<(string Id, string Title, string Icon)>> GetOpenersAsync( string path )
+		{
+			var apps = await navi.CallAsync<(string, string, string)[]>( "files.openers", path );
+			return apps.Select( x => (x.Item1, x.Item2, x.Item3) ).ToArray();
+		}
+
+		/// <summary>
 		/// The files the player opened with this app since it last asked, oldest first, as paths with symlinks followed.
 		/// Each is given once. An app that lists FileTypes in its .napp polls this a few times a second.
 		/// </summary>

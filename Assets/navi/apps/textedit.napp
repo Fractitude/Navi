@@ -12,7 +12,14 @@
     "navi.files.access"
   ],
   "FileTypes": [
-    "txt"
+    "txt",
+    "cs",
+    "razor",
+    "scss",
+    "css",
+    "json",
+    "js",
+    "lua"
   ],
   "IsSystem": false,
   "__references": [],

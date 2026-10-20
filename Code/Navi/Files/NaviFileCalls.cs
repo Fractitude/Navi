@@ -180,10 +180,22 @@ public static class NaviFileCalls
 				if ( at.Node.Kind != NaviFileKind.File )
 					throw new NaviFileException( NaviFileError.NotFound, at.Path );
 
-				var name = NaviFileSystem.NameOf( at.Path );
-				var dot = name.LastIndexOf( '.' );
-				var handler = dot > 0 ? computer.FindFileHandler( name[(dot + 1)..] ) : null;
+				// The player may choose among the apps that open this kind (files.openers); only one of those counts.
+				var handlers = HandlersOf( computer, at.Path );
+				var wanted = Opt( args, 1, "" );
+				var handler = wanted == "" ? handlers.FirstOrDefault() : handlers.FirstOrDefault( x => x.Id == wanted );
 				return handler is not null && computer.OpenFileWith( handler, at.Path );
+			}
+
+			case "files.openers":
+			{
+				// The apps files.open can open this file with, best first; none for a folder or a kind nothing opens.
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true );
+				var at = files.Resolve( path );
+				return at.Node.Kind == NaviFileKind.File
+					? HandlersOf( computer, at.Path ).Select( x => (x.Id, x.Name, x.Icon ?? "") ).ToArray()
+					: System.Array.Empty<(string, string, string)>();
 			}
 
 			case "files.opened":
@@ -261,6 +273,13 @@ public static class NaviFileCalls
 		at.Node.Modified,
 		(at.Node.Target ?? "", at.Node.TrashedFrom ?? "", at.Drive.ChildCount( at.Node ), at.Node.Id == NaviDrive.RootId)
 	);
+
+	static IReadOnlyList<NaviAppInfo> HandlersOf( NaviComputer computer, string path )
+	{
+		var name = NaviFileSystem.NameOf( path );
+		var dot = name.LastIndexOf( '.' );
+		return dot > 0 ? computer.FindFileHandlers( name[(dot + 1)..] ) : [];
+	}
 
 	static T Opt<T>( object[] args, int index, T fallback ) =>
 		index < args.Length && args[index] is T value ? value : fallback;

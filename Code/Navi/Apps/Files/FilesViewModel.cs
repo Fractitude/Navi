@@ -106,6 +106,14 @@ public sealed class FilesViewModel
 	IReadOnlyList<NaviMenuItem> menu = [];
 
 	string menuHeading;
+
+	/// <summary>Counts menus asked for, so a menu waiting for the apps that open a file is dropped if it was closed.</summary>
+	int menuRequest;
+
+	/// <summary>The apps that open the file the menu is about, when it is one file; else empty.</summary>
+	IReadOnlyList<(string Id, string Title, string Icon)> openers = [];
+
+	public const string OpenWithPrefix = "open-with:";
 	Vector2 menuAt;
 
 	/// <summary>The action <see cref="ConfirmAction"/> runs, while the player is asked about it; else null.</summary>
@@ -291,7 +299,10 @@ public sealed class FilesViewModel
 
 		// Anything the player does closes the menu, the way a click anywhere else does.
 		if ( action is not (OpenMenuAction or ChooseMenuAction or SetRenameTextAction) )
+		{
 			menu = [];
+			menuRequest++;
+		}
 
 		// While a question is open it covers the window: only its answers do anything.
 		if ( confirming is not null && action is not (ConfirmAction or CancelConfirmAction) )
@@ -449,6 +460,22 @@ public sealed class FilesViewModel
 			// The computer picks the app for the file's kind and gives it the file.
 			if ( !await navi.Files.OpenAsync( entry ) )
 				Notify( $"There's no app to open \"{to.Name}\"." );
+		}
+		catch ( System.Exception e )
+		{
+			Notify( Describe( e ) );
+		}
+	}
+
+	/// <summary>
+	/// Open a file with the app the player chose from "Open with...".
+	/// </summary>
+	async Task OpenWithAsync( string entry, string appId )
+	{
+		try
+		{
+			if ( !await navi.Files.OpenWithAsync( entry, appId ) )
+				Notify( $"That app can't open \"{NameOf( entry )}\"." );
 		}
 		catch ( System.Exception e )
 		{
@@ -647,6 +674,36 @@ public sealed class FilesViewModel
 		}
 
 		menuAt = new Vector2( x, y );
+		_ = ShowMenuAsync();
+	}
+
+	/// <summary>
+	/// Build the menu once the apps that open the selected file are known (only one file has them).
+	/// </summary>
+	async Task ShowMenuAsync()
+	{
+		var request = ++menuRequest;
+		openers = [];
+
+		if ( selection.Count == 1 && !IsTrash( path )
+			&& entries.FirstOrDefault( x => x.Path == selection[0] ) is { Kind: Navi.FileKind.File } file )
+		{
+			try
+			{
+				var found = await navi.Files.GetOpenersAsync( file.Path );
+				if ( request != menuRequest )
+					return;
+
+				openers = found;
+			}
+			catch ( System.Exception )
+			{
+				// No list of apps: the menu has its plain Open.
+				if ( request != menuRequest )
+					return;
+			}
+		}
+
 		(menu, menuHeading) = BuildMenu();
 		Rebuild();
 	}
@@ -707,8 +764,13 @@ public sealed class FilesViewModel
 			], null);
 		}
 
+		var open = openers.Count > 1
+			? new NaviMenuItem( "open-with", "Open with...", "folder_open", "Enter",
+				Children: openers.Select( x => new NaviMenuItem( OpenWithPrefix + x.Id, x.Title, x.Icon ?? "" ) ).ToList() )
+			: new NaviMenuItem( OpenAction, entry?.Kind == Navi.FileKind.Alias ? "Show original" : "Open", "folder_open", "Enter" );
+
 		return ([
-			new( OpenAction, entry?.Kind == Navi.FileKind.Alias ? "Show original" : "Open", "folder_open", "Enter" ),
+			open,
 			new( StartRenameAction, "Rename", "edit", "F2", canChange, Separator: true ),
 			new( "make-link", "Make link", "link", Children: [
 				new( MakeAliasAction, "Make alias", "shortcut" ),
@@ -733,6 +795,12 @@ public sealed class FilesViewModel
 			return;
 
 		var first = selection.FirstOrDefault();
+		if ( id.StartsWith( OpenWithPrefix ) && first is not null )
+		{
+			_ = OpenWithAsync( first, id[OpenWithPrefix.Length..] );
+			return;
+		}
+
 		switch ( id )
 		{
 			case OpenAction when first is not null: _ = OpenAsync( first ); break;

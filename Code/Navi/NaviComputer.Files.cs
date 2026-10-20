@@ -161,17 +161,22 @@ public sealed partial class NaviComputer
 	/// The installed app that opens files with this extension, or null. One that ships with the game comes first; a Store
 	/// app only counts if it declares <see cref="NaviPermissions.Files"/>, or the file would be out of its reach.
 	/// </summary>
-	public NaviAppInfo FindFileHandler( string extension )
+	public NaviAppInfo FindFileHandler( string extension ) => FindFileHandlers( extension ).FirstOrDefault();
+
+	/// <summary>
+	/// Every installed app that opens files with this extension, the one <see cref="FindFileHandler"/> picks first.
+	/// </summary>
+	public IReadOnlyList<NaviAppInfo> FindFileHandlers( string extension )
 	{
 		if ( string.IsNullOrEmpty( extension ) )
-			return null;
+			return [];
 
 		extension = extension.ToLowerInvariant();
 		return NaviAppRegistry.All
 			.Where( x => x.FileTypes.Contains( extension ) && IsInstalled( x ) )
 			.Where( x => x.IsPrepackaged || x.IsSystem || x.Permissions.Contains( NaviPermissions.Files ) )
 			.OrderBy( x => x.IsCore ? 0 : x.IsPrepackaged ? 1 : 2 )
-			.FirstOrDefault();
+			.ToList();
 	}
 
 	/// <summary>

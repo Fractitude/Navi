@@ -204,7 +204,7 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Files.PickAsync( fileTypes, startFolder )` | Ask the player for a file in the system File Picker, a window of its own. Returns the path (or null), and the app may read that one file | none |
 | `Navi.Files.RestoreAsync( path )`, `EjectAsync( path )` | Put back from the trash; take out a removable drive | `navi.files.access` |
 | `Navi.Files.GetAppFolderAsync()`, `GetDrivesAsync()`, `GetVersionAsync()`, `GetTrashPathAsync()` | The app's own folder, the drives, a version to poll | |
-| `Navi.Files.OpenAsync( path )`, `TakeOpenedAsync()` | Open a file with the app for its kind; take the files opened with this app. See "Files" | a path the app can reach |
+| `Navi.Files.OpenAsync( path )`, `OpenWithAsync( path, appId )`, `GetOpenersAsync( path )`, `TakeOpenedAsync()` | Open a file with the app for its kind, or with one of the apps that open it (the Files app offers them under "Open with..." when there are several); take the files opened with this app. See "Files" | a path the app can reach |
 | `Navi.Messages.GetMeAsync()`, `ListContactsAsync()`, `GetHistoryAsync( playerId, take )`, `SendAsync( playerId, text )`, `MarkReadAsync( playerId )`, `GetVersionAsync()` | The direct messages of the player in the seat. See "Messages" | `navi.messages.access` |
 | `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
 
