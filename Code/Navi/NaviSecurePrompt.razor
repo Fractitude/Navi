@@ -590,10 +590,19 @@
 	/// </summary>
 	void UpdateSit()
 	{
-		if ( (Request is not null || Locked) && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
-			&& Input.Pressed( "Use" ) && Panel is { HasHovered: true } )
+		if ( !(Request is not null || Locked) || !Computer.IsValid() || Computer.IsSeated || !Computer.CanUse
+			|| Panel is not { HasHovered: true } )
+			return;
+
+		// A computer that doesn't require a seat takes it as soon as the player points at the prompt.
+		if ( Computer.RequireSeat ? Input.Pressed( "Use" ) : sinceSitAsked > 0.5f )
+		{
+			sinceSitAsked = 0;
 			Computer.UserSit();
+		}
 	}
+
+	RealTimeSince sinceSitAsked;
 
 	void TogglePermission( string permission )
 	{

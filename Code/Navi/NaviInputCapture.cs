@@ -176,7 +176,7 @@ public sealed class NaviInputCapture : Component
 	{
 		// Only the player using the computer, or watching from a spectator seat, gets pulled in. Everyone else watches from
 		// where they stand.
-		var wanted = Computer.IsSeated || Computer.IsSpectating;
+		var wanted = (Computer.IsSeated && Computer.RequireSeat) || Computer.IsSpectating;
 
 		if ( wanted && state is State.Idle or State.FlyingOut )
 			Begin();

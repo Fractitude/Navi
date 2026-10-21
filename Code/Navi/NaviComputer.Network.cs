@@ -131,6 +131,14 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	[Property] public float SeatTimeout { get; set; } = 5f;
 
+	/// <summary>
+	/// Turn off for a computer used by pointing at it, like a keypad at a door. The player doesn't sit down or get pulled to
+	/// the screen: pointing at it takes the seat, they click around with the mouse, and the seat frees itself
+	/// <see cref="SeatTimeout"/> after they look away. Everything else about the seat is the same, so one player at a time
+	/// works it, and only they can answer a permission prompt. Without the camera and the keyboard, nothing can be typed.
+	/// </summary>
+	[Property, Sync( SyncFlags.FromHost )] public bool RequireSeat { get; set; } = true;
+
 	RealTimeSince sinceUserActed;
 
 	void UpdateNetwork()

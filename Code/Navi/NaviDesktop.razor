@@ -239,7 +239,7 @@
 			<div class="badge"><i>person</i>In use by @( Computer.User?.DisplayName ?? "another player" )</div>
 		</div>
 	}
-	else if ( !Computer.IsSeated )
+	else if ( Computer.RequireSeat && !Computer.IsSeated )
 	{
 		@* The seat is free. Catches every click, so nothing on the screen is used before the player sits. Pressing Use while pointing at it sits them
 		   down (UpdateSit), so no click lands on the screen while the camera flies in. *@
@@ -1094,14 +1094,35 @@
 
 	/// <summary>
 	/// The player presses Use while pointing at the free screen. Apps can raise panel events, but can't press the player's
-	/// Use action, so they can't sit the player down.
+	/// Use action, so they can't sit the player down. A computer that doesn't <see cref="NaviComputer.RequireSeat"/> takes the
+	/// seat as soon as the player points at it.
 	/// </summary>
 	void UpdateSit()
 	{
-		if ( Computer.CanUse && !Computer.IsSeated && Input.Pressed( "Use" )
-			&& Panel?.Children.FirstOrDefault( x => x.HasClass( "sit" ) ) is { HasHovered: true } )
+		if ( !Computer.CanUse || Computer.IsSeated )
+			return;
+
+		if ( !Computer.RequireSeat )
+		{
+			if ( Panel?.HasHovered == true && sinceSitAsked > SitAskInterval )
+			{
+				sinceSitAsked = 0;
+				Computer.UserSit();
+			}
+
+			return;
+		}
+
+		if ( Input.Pressed( "Use" ) && Panel?.Children.FirstOrDefault( x => x.HasClass( "sit" ) ) is { HasHovered: true } )
 			Computer.UserSit();
 	}
+
+	/// <summary>
+	/// How often a pointed-at computer without a required seat asks for it again while waiting for the host's answer, in seconds.
+	/// </summary>
+	const float SitAskInterval = 0.5f;
+
+	RealTimeSince sinceSitAsked;
 
 	/// <summary>
 	/// How often the user's client tells the host they're still at the screen, in seconds.
