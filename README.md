@@ -384,7 +384,7 @@ A computer that has `OnlyApps` listed is a kiosk: it has exactly those apps and 
 
 ## Computer tags
 
-A game can limit an app to some computers, e.g. a gameplay app only the player's home computer may have. Give the computer `NaviComputer.Tags` (say `home`) and list the same tag in the app's `.napp` under `ComputerTags`. An app with tags can be installed only on a computer that has at least one of them (compared without case). An app with none can go anywhere.
+A game can limit an app to some computers, e.g. a gameplay app only the player's home computer may have. Give the computer `NaviComputer.ComputerTags` (say `home`) and list the same tag in the app's `.napp` under `ComputerTags`. An app with tags can be installed only on a computer that has at least one of them (compared without case). An app with none can go anywhere.
 
 - Checked on `Install` and `InstallPackageAsync` (a Store app's manifest is read after the download, so it is refused then, before root is asked for), and the Packages app doesn't list the app on other computers.
 - An app already installed stays, whatever its tags: the scene's `InstalledApps` and saves are the game's own.

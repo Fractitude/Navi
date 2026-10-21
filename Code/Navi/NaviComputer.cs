@@ -284,7 +284,7 @@ public sealed partial class NaviComputer : Component
 	/// can only be installed on a computer with one of them. Compared without case. Set in the scene, never saved, and no
 	/// app or <c>User...</c> call can change it.
 	/// </summary>
-	[Property] public List<string> Tags { get; set; } = new();
+	[Property] public List<string> ComputerTags { get; set; } = new();
 
 	/// <summary>
 	/// Can this computer install the app? Yes if the app lists no <see cref="NaviAppInfo.ComputerTags"/>, or this computer
@@ -295,7 +295,7 @@ public sealed partial class NaviComputer : Component
 		if ( app?.ComputerTags is not { Count: > 0 } allowed )
 			return true;
 
-		var own = CleanTags( Tags );
+		var own = CleanTags( ComputerTags );
 		return allowed.Any( own.Contains );
 	}
 

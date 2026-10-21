@@ -138,7 +138,7 @@ public sealed class NaviAppResource : GameResource
 
 	/// <summary>
 	/// An allow list of computers: the app can only be installed on a computer that has at least one of these tags
-	/// (<see cref="NaviComputer.Tags"/>). Empty for an app any computer can install. Tags are compared without case.
+	/// (<see cref="NaviComputer.ComputerTags"/>). Empty for an app any computer can install. Tags are compared without case.
 	/// It only limits where the app goes: it can't give the app anything, and a computer's tags are set by the game.
 	/// </summary>
 	[Property] public List<string> ComputerTags { get; set; } = new();
