@@ -7,7 +7,7 @@
   "CanMinimize": true,
   "CanMaximize": false,
   "CanResize": true,
-  "MinSize": "260,200",
+  "MinSize": "260,300",
   "Shared": true,
   "Permissions": [],
   "IsSystem": false,
