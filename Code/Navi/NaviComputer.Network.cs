@@ -66,7 +66,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	/// <summary>
 	/// Connection id of the player using this computer, or empty while nobody does. Only they can work it; everyone else
-	/// watches. The first player to click a free computer and let go takes the seat (<see cref="UserSit"/>), and it frees
+	/// watches. The first player to press Use at a free computer takes the seat (<see cref="UserSit"/>), and it frees
 	/// itself when they leave the game or stop using it for <see cref="SeatTimeout"/>. Offline it stays empty, and the
 	/// local player sits the same way.
 	/// </summary>
@@ -84,7 +84,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	/// <summary>
 	/// The local player has taken the seat: <see cref="NaviInputCapture"/> pulls the camera to the screen and gives them the
-	/// mouse. Online it is the seat itself. Offline there is no one to share with, but they still sit down with a click
+	/// mouse. Online it is the seat itself. Offline there is no one to share with, but they still sit down with Use
 	/// (<see cref="UserSit"/>) before they can use the screen. <see cref="UserLeave"/> stands them up.
 	/// </summary>
 	public bool IsSeated => Networking.IsActive ? UserId != default && UserId == Connection.Local?.Id : seatedOffline;

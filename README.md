@@ -392,7 +392,7 @@ A game can limit an app to some computers, e.g. a gameplay app only the player's
 
 ## Sitting at the computer
 
-Taking the seat (clicking the screen; see Multiplayer) pulls the player in, for every app. `NaviComputer.IsSeated` says whether the local player has it. Offline, the first click on the screen sits the player down.
+Taking the seat (pressing Use while pointing at the screen; see Multiplayer) pulls the player in, for every app. `NaviComputer.IsSeated` says whether the local player has it. Offline, the first Use press on the screen sits the player down.
 
 **Spectator seats.** Add a `NaviSpectatorSeat` component to a GameObject with a collider (a chair, say) and point its `Computer` at the computer. A player presses Use on it (`Component.IPressable`) and `NaviInputCapture` flies their camera to frame the screen, as for the driver. They are not the user: `Authorize` refuses everything they send, so they cannot click, type or answer a prompt. One viewer per seat; Escape stands them up (`UserLeave`). The host keeps who sits where in `NaviComputer.Spectators` and sends them the computer's state whatever the range. `NaviComputer.IsSpectating` says whether the local player is watching.
 

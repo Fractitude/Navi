@@ -60,7 +60,7 @@ view model reads as null), so an app window from before the change proves nothin
 
 ```csharp
 var computer = Game.ActiveScene.GetAllComponents<NaviComputer>().First();
-computer.UserSit();                                   // takes the seat offline, like the first click on the screen
+computer.UserSit();                                   // takes the seat offline, like pressing Use at the screen
 computer.Launch( NaviAppRegistry.BuiltInFolder + "files.napp" );
 await Task.Delay( 2500 );                             // the camera flies in and the window opens
 return computer.IsSeated;

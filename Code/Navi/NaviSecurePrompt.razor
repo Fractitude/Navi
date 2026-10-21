@@ -11,9 +11,7 @@
 @* the password or pattern is typed or drawn here (NaviLockEntry), made into a proof on this client and only that is sent: *@
 @* see NaviLockCrypto. The dialog that sets or changes the lock is here for the same reason, so no app sees either. *@
 
-<root class="@(Locked ? "active locked" : Request is null && setup == SetupStep.None && !Watching ? "" : "active") @(Computer?.ThemeClasses)"
-	@onmousedown=@(( PanelEvent e ) => PressSit( e ))
-	@onclick=@(( PanelEvent e ) => ReleaseSit( e ))>
+<root class="@(Locked ? "active locked" : Request is null && setup == SetupStep.None && !Watching ? "" : "active") @(Computer?.ThemeClasses)">
 	@if ( Locked )
 	{
 		var now = System.DateTime.Now;
@@ -29,7 +27,7 @@
 				<i>lock</i>
 				@if ( credential )
 				{
-					@(Computer.IsSeated ? "Locked" : "Locked. Click to sit down.")
+					@(Computer.IsSeated ? "Locked" : "Locked. Press Use to sit down.")
 				}
 				else if ( !Computer.IsLockOwner )
 				{
@@ -37,7 +35,7 @@
 				}
 				else if ( !Computer.IsSeated )
 				{
-					@("Locked. Click to sit down.")
+					@("Locked. Press Use to sit down.")
 				}
 				else
 				{
@@ -162,7 +160,7 @@
 			</div>
 			@if ( Computer.CanUse )
 			{
-				<div class="dialog-text">Click to sit down at the computer, then answer this.</div>
+				<div class="dialog-text">Press Use to sit down at the computer, then answer this.</div>
 			}
 			else
 			{
@@ -223,7 +221,7 @@
 			}
 			else if ( !Computer.IsSeated )
 			{
-				<div class="dialog-text">Click to sit down at the computer, then answer this.</div>
+				<div class="dialog-text">Press Use to sit down at the computer, then answer this.</div>
 			}
 
 			<div class="dialog-buttons">
@@ -530,9 +528,6 @@
 	bool shownSeated;
 	RealTimeSince sinceShown;
 
-	// A real press started on the layer while the player wasn't seated. Letting go sits them down.
-	bool sitPressed;
-
 	// Permissions unticked in the prompt. Reset for each new request, from what it starts with ticked.
 	readonly HashSet<string> Unticked = new();
 
@@ -542,6 +537,7 @@
 	protected override void OnUpdate()
 	{
 		UpdateLock();
+		UpdateSit();
 
 		var request = Request;
 		var seated = Computer.IsValid() && Computer.IsSeated;
@@ -589,23 +585,13 @@
 	}
 
 	/// <summary>
-	/// A press anywhere on the open prompt, before the player sits. Only a real left press counts, as in <see cref="Press"/>.
+	/// Pressing Use while pointing at the open prompt, before the player sits, sits them down as it would on the desktop.
+	/// It doesn't answer the prompt.
 	/// </summary>
-	void PressSit( PanelEvent e )
+	void UpdateSit()
 	{
-		sitPressed = (Request is not null || Locked) && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
-			&& e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" );
-	}
-
-	/// <summary>
-	/// Letting go sits the player down, as a click on the desktop would. It doesn't answer the prompt.
-	/// </summary>
-	void ReleaseSit( PanelEvent e )
-	{
-		var real = sitPressed && Computer.IsValid() && !Computer.IsSeated && e.This.HasHovered;
-		sitPressed = false;
-
-		if ( real )
+		if ( (Request is not null || Locked) && Computer.IsValid() && !Computer.IsSeated && Computer.CanUse
+			&& Input.Pressed( "Use" ) && Panel is { HasHovered: true } )
 			Computer.UserSit();
 	}
 
