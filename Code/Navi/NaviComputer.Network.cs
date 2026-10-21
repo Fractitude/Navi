@@ -229,7 +229,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 	bool Component.INetworkVisible.IsVisibleToConnection( Connection connection, in BBox worldBounds )
 	{
-		if ( NetworkRange <= 0 || connection.Id == UserId )
+		if ( NetworkRange <= 0 || connection.Id == UserId || IsSpectator( connection.Id ) )
 			return true;
 
 		return connection.DistanceSquared( WorldPosition ) <= NetworkRange * NetworkRange;
@@ -246,6 +246,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	{
 		IsOutOfRange = standIn.IsValid()
 			&& !IsUser
+			&& !IsSpectating
 			&& Scene.Camera is { } camera
 			&& camera.WorldPosition.DistanceSquared( WorldPosition ) > NetworkRange * NetworkRange;
 	}
@@ -510,6 +511,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Unlock();
 
 		PruneAttempts();
+		PruneSpectators();
 
 		if ( UserId == default )
 			return;
@@ -569,6 +571,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 
 		if ( !Networking.IsActive )
 		{
+			// A spectator is not the user: they stand up from their seat first.
+			if ( spectatingOffline != default )
+				return false;
+
 			seatedOffline |= sit;
 			return seatedOffline;
 		}
@@ -583,7 +589,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return true;
 		}
 
-		if ( !sit || UserId != default )
+		if ( !sit || UserId != default || IsSpectator( caller.Id ) )
 			return false;
 
 		SetUser( caller.Id );
@@ -901,12 +907,12 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
-	/// The user stands up and gives the seat back.
+	/// The user stands up and gives the seat back. A spectator stands up from their seat.
 	/// </summary>
 	[Rpc.Host]
 	public void UserLeave()
 	{
-		if ( !Authorize( whileLocked: true ) )
+		if ( LeaveSpectating() || !Authorize( whileLocked: true ) )
 			return;
 
 		if ( Networking.IsActive )
