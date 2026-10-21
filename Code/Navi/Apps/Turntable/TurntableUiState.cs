@@ -53,7 +53,7 @@ public sealed record TurntableUiState
 	/// <summary>
 	/// The model's yaw in degrees. While <see cref="Spinning"/>, where it was when this state was made: the panel spins it on from there.
 	/// </summary>
-	public float Yaw { get; init; } = 30;
+	public float Yaw { get; init; } = 180;
 
 	public bool Spinning { get; init; }
 
