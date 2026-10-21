@@ -55,7 +55,7 @@ public sealed record TurntableUiState
 	/// </summary>
 	public float Yaw { get; init; } = 30;
 
-	public bool Spinning { get; init; } = true;
+	public bool Spinning { get; init; }
 
 	/// <summary>
 	/// A player has the model grabbed to turn it by hand, which pauses the spin until they let go.

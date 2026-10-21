@@ -11,11 +11,6 @@ public sealed class TurntableViewModel
 	/// </summary>
 	public const float SpinSpeed = 45;
 
-	/// <summary>
-	/// How far one press of a rotate button turns the model, in degrees.
-	/// </summary>
-	const float RotateStep = 45;
-
 	/// <summary>Show a model. Its argument is the index into <see cref="TurntableUiState.Models"/>.</summary>
 	public const string ModelAction = "model";
 
@@ -24,9 +19,6 @@ public sealed class TurntableViewModel
 
 	/// <summary>Start or stop the spin.</summary>
 	public const string SpinAction = "spin";
-
-	/// <summary>Turn the model by one step. Its argument is "left" or "right".</summary>
-	public const string RotateAction = "rotate";
 
 	/// <summary>Turn the model to the yaw in its argument, in degrees, as a player drags it.</summary>
 	public const string DragAction = "drag";
@@ -67,8 +59,6 @@ public sealed class TurntableViewModel
 			case ModelAction when int.TryParse( arg, out var index ): ShowModel( index ); break;
 			case TintAction: NextTint(); break;
 			case SpinAction: ToggleSpin(); break;
-			case RotateAction when arg is "left": Rotate( RotateStep ); break;
-			case RotateAction when arg is "right": Rotate( -RotateStep ); break;
 			case DragAction when float.TryParse( arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var degrees ) && float.IsFinite( degrees ):
 				Drag( degrees );
 				break;
@@ -88,12 +78,6 @@ public sealed class TurntableViewModel
 		Update( uiState => uiState with { TintIndex = (uiState.TintIndex + 1) % TurntableUiState.Tints.Count } );
 
 	public void ToggleSpin() => Update( uiState => uiState with { Spinning = !uiState.Spinning } );
-
-	/// <summary>
-	/// Turn by <paramref name="degrees"/> from where the model is now. A spin carries on from there.
-	/// </summary>
-	public void Rotate( float degrees ) =>
-		Update( uiState => uiState with { Yaw = Normalize( uiState.Yaw + degrees ) } );
 
 	/// <summary>
 	/// Turn the model to <paramref name="yaw"/> for a player dragging it. Counts as holding it. The dragging panel

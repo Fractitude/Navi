@@ -22,14 +22,8 @@
 		</div>
 
 		<div class="row">
-			<div class="button" @onclick=@( () => Navi.Act( TurntableViewModel.RotateAction, "left" ) )>
-				<i>rotate_left</i>
-			</div>
 			<div class="button spin" @onclick=@( () => Navi.Act( TurntableViewModel.SpinAction ) )>
 				@UiState.SpinLabel
-			</div>
-			<div class="button" @onclick=@( () => Navi.Act( TurntableViewModel.RotateAction, "right" ) )>
-				<i>rotate_right</i>
 			</div>
 			<div class="button tint" @onclick=@( () => Navi.Act( TurntableViewModel.TintAction ) )>
 				<div class="swatch" style="background-color: @UiState.Tint.Hex"></div>
