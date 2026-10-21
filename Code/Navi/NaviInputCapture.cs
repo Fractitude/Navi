@@ -152,7 +152,6 @@ public sealed class NaviInputCapture : Component
 	State state;
 	float flight; // 0 at the player's view, 1 at the screen
 	Transform playerView;
-	NaviSpectatorSeat watchedSeat;
 	MouseVisibility playerMouse;
 
 	/// <summary>
@@ -178,9 +177,6 @@ public sealed class NaviInputCapture : Component
 		// Only the player using the computer, or watching from a spectator seat, gets pulled in. Everyone else watches from
 		// where they stand.
 		var wanted = Computer.IsSeated || Computer.IsSpectating;
-
-		// A spectator's camera goes to their seat. Kept while they stand up, so the camera flies back from the seat.
-		watchedSeat = Computer.IsSeated ? null : Computer.SpectatorSeat ?? watchedSeat;
 
 		if ( wanted && state is State.Idle or State.FlyingOut )
 			Begin();
@@ -261,9 +257,7 @@ public sealed class NaviInputCapture : Component
 		if ( state == State.Idle || Scene.Camera is not { } camera )
 			return;
 
-		var screen = watchedSeat.IsValid()
-			? new Transform( watchedSeat.WorldPosition, watchedSeat.WorldRotation )
-			: ScreenView( camera );
+		var screen = ScreenView( camera );
 		var t = Sandbox.Utility.Easing.EaseInOut( flight );
 
 		camera.WorldPosition = Vector3.Lerp( playerView.Position, screen.Position, t );
@@ -366,7 +360,6 @@ public sealed class NaviInputCapture : Component
 		}
 
 		reaches.Clear();
-		watchedSeat = null;
 		Mouse.Visibility = playerMouse;
 		controllers.Clear();
 		worldInputs.Clear();
