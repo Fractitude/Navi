@@ -377,7 +377,7 @@
 	/// </summary>
 	void FocusFields()
 	{
-		if ( !Navi.HasInput || Navi.IsViewer || UiState.Confirming )
+		if ( !Navi.HasInput || Navi.IsViewer || Navi.IsWatching || UiState.Confirming )
 			return;
 
 		if ( UiState.BarOpen && UiState.BarSession != focusedBar && BarEntry is not null )

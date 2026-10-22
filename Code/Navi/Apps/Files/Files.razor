@@ -473,7 +473,8 @@
 	/// </summary>
 	void FocusRename()
 	{
-		if ( UiState.RenameSession == focusedRename || RenameEntry is null || !Navi.HasInput || Navi.IsViewer )
+		if ( UiState.RenameSession == focusedRename || RenameEntry is null || !Navi.HasInput || Navi.IsViewer
+			|| Navi.IsWatching )
 			return;
 
 		focusedRename = UiState.RenameSession;
