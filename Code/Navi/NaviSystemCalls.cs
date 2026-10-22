@@ -118,7 +118,8 @@ public static class NaviSystemCalls
 		{
 			case "hardware.list":
 				return computer.InstalledHardware
-					.Select( x => (x.Id, x.Name, x.Description ?? "", x.Icon ?? "", x.Capabilities?.ToArray() ?? []) )
+					.Select( x => (x.Id, x.Name, x.Description ?? "", x.Icon ?? "", x.Capabilities?.ToArray() ?? [],
+						computer.IsHardwareEnabled( x.Id )) )
 					.ToArray();
 
 			case "network.status":

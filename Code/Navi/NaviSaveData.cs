@@ -54,6 +54,11 @@ public sealed class NaviComputerSave
 	public List<string> Hardware { get; set; }
 
 	/// <summary>
+	/// Ids of installed hardware that is turned off (<see cref="NaviComputer.DisabledHardware"/>).
+	/// </summary>
+	public List<string> DisabledHardware { get; set; } = new();
+
+	/// <summary>
 	/// The computer's IP address, given to it the first time it started (<see cref="NaviComputer.IpAddress"/>).
 	/// </summary>
 	public string IpAddress { get; set; } = "";

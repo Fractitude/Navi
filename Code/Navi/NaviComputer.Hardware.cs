@@ -51,15 +51,73 @@ public sealed partial class NaviComputer
 	public bool HasHardware( string id ) => InstalledHardware.Any( x => x.Id == id );
 
 	/// <summary>
-	/// Does any installed hardware provide <paramref name="capability"/> (<see cref="NaviHardware"/>)?
+	/// Ids of installed hardware the player turned off (<see cref="SetHardwareEnabled"/>). A turned-off piece is still
+	/// installed, but provides no capability. Saved. Don't change the list directly.
 	/// </summary>
-	public bool HasCapability( string capability ) => InstalledHardware.Any( x => x.Provides( capability ) );
+	public List<string> DisabledHardware { get; private set; } = new();
+
+	/// <summary>
+	/// Is this hardware turned on? True for hardware that isn't installed, too: only a turned-off piece answers false.
+	/// </summary>
+	public bool IsHardwareEnabled( string id ) => !DisabledHardware.Contains( id );
+
+	/// <summary>
+	/// The installed hardware that is turned on, which is what gives the computer its capabilities.
+	/// </summary>
+	public IEnumerable<NaviHardwareResource> ActiveHardware => InstalledHardware.Where( x => IsHardwareEnabled( x.Id ) );
+
+	/// <summary>
+	/// Does any hardware that is turned on provide <paramref name="capability"/> (<see cref="NaviHardware"/>)?
+	/// </summary>
+	public bool HasCapability( string capability ) => ActiveHardware.Any( x => x.Provides( capability ) );
+
+	/// <summary>
+	/// The computer has hardware that provides <see cref="NaviHardware.Network"/>, turned on or not.
+	/// </summary>
+	public bool HasNetworkCard => InstalledHardware.Any( x => x.Provides( NaviHardware.Network ) );
 
 	/// <summary>
 	/// The computer can reach other computers, the Store and the web: it has hardware that provides
-	/// <see cref="NaviHardware.Network"/>. See <see cref="NaviNetwork"/>.
+	/// <see cref="NaviHardware.Network"/>, and it is turned on. See <see cref="NaviNetwork"/>.
 	/// </summary>
 	public bool IsOnline => HasCapability( NaviHardware.Network );
+
+	/// <summary>
+	/// Turn an installed piece of hardware on or off. Returns false if it isn't installed or already is that way. Host
+	/// only. Turning off a network card takes the computer offline, which apps and the scene hear about like any change.
+	/// </summary>
+	public bool SetHardwareEnabled( string id, bool enabled )
+	{
+		if ( !IsAuthority || NaviScriptGuard.Active || !HasHardware( id ) || IsHardwareEnabled( id ) == enabled )
+			return false;
+
+		DisabledHardware = enabled ? DisabledHardware.Where( x => x != id ).ToList() : DisabledHardware.Append( id ).ToList();
+		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Turn every network card on or off: the computer goes online or offline. Returns false if nothing changed. Host only.
+	/// </summary>
+	public bool SetNetworkEnabled( bool enabled )
+	{
+		var changed = false;
+
+		foreach ( var card in InstalledHardware.Where( x => x.Provides( NaviHardware.Network ) ).ToList() )
+			changed |= SetHardwareEnabled( card.Id, enabled );
+
+		return changed;
+	}
+
+	/// <summary>
+	/// The user picked Go offline or Go online in the tray's network menu.
+	/// </summary>
+	[Rpc.Host]
+	public void UserSetNetworkEnabled( bool enabled )
+	{
+		if ( Authorize() )
+			SetNetworkEnabled( enabled );
+	}
 
 	/// <summary>
 	/// The computer can play sounds: it has hardware that provides <see cref="NaviHardware.Audio"/>. Without it, it only beeps.
@@ -79,6 +137,7 @@ public sealed partial class NaviComputer
 			return false;
 
 		Hardware = InstalledHardware.Append( hardware ).ToList();
+		DisabledHardware = DisabledHardware.Where( x => x != hardware.Id ).ToList();
 		Version++;
 		return true;
 	}
@@ -92,6 +151,7 @@ public sealed partial class NaviComputer
 			return false;
 
 		Hardware = InstalledHardware.Where( x => x.Id != id ).ToList();
+		DisabledHardware = DisabledHardware.Where( x => x != id ).ToList();
 		Version++;
 		return true;
 	}
@@ -102,6 +162,8 @@ public sealed partial class NaviComputer
 	/// </summary>
 	void ApplyHardware( NaviComputerSave save )
 	{
+		DisabledHardware = save.DisabledHardware?.Distinct().ToList() ?? new();
+
 		if ( save.Hardware is null )
 			return;
 
@@ -139,7 +201,8 @@ public sealed partial class NaviComputer
 
 		hardwareCheckedVersion = Version;
 
-		var hardware = string.Join( "\n", InstalledHardware.Select( x => x.Id ).Order( System.StringComparer.Ordinal ) );
+		var hardware = string.Join( "\n",
+			InstalledHardware.Select( x => IsHardwareEnabled( x.Id ) ? x.Id : $"{x.Id} (off)" ).Order( System.StringComparer.Ordinal ) );
 		var online = IsOnline;
 
 		if ( deliveredHardware is null )
@@ -467,7 +530,8 @@ public sealed partial class NaviComputer
 			+ $"{(computer.HasAudio ? "sound card" : "beep only")}" );
 
 		foreach ( var hardware in computer.InstalledHardware )
-			Log.Info( $"  {hardware.Name} ({hardware.Id}): {string.Join( ", ", hardware.Capabilities ?? [] )}" );
+			Log.Info( $"  {hardware.Name} ({hardware.Id}){(computer.IsHardwareEnabled( hardware.Id ) ? "" : " [off]")}: "
+				+ string.Join( ", ", hardware.Capabilities ?? [] ) );
 
 		Log.Info( $"Hardware there is: {string.Join( ", ", NaviHardware.All.Select( x => x.Id ) )}" );
 	}

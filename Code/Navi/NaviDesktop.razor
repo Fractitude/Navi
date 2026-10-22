@@ -81,7 +81,7 @@
 		}
 	</div>
 
-	@if ( MenuApp is not null || TrayMenuApp is not null || StartOpen || NotificationsOpen || NotificationMenu != 0 )
+	@if ( MenuApp is not null || TrayMenuApp is not null || NetworkMenuOpen || StartOpen || NotificationsOpen || NotificationMenu != 0 )
 	{
 		@* Catches clicks outside the menu, to close it. *@
 		<div class="menu-backdrop" @onmousedown=@(() => CloseMenus())></div>
@@ -211,9 +211,15 @@
 
 			@* The network and the clock are the computer's own, always there. The clock runs on each client from NaviClock, *@
 			@* so nothing is sent for it. *@
-			<div class="tray-icon network @( Computer.IsOnline ? "" : "offline" )">
-				<div class="tooltip">@( Computer.IsOnline ? $"Connected to the internet: {Computer.IpAddress}" : "No internet: this computer has no network card" )</div>
+			<div class="tray-icon network @( Computer.IsOnline ? "" : "offline" ) @( NetworkMenuOpen ? "menu-open" : "" )"
+				@onrightclick=@( () => OpenNetworkMenu() )>
+				<div class="tooltip">@NetworkTooltip</div>
 				<i>@( Computer.IsOnline ? "wifi" : "wifi_off" )</i>
+
+				@if ( NetworkMenuOpen )
+				{
+					<NaviMenu class="tray-menu" Heading="Network" Items=@NetworkMenu() OnChoose=@( ( string item ) => NetworkMenuChoose( item ) )/>
+				}
 			</div>
 
 			@* The notification list's button, between the network and the clock. It counts what the player hasn't seen. *@
@@ -348,6 +354,11 @@
 	/// Id of the app whose tray menu is open, or null.
 	/// </summary>
 	string TrayMenuApp;
+
+	/// <summary>
+	/// The right-click menu of the tray's network icon is open.
+	/// </summary>
+	bool NetworkMenuOpen;
 
 	/// <summary>
 	/// How far in front of the screen the secure layer floats, in world units. Less than 1 and the screen can still draw
@@ -487,7 +498,7 @@
 
 		// A taskbar or tray menu opened with the start menu already up. The host closes it when the player stands up or the
 		// screen locks.
-		if ( StartOpen && Computer.CanUse && (MenuApp is not null || TrayMenuApp is not null) )
+		if ( StartOpen && Computer.CanUse && (MenuApp is not null || TrayMenuApp is not null || NetworkMenuOpen) )
 			SetStart( false );
 
 		if ( (NotificationsOpen || NotificationMenu != 0) && (!Computer.CanUse || Computer.IsLocked) )
@@ -551,6 +562,7 @@
 	{
 		MenuApp = null;
 		TrayMenuApp = null;
+		NetworkMenuOpen = false;
 		SetStart( false );
 		NotificationsOpen = false;
 		NotificationMenu = 0;
@@ -605,6 +617,7 @@
 		var open = NotificationMenu != id;
 		MenuApp = null;
 		TrayMenuApp = null;
+		NetworkMenuOpen = false;
 		SetStart( false );
 		NotificationMenu = open ? id : 0;
 	}
@@ -708,6 +721,49 @@
 	{
 		MenuApp = null;
 		TrayMenuApp = id;
+		NetworkMenuOpen = false;
+	}
+
+	void OpenNetworkMenu()
+	{
+		MenuApp = null;
+		TrayMenuApp = null;
+		NetworkMenuOpen = true;
+	}
+
+	/// <summary>
+	/// What the network icon says: connected with the address, offline because the player turned it off, or no card.
+	/// </summary>
+	string NetworkTooltip =>
+		Computer.IsOnline ? $"Connected to the internet: {Computer.IpAddress}" :
+		Computer.HasNetworkCard ? "No internet: the network is turned off" :
+		"No internet: this computer has no network card";
+
+	/// <summary>
+	/// The items of the network menu. Going online or offline needs a network card to turn on or off.
+	/// </summary>
+	List<NaviMenuItem> NetworkMenu() =>
+	[
+		new( "copy-ip", "Copy IP address", "content_copy", Enabled: NaviNetwork.IsAddress( Computer.IpAddress ) ),
+		new( "toggle", Computer.IsOnline ? "Go offline" : "Go online", Computer.IsOnline ? "wifi_off" : "wifi",
+			Enabled: Computer.HasNetworkCard ),
+	];
+
+	/// <summary>
+	/// Run a network menu item and close the menu. The address is copied on this client, so it only touches the player's own
+	/// clipboard.
+	/// </summary>
+	void NetworkMenuChoose( string item )
+	{
+		CloseMenus();
+
+		if ( !Computer.CanUse )
+			return;
+
+		if ( item == "copy-ip" && NaviNetwork.IsAddress( Computer.IpAddress ) )
+			Clipboard.SetText( Computer.IpAddress );
+		else if ( item == "toggle" )
+			Computer.UserSetNetworkEnabled( !Computer.IsOnline );
 	}
 
 	/// <summary>
@@ -1600,7 +1656,7 @@
 	{
 		clockText = NaviClock.Text;
 
-		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
+		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, NetworkMenuOpen, StartOpen), Computer?.CanUse, Computer?.UserId,
 			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion, Computer?.CurrentDrag?.Serial, Computer?.CurrentDrag?.Effect, Computer?.CurrentDrag?.Refused) );
 	}
 }

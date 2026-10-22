@@ -1101,18 +1101,22 @@ public sealed class Navi
 	/// <summary>
 	/// A piece of hardware installed in the computer, and the <see cref="Capability"/> values it provides.
 	/// </summary>
-	public sealed record HardwareInfo( string Id, string Name, string Description, string Icon, IReadOnlyList<string> Capabilities );
+	/// <remarks>
+	/// <paramref name="Enabled"/> is false while the player has it turned off: it is installed but provides nothing.
+	/// </remarks>
+	public sealed record HardwareInfo( string Id, string Name, string Description, string Icon, IReadOnlyList<string> Capabilities,
+		bool Enabled = true );
 
 	/// <summary>
-	/// The hardware installed in the computer. The game installs and removes it; apps hear of it in
-	/// <see cref="NaviApp.OnHardwareChanged"/>.
+	/// The hardware installed in the computer. The game installs and removes it, the player can turn it off; apps hear of it
+	/// in <see cref="NaviApp.OnHardwareChanged"/>.
 	/// </summary>
 	public sealed class HardwareCalls( Navi navi )
 	{
 		public async Task<IReadOnlyList<HardwareInfo>> ListAsync()
 		{
-			var list = await navi.CallAsync<(string, string, string, string, string[])[]>( "hardware.list" );
-			return list.Select( x => new HardwareInfo( x.Item1, x.Item2, x.Item3, x.Item4, x.Item5 ) ).ToArray();
+			var list = await navi.CallAsync<(string, string, string, string, string[], bool)[]>( "hardware.list" );
+			return list.Select( x => new HardwareInfo( x.Item1, x.Item2, x.Item3, x.Item4, x.Item5, x.Item6 ) ).ToArray();
 		}
 	}
 

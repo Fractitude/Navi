@@ -928,6 +928,7 @@ public sealed partial class NaviComputer : Component
 		SnapDistance = SnapDistance,
 		WindowPlacements = placements ? CapturePlacements() : new(),
 		Hardware = InstalledHardware.Select( x => x.Id ).ToList(),
+		DisabledHardware = DisabledHardware.Where( HasHardware ).Order( System.StringComparer.Ordinal ).ToList(),
 		IpAddress = IpAddress ?? "",
 	};
 
