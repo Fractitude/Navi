@@ -243,6 +243,50 @@
 		</div>
 	}
 
+	@* Entries dragged into a folder that has some of the same names: what to do with each, before anything moves. *@
+	@if ( UiState.Conflict is { } conflict )
+	{
+		<div class="confirm-backdrop">
+			<div class="confirm conflict">
+				<div class="confirm-title">
+					@( conflict.Items.Count == 1 ? "1 item" : $"{conflict.Items.Count} items" ) already there
+				</div>
+				<div class="confirm-text">"@conflict.Folder" has items with the same names. Choose what happens to each.</div>
+
+				<div class="conflict-all">
+					<div class="conflict-label">All</div>
+					@foreach ( var (choice, label) in ConflictChoices )
+					{
+						<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.SetConflictAction, "-1", choice ) )>@label</div>
+					}
+				</div>
+
+				<div class="conflict-list">
+					@for ( var i = 0; i < conflict.Items.Count; i++ )
+					{
+						var index = i.ToString();
+						var item = conflict.Items[i];
+
+						<div class="conflict-row">
+							<i>@item.Icon</i>
+							<div class="conflict-label">@item.Name</div>
+							@foreach ( var (choice, label) in ConflictChoices )
+							{
+								<div class="tool wide @( item.Choice == choice ? "active" : "" )"
+								     @onclick=@( () => Navi.Act( FilesViewModel.SetConflictAction, index, choice ) )>@label</div>
+							}
+						</div>
+					}
+				</div>
+
+				<div class="confirm-buttons">
+					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.CancelConflictAction ) )>Cancel</div>
+					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.ResolveConflictAction ) )>Move</div>
+				</div>
+			</div>
+		</div>
+	}
+
 	@* What the cursor carries while entries are dragged inside the window. *@
 	<div class="drag-ghost" @ref="Ghost">
 		@if ( dragPaths is not null )
@@ -274,6 +318,14 @@
 	FilesThumbnails ViewerThumbnails => field ??= new( Navi );
 
 	TextEntry RenameEntry;
+
+	/// <summary>The choices for an entry that clashes, with their buttons' labels.</summary>
+	static readonly (string Choice, string Label)[] ConflictChoices =
+	[
+		(FilesViewModel.ConflictReplace, "Replace"),
+		(FilesViewModel.ConflictKeep, "Keep both"),
+		(FilesViewModel.ConflictSkip, "Skip"),
+	];
 
 	Panel List;
 

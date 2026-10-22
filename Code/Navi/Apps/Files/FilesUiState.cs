@@ -37,6 +37,18 @@ public sealed record FileRow(
 public sealed record ConfirmDialog( string Title, string Text, string Button );
 
 /// <summary>
+/// An entry being moved that the folder already has, and what the player has chosen to do with it: one of
+/// <see cref="FilesViewModel.ConflictReplace"/>, <see cref="FilesViewModel.ConflictKeep"/> or
+/// <see cref="FilesViewModel.ConflictSkip"/>.
+/// </summary>
+public sealed record ConflictItem( string Name, string Icon, string Choice );
+
+/// <summary>
+/// The question over the window when entries moved into <see cref="Folder"/> clash with what it has: one line for each.
+/// </summary>
+public sealed record ConflictDialog( string Folder, IReadOnlyList<ConflictItem> Items );
+
+/// <summary>
 /// Everything the Files panel draws. Replaced whole by <see cref="FilesViewModel"/> on every change.
 /// </summary>
 public sealed record FilesUiState
@@ -114,6 +126,9 @@ public sealed record FilesUiState
 
 	/// <summary>The question waiting for the player's answer, or null. It covers the window until answered.</summary>
 	public ConfirmDialog Confirm { get; init; }
+
+	/// <summary>The question about entries that clash with a folder they are dragged into, or null. It covers the window too.</summary>
+	public ConflictDialog Conflict { get; init; }
 
 	public bool MenuOpen => Menu.Count > 0;
 

@@ -520,6 +520,57 @@
 			background-color: #a0442c;
 			border-color: #a0442c;
 		}
+
+		// The dialog for entries that clash: a line for each, with a button for each choice.
+		&.conflict
+		{
+			width: 420px;
+			max-width: 96%;
+
+			.conflict-all, .conflict-row
+			{
+				flex-direction: row;
+				align-items: center;
+				gap: 4px;
+			}
+
+			.conflict-all
+			{
+				justify-content: flex-end;
+			}
+
+			.conflict-list
+			{
+				flex-direction: column;
+				gap: 3px;
+				max-height: 180px;
+				overflow-y: scroll;
+			}
+
+			.conflict-row > i
+			{
+				flex-shrink: 0;
+				font-size: 14px;
+			}
+
+			.conflict-label
+			{
+				flex-grow: 1;
+				flex-basis: 0;
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				font-size: 11px;
+				font-weight: 700;
+			}
+
+			.active
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+		}
 	}
 
 	.status

@@ -49,6 +49,17 @@ public sealed class FilesViewModel
 	public const string MoveIntoAction = "move-into";
 
 	/// <summary>
+	/// Answers to the question about entries the folder already has: <see cref="SetConflictAction"/> takes an entry's number
+	/// (-1 for all) and one of the choices below; the other two end the question.
+	/// </summary>
+	public const string SetConflictAction = "set-conflict";
+	public const string ResolveConflictAction = "resolve-conflict";
+	public const string CancelConflictAction = "cancel-conflict";
+
+	/// <summary>What to do with an entry the folder already has.</summary>
+	public const string ConflictReplace = "replace", ConflictKeep = "keep", ConflictSkip = "skip";
+
+	/// <summary>
 	/// The menu's "Copy path". The host's copy does nothing with it but close the menu: the clipboard is the player's, so
 	/// the panel on their own client copies <see cref="FilesUiState.MenuPaths"/> when they click it.
 	/// </summary>
@@ -266,10 +277,17 @@ public sealed class FilesViewModel
 		if ( confirming is not null && action is not (ConfirmAction or CancelConfirmAction) )
 			return;
 
+		// The same for the question about entries that clash.
+		if ( pendingMove is not null && action is not (SetConflictAction or ResolveConflictAction or CancelConflictAction) )
+			return;
+
 		switch ( action )
 		{
 			case ConfirmAction: Answer( true ); break;
 			case CancelConfirmAction: Answer( false ); break;
+			case SetConflictAction when args is { Length: > 1 }: SetConflict( args[0], args[1] ); break;
+			case ResolveConflictAction: ResolveConflict( true ); break;
+			case CancelConflictAction: ResolveConflict( false ); break;
 
 			case OpenMenuAction:
 				OpenMenu( arg, Number( args, 1 ), Number( args, 2 ) );
@@ -581,6 +599,15 @@ public sealed class FilesViewModel
 		{
 			menu = [];
 			Rebuild();
+		}
+
+		// The question about clashing entries takes the keys too: Enter moves with the choices made.
+		if ( pendingMove is not null )
+		{
+			if ( keys == "enter" )
+				ResolveConflict( true );
+
+			return;
 		}
 
 		// A question takes the keys: Enter answers yes. Escape stands the player up, so no is the button only.
@@ -1022,12 +1049,13 @@ public sealed class FilesViewModel
 
 	/// <summary>
 	/// Move entries the player dragged onto a folder (a row, a place, a drive or a crumb) into it. Only entries of the open
-	/// folder count, as for Cut, and a folder can't go into itself. A name the folder already has gets a number, as in Paste.
-	/// Dropped on the trash they are trashed. The folder is looked at here, not trusted from the panel.
+	/// folder count, as for Cut, and a folder can't go into itself. Dropped on the trash they are trashed. If the folder
+	/// already has an entry by the name of one being moved, the player is asked what to do with each of those
+	/// (<see cref="ConflictDialog"/>) before anything moves. The folder is looked at here, not trusted from the panel.
 	/// </summary>
 	async Task MoveIntoAsync( string folder, string[] dragged )
 	{
-		if ( IsTrash( path ) || dragged.Length > MaxRows )
+		if ( IsTrash( path ) || dragged.Length > MaxRows || pendingMove is not null )
 			return;
 
 		var moving = dragged.Distinct().Where( x => entries.Any( y => y.Path == x ) ).ToList();
@@ -1038,13 +1066,43 @@ public sealed class FilesViewModel
 		if ( target is null )
 			return;
 
+		moving = moving.Where( x => FolderOf( x ) != target && !IsWithin( target, x ) ).ToList();
+		if ( moving.Count == 0 )
+			return;
+
+		if ( !IsTrash( target ) )
+		{
+			var names = new HashSet<string>( (await navi.Files.ListAsync( target )).Select( x => x.Name ), System.StringComparer.Ordinal );
+			var clashing = moving.Where( x => names.Contains( NameOf( x ) ) ).ToList();
+
+			if ( clashing.Count > 0 )
+			{
+				pendingMove = new PendingMove( target, moving, clashing, clashing.Select( _ => ConflictKeep ).ToList() );
+				Rebuild();
+				return;
+			}
+		}
+
+		await MoveEntriesAsync( target, moving, [], [] );
+	}
+
+	/// <summary>
+	/// Move <paramref name="moving"/> into <paramref name="target"/>. For those in <paramref name="clashing"/>, which the
+	/// folder already has, <paramref name="choices"/> says what to do: replace (the old one goes to the trash), keep both
+	/// (the moved one gets a number) or skip. One that fails stops the rest.
+	/// </summary>
+	async Task MoveEntriesAsync( string target, List<string> moving, List<string> clashing, List<string> choices )
+	{
 		var names = IsTrash( target )
 			? null
 			: new HashSet<string>( (await navi.Files.ListAsync( target )).Select( x => x.Name ), System.StringComparer.Ordinal );
 
 		foreach ( var from in moving )
 		{
-			if ( FolderOf( from ) == target || IsWithin( target, from ) )
+			var clash = clashing.IndexOf( from );
+			var choice = clash >= 0 ? choices[clash] : ConflictKeep;
+
+			if ( choice == ConflictSkip )
 				continue;
 
 			string done;
@@ -1054,7 +1112,18 @@ public sealed class FilesViewModel
 			}
 			else
 			{
-				var name = UniqueName( NameOf( from ), names );
+				var name = NameOf( from );
+
+				if ( clash >= 0 && choice == ConflictReplace )
+				{
+					// The old one is trashed, not deleted, so a wrong choice can be undone from the trash.
+					if ( await RunAsync( () => navi.Files.TrashAsync( Join( target, name ) ) ) is null )
+						break;
+
+					names.Remove( name );
+				}
+
+				name = UniqueName( name, names );
 				names.Add( name );
 				done = await RunAsync( async () => { await navi.Files.MoveAsync( from, Join( target, name ) ); return from; } );
 			}
@@ -1067,6 +1136,50 @@ public sealed class FilesViewModel
 
 		await RefreshAsync();
 	}
+
+	/// <summary>
+	/// A move waiting for the player to say what to do with the entries the folder already has.
+	/// </summary>
+	sealed record PendingMove( string Target, List<string> Moving, List<string> Clashing, List<string> Choices );
+
+	PendingMove pendingMove;
+
+	/// <summary>
+	/// The player chose what to do with one clashing entry, or with all of them (<paramref name="index"/> -1).
+	/// </summary>
+	void SetConflict( string index, string choice )
+	{
+		if ( pendingMove is not { } pending || choice is not (ConflictReplace or ConflictKeep or ConflictSkip)
+			|| !int.TryParse( index, out var i ) || i < -1 || i >= pending.Choices.Count )
+			return;
+
+		for ( var j = 0; j < pending.Choices.Count; j++ )
+		{
+			if ( i == -1 || i == j )
+				pending.Choices[j] = choice;
+		}
+
+		Rebuild();
+	}
+
+	/// <summary>
+	/// The player closed the question: move with the choices made, or move nothing.
+	/// </summary>
+	void ResolveConflict( bool go )
+	{
+		var pending = pendingMove;
+		pendingMove = null;
+		Rebuild();
+
+		if ( go && pending is not null )
+			_ = MoveEntriesAsync( pending.Target, pending.Moving, pending.Clashing, pending.Choices );
+	}
+
+	ConflictDialog BuildConflict() => pendingMove is not { } pending
+		? null
+		: new ConflictDialog( NameOf( pending.Target ) is { Length: > 0 } name ? name : pending.Target,
+			pending.Clashing.Select( ( x, i ) => new ConflictItem( NameOf( x ),
+				entries.FirstOrDefault( y => y.Path == x ) is { } entry ? IconOf( entry ) : "description", pending.Choices[i] ) ).ToList() );
 
 	/// <summary>
 	/// Select entries that were just made here, once they are listed.
@@ -1245,6 +1358,7 @@ public sealed class FilesViewModel
 			MenuX = menuAt.x,
 			MenuY = menuAt.y,
 			Confirm = BuildConfirm(),
+			Conflict = BuildConflict(),
 		};
 	}
 
