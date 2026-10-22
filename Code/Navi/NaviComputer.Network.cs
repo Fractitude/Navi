@@ -589,6 +589,18 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// On the host: stand the user up, as Escape does, for game code that moves the player away (the game's own app
+	/// that takes them somewhere else). Does nothing on a client, or while a script runs (<see cref="NaviScriptGuard"/>).
+	/// </summary>
+	public void StandUp()
+	{
+		if ( !IsAuthority || NaviScriptGuard.Active )
+			return;
+
+		Unseat();
+	}
+
+	/// <summary>
 	/// On the host: stand the user up, as Escape does.
 	/// </summary>
 	void Unseat()
