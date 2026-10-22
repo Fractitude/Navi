@@ -216,16 +216,7 @@
 				<i>@( Computer.IsOnline ? "wifi" : "wifi_off" )</i>
 			</div>
 
-			<div class="tray-clock">
-				<div class="tooltip">@NaviClock.DateText</div>
-				@* One box per character, each digit as wide as any other, so the clock never changes width as it ticks. *@
-				@foreach ( var character in clockText )
-				{
-					<div class="@( char.IsDigit( character ) ? "digit" : "separator" )">@character</div>
-				}
-			</div>
-
-			@* The notification list's button, always last. It counts what the player hasn't seen. *@
+			@* The notification list's button, between the network and the clock. It counts what the player hasn't seen. *@
 			@{
 				var unread = Computer.UnreadNotifications;
 			}
@@ -235,6 +226,15 @@
 				@if ( unread > 0 )
 				{
 					<div class="badge">@( unread > 9 ? "9+" : unread.ToString() )</div>
+				}
+			</div>
+
+			<div class="tray-clock">
+				<div class="tooltip">@NaviClock.DateText</div>
+				@* One box per character, each digit as wide as any other, so the clock never changes width as it ticks. *@
+				@foreach ( var character in clockText )
+				{
+					<div class="@( char.IsDigit( character ) ? "digit" : "separator" )">@character</div>
 				}
 			</div>
 		</div>
