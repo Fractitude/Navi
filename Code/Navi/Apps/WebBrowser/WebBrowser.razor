@@ -85,6 +85,12 @@
 	float boardScale;
 
 	/// <summary>
+	/// The board <see cref="boardScale"/> was applied to. The markup makes a new board when the page is drawn again (the
+	/// player stood up and sat down, say), and a new one starts unscaled.
+	/// </summary>
+	DinoRunBoard scaledBoard;
+
+	/// <summary>
 	/// The offline game. Made the first time the computer is offline, and kept, so a best score lasts while the window does.
 	/// </summary>
 	DinoRunGame Dino => field ??= new(Navi);
@@ -136,10 +142,14 @@
 		var scale = System.MathF.Min( DinoArea.Box.Rect.Width * 0.95f / Board.Box.Rect.Width,
 			DinoArea.Box.Rect.Height * 0.95f / Board.Box.Rect.Height );
 
-		if ( !float.IsFinite( scale ) || scale <= 0f || System.MathF.Abs( scale - boardScale ) < 0.001f )
+		if ( !float.IsFinite( scale ) || scale <= 0f )
+			return;
+
+		if ( Board == scaledBoard && Board.Style.Transform is not null && System.MathF.Abs( scale - boardScale ) < 0.001f )
 			return;
 
 		boardScale = scale;
+		scaledBoard = Board;
 		var transform = new PanelTransform();
 		transform.AddScale( scale );
 		Board.Style.Transform = transform;
