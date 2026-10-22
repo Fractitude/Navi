@@ -26,6 +26,11 @@ public sealed record WebBrowserUiState
 	/// </summary>
 	public string LocalPage { get; init; }
 
+	/// <summary>
+	/// The computer's file or folder at a <c>file://</c> address, drawn instead of the web page, or null on any other page.
+	/// </summary>
+	public WebBrowserFilePage File { get; init; }
+
 	/// <summary>What the address field holds.</summary>
 	public string AddressText { get; init; } = "";
 
@@ -58,4 +63,41 @@ public sealed record WebBrowserSharedState
 
 	/// <summary>Dino Run, played while the computer is offline or the seated player opened it.</summary>
 	public DinoRunFrame Dino { get; init; } = DinoRunFrame.Empty;
+}
+
+public enum WebBrowserFileKind
+{
+	Loading,
+	Text,
+	Image,
+	Folder,
+
+	/// <summary>It couldn't be shown: <see cref="WebBrowserFilePage.Message"/> says why.</summary>
+	Error,
+}
+
+/// <summary>
+/// One entry of a folder's listing. <see cref="Url"/> is its <c>file://</c> address.
+/// </summary>
+public sealed record WebBrowserFileEntry( string Name, string Url, bool IsFolder, string SizeText );
+
+/// <summary>
+/// A <c>file://</c> page: a text file's text, a picture (the texture is <c>WebBrowserViewModel.Picture</c>), a folder's
+/// listing, or why it can't be shown.
+/// </summary>
+public sealed record WebBrowserFilePage
+{
+	/// <summary>The path in the computer's files, e.g. "/Pictures/angel.jpg".</summary>
+	public string Path { get; init; } = "/";
+
+	public WebBrowserFileKind Kind { get; init; }
+
+	/// <summary>A text file's text.</summary>
+	public string Text { get; init; } = "";
+
+	/// <summary>A folder's entries, its parent ("..") first.</summary>
+	public IReadOnlyList<WebBrowserFileEntry> Entries { get; init; } = [];
+
+	/// <summary>Why it can't be shown, or a picture's size.</summary>
+	public string Message { get; init; } = "";
 }

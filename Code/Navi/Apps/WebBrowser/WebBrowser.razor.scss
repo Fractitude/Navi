@@ -219,6 +219,107 @@
 		}
 	}
 
+	// A file:// page: the computer's own file or folder, drawn by the browser in the room the web page would take.
+	.file-page
+	{
+		flex-grow: 1;
+		flex-shrink: 1;
+		min-height: 0;
+		flex-direction: column;
+		background-color: $paper-bg;
+		border: 1px solid $line-bc;
+		color: $ink-t;
+	}
+
+	.file-text
+	{
+		overflow: scroll;
+		padding: 6px;
+
+		.text
+		{
+			flex-shrink: 0;
+			white-space: pre;
+			font-family: monospace;
+			font-size: 10px;
+		}
+	}
+
+	.file-image
+	{
+		justify-content: center;
+		align-items: center;
+		gap: 4px;
+		padding: 6px;
+		overflow: hidden;
+
+		.picture
+		{
+			flex-grow: 1;
+			min-height: 0;
+			width: 100%;
+			background-size: contain;
+			background-repeat: no-repeat;
+			background-position: center;
+		}
+
+		.size
+		{
+			flex-shrink: 0;
+			font-size: 9px;
+			opacity: 0.6;
+		}
+	}
+
+	.file-folder
+	{
+		overflow: scroll;
+		padding: 6px;
+		gap: 1px;
+
+		.heading
+		{
+			flex-shrink: 0;
+			margin-bottom: 6px;
+			font-size: 13px;
+			font-weight: 700;
+		}
+
+		.entry
+		{
+			flex-shrink: 0;
+			flex-direction: row;
+			align-items: center;
+			gap: 6px;
+			padding: 2px 4px;
+			font-size: 11px;
+			cursor: pointer;
+
+			i
+			{
+				font-size: 14px;
+			}
+
+			.name
+			{
+				flex-grow: 1;
+				min-width: 0;
+			}
+
+			.size
+			{
+				flex-shrink: 0;
+				opacity: 0.6;
+			}
+
+			&:hover
+			{
+				color: $paper-t;
+				background-color: $ink-bg;
+			}
+		}
+	}
+
 	// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
 	.page
 	{

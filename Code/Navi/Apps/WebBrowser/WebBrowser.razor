@@ -4,7 +4,8 @@
 
 @* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. The page itself is *@
 @* the engine's WebPanel. Offline it shows Dino Run instead (DinoRunGame), as Chrome does. A local address *@
-@* (browser://, see WebBrowserViewModel.LocalScheme) is drawn here and never loaded: browser://dino is the game. *@
+@* (browser://, see WebBrowserViewModel.LocalScheme) is drawn here and never loaded: browser://dino is the game. So *@
+@* is a file address (file:///Pictures/angel.jpg): a text file, a picture or a folder of the computer's own files. *@
 @* It is shared, but only for Dino Run: the host's copy runs the game and says whether the computer is online *@
 @* (WebBrowserSharedViewModel), and every player near the screen sees it. Browsing is the seated player's own: their *@
 @* copy has the address, the history and the page, everyone else sees a private screen, and nothing about it is *@
@@ -72,6 +73,43 @@
 			<label>@localPage isn't a page of this browser. Try @WebBrowserViewModel.DinoPage.</label>
 		</div>
 	}
+	else if ( UiState.File is { } file )
+	{
+		@if ( file.Kind == WebBrowserFileKind.Text )
+		{
+			<div class="file-page file-text">
+				<label class="text">@file.Text</label>
+			</div>
+		}
+		else if ( file.Kind == WebBrowserFileKind.Image )
+		{
+			<div class="file-page file-image">
+				<Image class="picture" Texture=@ViewModel.Picture/>
+				<label class="size">@file.Message</label>
+			</div>
+		}
+		else if ( file.Kind == WebBrowserFileKind.Folder )
+		{
+			<div class="file-page file-folder">
+				<label class="heading">Index of @file.Path</label>
+				@foreach ( var entry in file.Entries )
+				{
+					<div class="entry" @onclick=@( () => ViewModel.OpenFile( entry.Url ) )>
+						<i>@( entry.IsFolder ? "folder" : "description" )</i>
+						<label class="name">@entry.Name</label>
+						<label class="size">@entry.SizeText</label>
+					</div>
+				}
+			</div>
+		}
+		else
+		{
+			<div class="private">
+				<i>@( file.Kind == WebBrowserFileKind.Loading ? "hourglass_empty" : "draft" )</i>
+				<label>@( file.Kind == WebBrowserFileKind.Loading ? $"Opening {file.Path}..." : file.Message )</label>
+			</div>
+		}
+	}
 	else if ( SharedState.Online is true )
 	{
 		<WebPanel @ref="Web" class="page"/>
@@ -123,7 +161,7 @@
 
 	/// <summary>Dino Run as this client's own browsing has it, whether or not this player is in the seat.</summary>
 	DinoView OwnDino => UiState.LocalPage == WebBrowserViewModel.DinoPage ? DinoView.Opened
-		: UiState.LocalPage is null ? OfflineView : DinoView.None;
+		: UiState.LocalPage is null && UiState.File is null ? OfflineView : DinoView.None;
 
 	DinoView OfflineView => SharedState.Online is false ? DinoView.Offline : DinoView.None;
 
@@ -192,8 +230,8 @@
 			_ = Navi.Input.KeepLocalAsync( keepLocal );
 		}
 
-		// A local page is never loaded into the web page, which isn't drawn then.
-		if ( Navi.IsWatching || UiState.LocalPage is not null || !Web.IsValid() )
+		// A local or file page is never loaded into the web page, which isn't drawn then.
+		if ( Navi.IsWatching || UiState.LocalPage is not null || UiState.File is not null || !Web.IsValid() )
 		{
 			// The page is made again when the player is back, and loads the address again.
 			loadedId = -1;

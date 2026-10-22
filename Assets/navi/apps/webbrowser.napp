@@ -8,7 +8,9 @@
   "CanMaximize": true,
   "CanResize": true,
   "Shared": true,
-  "Permissions": [],
+  "Permissions": [
+    "navi.files.access"
+  ],
   "IsSystem": false,
   "__references": [],
   "__version": 0
