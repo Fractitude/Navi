@@ -44,6 +44,11 @@ public sealed class FilesViewModel
 	public const string PasteAction = "paste";
 
 	/// <summary>
+	/// The player dragged entries of the open folder onto a folder: the first argument is that folder, the rest the entries.
+	/// </summary>
+	public const string MoveIntoAction = "move-into";
+
+	/// <summary>
 	/// The menu's "Copy path". The host's copy does nothing with it but close the menu: the clipboard is the player's, so
 	/// the panel on their own client copies <see cref="FilesUiState.MenuPaths"/> when they click it.
 	/// </summary>
@@ -300,6 +305,7 @@ public sealed class FilesViewModel
 			case CopyAction: Copy( cut: false ); break;
 			case CutAction: Copy( cut: true ); break;
 			case PasteAction: _ = PasteAsync(); break;
+			case MoveIntoAction when args is { Length: > 1 }: _ = MoveIntoAsync( args[0], args[1..] ); break;
 			case ToggleHiddenAction: ToggleHidden(); break;
 			case ToggleGridAction: ToggleGrid(); break;
 			case EjectAction when arg is not null: _ = EjectAsync( arg ); break;
@@ -1015,6 +1021,54 @@ public sealed class FilesViewModel
 	}
 
 	/// <summary>
+	/// Move entries the player dragged onto a folder (a row, a place, a drive or a crumb) into it. Only entries of the open
+	/// folder count, as for Cut, and a folder can't go into itself. A name the folder already has gets a number, as in Paste.
+	/// Dropped on the trash they are trashed. The folder is looked at here, not trusted from the panel.
+	/// </summary>
+	async Task MoveIntoAsync( string folder, string[] dragged )
+	{
+		if ( IsTrash( path ) || dragged.Length > MaxRows )
+			return;
+
+		var moving = dragged.Distinct().Where( x => entries.Any( y => y.Path == x ) ).ToList();
+		if ( !CanChange( moving ) )
+			return;
+
+		var target = await RunAsync( async () => (await navi.Files.GetInfoAsync( folder )) is { IsFolder: true } info ? info.Path : null );
+		if ( target is null )
+			return;
+
+		var names = IsTrash( target )
+			? null
+			: new HashSet<string>( (await navi.Files.ListAsync( target )).Select( x => x.Name ), System.StringComparer.Ordinal );
+
+		foreach ( var from in moving )
+		{
+			if ( FolderOf( from ) == target || IsWithin( target, from ) )
+				continue;
+
+			string done;
+			if ( names is null )
+			{
+				done = await RunAsync( () => navi.Files.TrashAsync( from ) );
+			}
+			else
+			{
+				var name = UniqueName( NameOf( from ), names );
+				names.Add( name );
+				done = await RunAsync( async () => { await navi.Files.MoveAsync( from, Join( target, name ) ); return from; } );
+			}
+
+			if ( done is null )
+				break;
+
+			ForgetPath( from );
+		}
+
+		await RefreshAsync();
+	}
+
+	/// <summary>
 	/// Select entries that were just made here, once they are listed.
 	/// </summary>
 	void SelectMade( List<string> made )
@@ -1105,7 +1159,14 @@ public sealed class FilesViewModel
 	/// </summary>
 	string FreeName( string name, IEnumerable<string> alsoTaken = null )
 	{
-		var taken = entries.Select( x => NameOf( x.Path ) ).Concat( alsoTaken ?? [] ).ToHashSet( System.StringComparer.Ordinal );
+		return UniqueName( name, entries.Select( x => NameOf( x.Path ) ).Concat( alsoTaken ?? [] ).ToHashSet( System.StringComparer.Ordinal ) );
+	}
+
+	/// <summary>
+	/// <paramref name="name"/>, or "name 2.txt" and so on if <paramref name="taken"/> has it.
+	/// </summary>
+	static string UniqueName( string name, HashSet<string> taken )
+	{
 		var dot = name.LastIndexOf( '.' );
 		var (stem, extension) = dot > 0 ? (name[..dot], name[dot..]) : (name, "");
 

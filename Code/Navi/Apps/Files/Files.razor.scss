@@ -32,6 +32,13 @@
 		}
 	}
 
+	// The folder entries being dragged would go into.
+	.place.drop-over, .row.drop-over
+	{
+		color: $paper-t;
+		background-color: $ink-bg;
+	}
+
 	.place
 	{
 		flex-shrink: 0;
@@ -222,6 +229,12 @@
 			flex-shrink: 0;
 			flex-direction: row;
 			align-items: center;
+		}
+
+		.crumb.drop-over
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
 		}
 
 		.crumb

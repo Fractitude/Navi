@@ -1147,11 +1147,15 @@
 	void UpdateDrop( Panel screen )
 	{
 		var drag = Computer.CurrentDrag;
-		var target = drag is null ? null : WindowUnderMouse( screen, drag );
+		var target = drag is null ? null : WindowUnderMouse( screen );
 		var host = target?.Children.OfType<NaviAppHost>().FirstOrDefault();
 		var accepts = host is not null && host.AcceptsFiles;
 
-		if ( dropTarget is not null && (dropTarget != target || !accepts || !dropTarget.IsValid) )
+		// The window the drag came out of takes the drop too (Files moves entries into its own folders), but gets no outline:
+		// it is the one the player is already working in.
+		var outline = accepts && host.Window != drag?.Source;
+
+		if ( dropTarget is not null && (dropTarget != target || !outline || !dropTarget.IsValid) )
 		{
 			if ( dropTarget.IsValid )
 				dropTarget.SetClass( "drop-target", false );
@@ -1174,7 +1178,7 @@
 			return;
 		}
 
-		if ( accepts && target != dropTarget )
+		if ( outline && target != dropTarget )
 		{
 			dropTarget = target;
 			dropTarget.SetClass( "drop-target", true );
@@ -1201,9 +1205,9 @@
 	}
 
 	/// <summary>
-	/// The top window under the mouse, other than the one the drag came out of, or null.
+	/// The top window under the mouse, or null.
 	/// </summary>
-	static Panel WindowUnderMouse( Panel screen, NaviDrag drag )
+	static Panel WindowUnderMouse( Panel screen )
 	{
 		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ).Reverse() )
 		{
@@ -1216,7 +1220,7 @@
 			if ( at.x < 0f || at.y < 0f || at.x >= size.x || at.y >= size.y )
 				continue;
 
-			return window == drag.Source ? null : panel;
+			return panel;
 		}
 
 		return null;
