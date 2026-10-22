@@ -1130,11 +1130,11 @@ public sealed class Navi
 	public sealed record NetworkStatus( bool Online, string Address, bool HasCard = true )
 	{
 		/// <summary>
-		/// What to tell the player so they can get back online: the way to turn the network on, or that a card is missing.
-		/// For an app to show after saying what it can't do offline.
+		/// Why the computer is offline, in a short sentence: the network is turned off, or a card is missing. For an app to
+		/// show after saying what it can't do offline.
 		/// </summary>
 		public string OfflineHint => HasCard
-			? "The network is turned off. Right-click the network icon in the taskbar and choose Go online."
+			? "The network is turned off."
 			: "This computer has no network card.";
 	}
 
