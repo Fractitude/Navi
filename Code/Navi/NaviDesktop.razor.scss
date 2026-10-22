@@ -1179,23 +1179,13 @@ NaviDesktop
 		pointer-events: all;
 	}
 
-	// A window that takes the files being dragged over it.
-	.drop-hint
+	// A drop zone the player drags something over, while a drop there would be taken. The computer sets the class; an app
+	// can style it further.
+	.navi-drop-over
 	{
-		display: none;
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		border: 3px dashed #6a8fb0;
-		background-color: rgba( 106, 143, 176, 0.18 );
-		pointer-events: none;
-	}
-
-	.window.drop-target > .drop-hint
-	{
-		display: flex;
+		outline-width: 3px;
+		outline-color: #6a8fb0;
+		outline-offset: -3px;
 	}
 
 	// What the cursor carries while the player drags between windows.
@@ -1240,6 +1230,17 @@ NaviDesktop
 			border-radius: 8px;
 			color: $paper-t;
 			background-color: $ink-bg;
+		}
+
+		// What a drop here would do: add (copy), an arrow (move), a shortcut (link), or no.
+		> .effect
+		{
+			font-size: 14px;
+
+			&.refused
+			{
+				color: #a0402c;
+			}
 		}
 	}
 

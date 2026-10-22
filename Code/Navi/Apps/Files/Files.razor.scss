@@ -646,5 +646,17 @@
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
+
+		// A copy, not a move (Ctrl held).
+		> .plus
+		{
+			display: none;
+			font-size: 14px;
+		}
+
+		&.copy > .plus
+		{
+			display: flex;
+		}
 	}
 }

@@ -48,6 +48,9 @@ public sealed class FilesViewModel
 	/// </summary>
 	public const string MoveIntoAction = "move-into";
 
+	/// <summary>As <see cref="MoveIntoAction"/>, but the entries stay where they are: the player held Ctrl.</summary>
+	public const string CopyIntoAction = "copy-into";
+
 	/// <summary>
 	/// Answers to the question about entries the folder already has: <see cref="SetConflictAction"/> takes an entry's number
 	/// (-1 for all) and one of the choices below; the other two end the question.
@@ -323,7 +326,8 @@ public sealed class FilesViewModel
 			case CopyAction: Copy( cut: false ); break;
 			case CutAction: Copy( cut: true ); break;
 			case PasteAction: _ = PasteAsync(); break;
-			case MoveIntoAction when args is { Length: > 1 }: _ = MoveIntoAsync( args[0], args[1..] ); break;
+			case MoveIntoAction when args is { Length: > 1 }: _ = MoveIntoAsync( args[0], args[1..], copy: false ); break;
+			case CopyIntoAction when args is { Length: > 1 }: _ = MoveIntoAsync( args[0], args[1..], copy: true ); break;
 			case ToggleHiddenAction: ToggleHidden(); break;
 			case ToggleGridAction: ToggleGrid(); break;
 			case EjectAction when arg is not null: _ = EjectAsync( arg ); break;
@@ -1053,7 +1057,7 @@ public sealed class FilesViewModel
 	/// already has an entry by the name of one being moved, the player is asked what to do with each of those
 	/// (<see cref="ConflictDialog"/>) before anything moves. The folder is looked at here, not trusted from the panel.
 	/// </summary>
-	async Task MoveIntoAsync( string folder, string[] dragged )
+	async Task MoveIntoAsync( string folder, string[] dragged, bool copy )
 	{
 		if ( IsTrash( path ) || dragged.Length > MaxRows || pendingMove is not null )
 			return;
@@ -1067,7 +1071,7 @@ public sealed class FilesViewModel
 			return;
 
 		moving = moving.Where( x => FolderOf( x ) != target && !IsWithin( target, x ) ).ToList();
-		if ( moving.Count == 0 )
+		if ( moving.Count == 0 || (copy && IsTrash( target )) )
 			return;
 
 		if ( !IsTrash( target ) )
@@ -1077,13 +1081,13 @@ public sealed class FilesViewModel
 
 			if ( clashing.Count > 0 )
 			{
-				pendingMove = new PendingMove( target, moving, clashing, clashing.Select( _ => ConflictKeep ).ToList() );
+				pendingMove = new PendingMove( target, moving, clashing, clashing.Select( _ => ConflictKeep ).ToList(), copy );
 				Rebuild();
 				return;
 			}
 		}
 
-		await MoveEntriesAsync( target, moving, [], [] );
+		await MoveEntriesAsync( target, moving, [], [], copy );
 	}
 
 	/// <summary>
@@ -1091,7 +1095,7 @@ public sealed class FilesViewModel
 	/// folder already has, <paramref name="choices"/> says what to do: replace (the old one goes to the trash), keep both
 	/// (the moved one gets a number) or skip. One that fails stops the rest.
 	/// </summary>
-	async Task MoveEntriesAsync( string target, List<string> moving, List<string> clashing, List<string> choices )
+	async Task MoveEntriesAsync( string target, List<string> moving, List<string> clashing, List<string> choices, bool copy )
 	{
 		var names = IsTrash( target )
 			? null
@@ -1125,13 +1129,18 @@ public sealed class FilesViewModel
 
 				name = UniqueName( name, names );
 				names.Add( name );
-				done = await RunAsync( async () => { await navi.Files.MoveAsync( from, Join( target, name ) ); return from; } );
+				done = await RunAsync( async () =>
+				{
+					await (copy ? navi.Files.CopyAsync( from, Join( target, name ) ) : navi.Files.MoveAsync( from, Join( target, name ) ));
+					return from;
+				} );
 			}
 
 			if ( done is null )
 				break;
 
-			ForgetPath( from );
+			if ( !copy )
+				ForgetPath( from );
 		}
 
 		await RefreshAsync();
@@ -1140,7 +1149,7 @@ public sealed class FilesViewModel
 	/// <summary>
 	/// A move waiting for the player to say what to do with the entries the folder already has.
 	/// </summary>
-	sealed record PendingMove( string Target, List<string> Moving, List<string> Clashing, List<string> Choices );
+	sealed record PendingMove( string Target, List<string> Moving, List<string> Clashing, List<string> Choices, bool Copy );
 
 	PendingMove pendingMove;
 
@@ -1172,14 +1181,15 @@ public sealed class FilesViewModel
 		Rebuild();
 
 		if ( go && pending is not null )
-			_ = MoveEntriesAsync( pending.Target, pending.Moving, pending.Clashing, pending.Choices );
+			_ = MoveEntriesAsync( pending.Target, pending.Moving, pending.Clashing, pending.Choices, pending.Copy );
 	}
 
 	ConflictDialog BuildConflict() => pendingMove is not { } pending
 		? null
 		: new ConflictDialog( NameOf( pending.Target ) is { Length: > 0 } name ? name : pending.Target,
 			pending.Clashing.Select( ( x, i ) => new ConflictItem( NameOf( x ),
-				entries.FirstOrDefault( y => y.Path == x ) is { } entry ? IconOf( entry ) : "description", pending.Choices[i] ) ).ToList() );
+				entries.FirstOrDefault( y => y.Path == x ) is { } entry ? IconOf( entry ) : "description", pending.Choices[i] ) ).ToList(),
+			pending.Copy );
 
 	/// <summary>
 	/// Select entries that were just made here, once they are listed.

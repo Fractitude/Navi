@@ -94,19 +94,64 @@ public abstract class NaviApp : Panel
 	}
 
 	/// <summary>
-	/// The player dropped something on this app's window (a file from Files, say). Only comes after the app said it takes
-	/// drops (<see cref="Navi.DragCalls.AcceptFiles"/>), and only for what the player dragged themselves. It comes on the copy
-	/// of the app on the player's client, a shared app's viewer included. Treat the paths like anything the player typed.
+	/// The player is dragging something over a drop zone of this app (<see cref="Navi.DragCalls.AcceptDrops"/>) for the first
+	/// time. <see cref="Navi.DragEvent.Zone"/> is the zone, and <see cref="Navi.DragEvent.Effect"/> what a drop there would do.
+	/// Comes on the copy of the app on the player's client, a shared app's viewer included. Treat what is dragged like
+	/// anything the player typed.
 	/// </summary>
-	protected virtual void OnDrop( Navi.Drop drop )
+	protected virtual void OnDragEnter( Navi.DragEvent e )
+	{
+	}
+
+	/// <summary>
+	/// The drag moved over the zone, or its effect changed (the player pressed Ctrl, say). Every frame while it is over.
+	/// <see cref="Navi.DragEvent.Position"/> is in the zone's panel pixels from its top left.
+	/// </summary>
+	protected virtual void OnDragOver( Navi.DragEvent e )
+	{
+	}
+
+	/// <summary>
+	/// The drag left the zone without a drop, or ended: take down what <see cref="OnDragEnter"/> showed.
+	/// </summary>
+	protected virtual void OnDragLeave( Navi.DragEvent e )
+	{
+	}
+
+	/// <summary>
+	/// The player let go over the zone. <see cref="Navi.DragEvent.Effect"/> is what to do: copy, move or link.
+	/// </summary>
+	protected virtual void OnDrop( Navi.DragEvent e )
+	{
+	}
+
+	/// <summary>
+	/// A drag this app started is over. <paramref name="effect"/> is what the target did with it, or
+	/// <see cref="Navi.DragEffects.None"/> if nothing took it. After a move the app removes what it moved.
+	/// </summary>
+	protected virtual void OnDragEnded( Navi.DragEffects effect )
 	{
 	}
 
 	protected override void OnEvent( PanelEvent e )
 	{
-		if ( Navi.TryGetDrop( e, out var drop ) )
+		if ( Navi.TryGetDragEvent( e, out var phase, out var drag ) )
 		{
-			OnDrop( drop );
+			switch ( phase )
+			{
+				case "enter": OnDragEnter( drag ); break;
+				case "over": OnDragOver( drag ); break;
+				case "leave": OnDragLeave( drag ); break;
+				default: OnDrop( drag ); break;
+			}
+
+			e.StopPropagation();
+			return;
+		}
+
+		if ( Navi.TryGetDragEnded( e, out var ended ) )
+		{
+			OnDragEnded( ended );
 			e.StopPropagation();
 			return;
 		}
@@ -465,18 +510,38 @@ public sealed class Navi
 	}
 
 	/// <summary>
-	/// Is this event the player dropping something on the app? See <see cref="TryGetAction"/> and <see cref="NaviApp.OnDrop"/>.
+	/// Is this event a drag over, or a drop on, one of the app's drop zones? <paramref name="phase"/> is "enter", "over",
+	/// "leave" or "drop". See <see cref="TryGetAction"/> and <see cref="NaviApp.OnDrop"/>.
 	/// </summary>
-	public static bool TryGetDrop( PanelEvent e, out Drop drop )
+	public static bool TryGetDragEvent( PanelEvent e, out string phase, out DragEvent drag )
 	{
 		// Plain types in the event, so a Store app's own copy of this file reads what the computer's makes.
-		if ( e.Name == "navi.drop" && e.Value is ValueTuple<string, string[]> value )
+		if ( e.Name is "navi.drag-enter" or "navi.drag-over" or "navi.drag-leave" or "navi.drop"
+			&& e.Value is ValueTuple<(string, string[])[], Vector2, int, Panel> value )
 		{
-			drop = new Drop( value.Item1, value.Item2 );
+			phase = e.Name == "navi.drop" ? "drop" : e.Name["navi.drag-".Length..];
+			var offers = value.Item1.Select( x => new DragOffer( x.Item1, x.Item2 ) ).ToArray();
+			drag = new DragEvent( new DragPayload( offers ), value.Item2, (DragEffects)value.Item3, value.Item4 );
 			return true;
 		}
 
-		drop = null;
+		phase = null;
+		drag = null;
+		return false;
+	}
+
+	/// <summary>
+	/// Is this event the end of a drag this app started? See <see cref="NaviApp.OnDragEnded"/>.
+	/// </summary>
+	public static bool TryGetDragEnded( PanelEvent e, out DragEffects effect )
+	{
+		if ( e.Name == "navi.drag-ended" && e.Value is int value )
+		{
+			effect = (DragEffects)value;
+			return true;
+		}
+
+		effect = DragEffects.None;
 		return false;
 	}
 
@@ -1542,52 +1607,145 @@ public sealed class Navi
 	}
 
 	/// <summary>
-	/// What the player is carrying from one window to another when they let go over an app: a file dragged out of Files
-	/// into the browser, say. Only the player's own drag makes one, and the app that is dropped on gets it with
-	/// <see cref="NaviApp.OnDrop"/>.
+	/// What a drop does with what was dragged. A drag allows some of them (what its source can do), a drop zone accepts some
+	/// (what its app can do), and the computer picks one of those from the keys the player holds
+	/// (<see cref="DragCalls.ChooseEffect"/>): Ctrl copies, Shift moves, Alt links.
 	/// </summary>
-	/// <param name="Kind"><see cref="DragCalls.FilesKind"/>.</param>
-	/// <param name="Paths">
-	/// The paths of the computer's files, absolute and cleaned up by the computer. A drop gives the app no access to them:
-	/// it reads them with its own permissions (<c>Navi.Files</c>).
-	/// </param>
-	public sealed record Drop( string Kind, IReadOnlyList<string> Paths );
+	[Flags]
+	public enum DragEffects
+	{
+		None = 0,
+
+		/// <summary>The target gets a copy; the source keeps what it had.</summary>
+		Copy = 1,
+
+		/// <summary>The target takes it; the source gives it up (it hears <see cref="NaviApp.OnDragEnded"/>).</summary>
+		Move = 2,
+
+		/// <summary>The target refers to it, such as opening a file where it is, without taking or copying it.</summary>
+		Link = 4,
+
+		All = Copy | Move | Link,
+	}
 
 	/// <summary>
-	/// Drag and drop between windows, across the whole desktop. The app that is dragged <i>from</i> starts the drag
-	/// (<see cref="BeginFilesAsync"/>) while the player holds the mouse button down over it. The one that is dropped
-	/// <i>on</i> says it takes drops (<see cref="AcceptFiles"/>) and gets <see cref="NaviApp.OnDrop"/> when the player lets go
-	/// over its window. The desktop draws the dragged thing and the window it would land in, so an app can't fake either.
+	/// One thing a drag carries, in one form: its <see cref="Kind"/> (<see cref="DragCalls.FilesKind"/> or
+	/// <see cref="DragCalls.TextKind"/>) and its items.
+	/// </summary>
+	public sealed record DragOffer( string Kind, IReadOnlyList<string> Items );
+
+	/// <summary>
+	/// What a drag carries: the same thing in one or more forms, like a data object. A target takes the form it understands.
+	/// </summary>
+	public sealed record DragPayload( IReadOnlyList<DragOffer> Offers )
+	{
+		/// <summary>The offer of this kind, or null.</summary>
+		public DragOffer Find( string kind ) => Offers?.FirstOrDefault( x => x.Kind == kind );
+
+		/// <summary>
+		/// The paths of the computer's files carried, absolute and cleaned up by the computer. Having them gives no access: a
+		/// target reads them with its own permissions (<c>Navi.Files</c>).
+		/// </summary>
+		public IReadOnlyList<string> Files => Find( DragCalls.FilesKind )?.Items ?? [];
+
+		/// <summary>The text carried, or null.</summary>
+		public string Text => Find( DragCalls.TextKind )?.Items.FirstOrDefault();
+
+		public static DragPayload OfFiles( IReadOnlyList<string> paths ) => new( [new DragOffer( DragCalls.FilesKind, paths )] );
+	}
+
+	/// <summary>
+	/// A drag over a drop zone, or a drop on it.
+	/// </summary>
+	/// <param name="Payload">What is dragged.</param>
+	/// <param name="Position">Where the mouse is, in the zone's panel pixels from its top left.</param>
+	/// <param name="Effect">What a drop here would do, or does.</param>
+	/// <param name="Zone">The panel that was made a drop zone.</param>
+	public sealed record DragEvent( DragPayload Payload, Vector2 Position, DragEffects Effect, Panel Zone );
+
+	/// <summary>
+	/// Drag and drop between windows, across the whole desktop, run by the computer like an OS does. The app that is dragged
+	/// <i>from</i> starts the drag (<see cref="BeginAsync"/>) while the player holds the mouse button down over it, saying what
+	/// it carries and what a drop may do. An app that is dropped <i>on</i> makes drop zones of its panels
+	/// (<see cref="AcceptDrops"/>): a whole window, or just part of it. The computer finds the zone under the mouse and tells
+	/// the app <see cref="NaviApp.OnDragEnter"/>, <see cref="NaviApp.OnDragOver"/>, <see cref="NaviApp.OnDragLeave"/> and
+	/// <see cref="NaviApp.OnDrop"/>, and the source <see cref="NaviApp.OnDragEnded"/>. The computer draws the dragged thing and
+	/// marks the zone (<c>navi-drop-over</c> class), so an app can't fake either. It all stays on the player's client.
 	/// </summary>
 	public sealed class DragCalls( Navi navi )
 	{
-		/// <summary>The <see cref="Drop.Kind"/> of files of the computer.</summary>
-		public const string FilesKind = "files";
+		/// <summary>The <see cref="DragOffer.Kind"/> of the computer's files (paths), and of text.</summary>
+		public const string FilesKind = "files", TextKind = "text";
 
-		/// <summary>The most paths one drag carries, and the longest a path or a label can be.</summary>
-		public const int MaxPaths = 256, MaxPath = 1024, MaxLabel = 40;
+		/// <summary>The most paths one drag carries, and the longest a path, a label or a text can be.</summary>
+		public const int MaxPaths = 256, MaxPath = 1024, MaxLabel = 40, MaxText = 1024;
 
-		/// <summary>The attribute the desktop reads on the app's panel to know what it takes.</summary>
-		public const string AcceptsAttribute = "navi-accepts-drop";
+		/// <summary>The most offers a drag carries.</summary>
+		public const int MaxOffers = 4;
+
+		/// <summary>The attributes the computer reads on a drop zone's panel.</summary>
+		public const string ZoneEffectsAttribute = "navi-drop-effects", ZoneKindsAttribute = "navi-drop-kinds";
 
 		/// <summary>
-		/// Start dragging files of the computer. Only while the player holds the left mouse button down over this app's
-		/// window, and only an app with the Files permission may (it could not name the files otherwise). False if the drag
-		/// didn't start. <paramref name="label"/> is what the cursor carries, <paramref name="icon"/> a Material icon name.
+		/// Start a drag. Only while the player holds the left mouse button down over this app's window. Files need the Files
+		/// permission (the app could not name them otherwise). False if the drag didn't start. <paramref name="label"/> is what
+		/// the cursor carries, <paramref name="icon"/> a Material icon name, <paramref name="allowed"/> what a drop may do with it.
 		/// Every copy of an app may call it, a shared app's viewer too: it never leaves this client.
 		/// </summary>
-		public Task<bool> BeginFilesAsync( string label, string icon, IReadOnlyList<string> paths ) =>
-			navi.CallAsync<bool>( "drag.begin", FilesKind, label ?? "", icon ?? "", (paths ?? []).ToArray() );
+		public Task<bool> BeginAsync( DragPayload payload, string label, string icon, DragEffects allowed )
+		{
+			var offers = payload?.Offers ?? [];
+			return navi.CallAsync<bool>( "drag.begin", label ?? "", icon ?? "", (int)allowed,
+				offers.Select( x => x.Kind ?? "" ).ToArray(), offers.Select( x => (x.Items ?? []).ToArray() ).ToArray() );
+		}
 
 		/// <summary>
-		/// Say whether this app takes dropped files. The desktop marks the window as a target while the player drags files
-		/// over it only if it does. Call it again to change.
+		/// Start dragging files of the computer. See <see cref="BeginAsync"/>.
 		/// </summary>
-		public void AcceptFiles( bool accept = true )
+		public Task<bool> BeginFilesAsync( string label, string icon, IReadOnlyList<string> paths, DragEffects allowed = DragEffects.All ) =>
+			BeginAsync( DragPayload.OfFiles( paths ?? [] ), label, icon, allowed );
+
+		/// <summary>
+		/// Make <paramref name="zone"/>, any panel of this app (the app's own panel for the whole window), a drop zone for
+		/// <paramref name="kinds"/> (an empty list means any), accepting the <paramref name="accepts"/> effects. <see cref="DragEffects.None"/>
+		/// makes it no zone. Call it every frame or whenever it changes: it only does anything when it did. Where zones overlap,
+		/// the innermost one under the mouse is the target. The computer gives the zone the <c>navi-drop-over</c> class while a drop
+		/// on it would be taken.
+		/// </summary>
+		public void AcceptDrops( Panel zone, DragEffects accepts, params string[] kinds )
 		{
-			var kind = accept ? FilesKind : null;
-			if ( navi.panel.GetAttribute( AcceptsAttribute, null ) != kind )
-				navi.panel.SetAttribute( AcceptsAttribute, kind );
+			if ( zone is null || !zone.IsValid )
+				return;
+
+			var effects = ((int)accepts).ToString();
+			var list = string.Join( ",", kinds ?? [] );
+
+			if ( zone.GetAttribute( ZoneEffectsAttribute, null ) != effects )
+				zone.SetAttribute( ZoneEffectsAttribute, effects );
+
+			if ( zone.GetAttribute( ZoneKindsAttribute, null ) != list )
+				zone.SetAttribute( ZoneKindsAttribute, list );
+		}
+
+		/// <summary>
+		/// Which of <paramref name="accepts"/> a drop does, out of what the drag <paramref name="allowed"/>, by the keys the
+		/// player holds: Alt (or Ctrl and Shift) links, Ctrl copies, Shift moves. Without a key, or if the one asked for isn't
+		/// on both lists, move, then copy, then link. None if they have nothing in common. The computer uses this to choose;
+		/// an app only needs it to tell what a drop would do without being in a zone.
+		/// </summary>
+		public static DragEffects ChooseEffect( DragEffects allowed, DragEffects accepts, bool ctrl, bool shift, bool alt )
+		{
+			var both = allowed & accepts;
+			if ( both == DragEffects.None )
+				return DragEffects.None;
+
+			var asked = alt || (ctrl && shift) ? DragEffects.Link : ctrl ? DragEffects.Copy : shift ? DragEffects.Move : DragEffects.None;
+			if ( (both & asked) != DragEffects.None )
+				return asked;
+
+			return (both & DragEffects.Move) != DragEffects.None ? DragEffects.Move
+				: (both & DragEffects.Copy) != DragEffects.None ? DragEffects.Copy
+				: DragEffects.Link;
 		}
 	}
 }

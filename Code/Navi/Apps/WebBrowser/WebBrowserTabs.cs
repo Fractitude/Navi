@@ -92,12 +92,30 @@ public sealed class WebBrowserTabs
 		}
 	}
 
-	void Add()
+	/// <summary>
+	/// The player dropped files on the tab bar, at a place between tabs (<paramref name="index"/>, 0 for before the first): each
+	/// opens in a new tab there, in order, while there is room. The last one is shown.
+	/// </summary>
+	public void OpenDroppedAt( IReadOnlyList<string> paths, int index )
+	{
+		index = System.Math.Clamp( index, 0, tabs.Count );
+
+		foreach ( var path in paths )
+		{
+			if ( !CanAdd )
+				return;
+
+			Add( index++ ).OpenDropped( path );
+		}
+	}
+
+	WebBrowserViewModel Add( int? index = null )
 	{
 		var tab = new WebBrowserViewModel( navi, ++lastId );
-		tabs.Add( tab );
+		tabs.Insert( index ?? tabs.Count, tab );
 		Active = tab;
 		revision++;
+		return tab;
 	}
 
 	/// <summary>

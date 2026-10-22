@@ -67,9 +67,15 @@ public static class NaviEvents
 	public const string CloseRequest = "navi.close-request";
 
 	/// <summary>
-	/// The player let go of a drag over the app's window. Raised on the app's panel. See <c>NaviApp.OnDrop</c>.
+	/// A drag is over a drop zone of the app, or was let go over one, raised on the zone's panel. See <c>NaviApp.OnDragEnter</c>
+	/// and the others.
 	/// </summary>
-	public const string Drop = "navi.drop";
+	public const string DragEnter = "navi.drag-enter", DragOver = "navi.drag-over", DragLeave = "navi.drag-leave", Drop = "navi.drop";
+
+	/// <summary>
+	/// A drag the app started is over, raised on the app's panel with what the drop did. See <c>NaviApp.OnDragEnded</c>.
+	/// </summary>
+	public const string DragEnded = "navi.drag-ended";
 
 	/// <summary>
 	/// Hardware was installed in or removed from the computer. Raised on every panel of every app. See
@@ -350,20 +356,69 @@ public sealed class NaviAppHost : Panel
 	}
 
 	/// <summary>
-	/// The app on this window says it takes dropped files (<c>Navi.Drag.AcceptFiles</c>). Only an app that does is ever
-	/// marked as a target or given a drop.
+	/// The drop zone under the mouse in this window that takes the drag, with the effects it accepts: the innermost panel of the
+	/// app that <c>Navi.Drag.AcceptDrops</c> made a zone and that holds one of the drag's kinds, or the last of them where
+	/// zones sit side by side. Null if there is none.
 	/// </summary>
-	internal bool AcceptsFiles => app is not null && app.IsValid
-		&& app.GetAttribute( Navi.DragCalls.AcceptsAttribute, null ) == Navi.DragCalls.FilesKind;
+	internal (Panel Zone, Navi.DragEffects Accepts) ZoneAt( NaviDrag drag )
+	{
+		(Panel, Navi.DragEffects) found = default;
+		var budget = MaxZoneScan;
+
+		void Walk( Panel panel, int depth )
+		{
+			if ( panel is null || !panel.IsValid || depth > 64 || budget-- <= 0 )
+				return;
+
+			if ( panel.GetAttribute( Navi.DragCalls.ZoneEffectsAttribute, null ) is { } text && int.TryParse( text, out var bits )
+				&& bits != 0 && AcceptsAny( panel, drag ) && Contains( panel ) )
+				found = (panel, (Navi.DragEffects)bits & Navi.DragEffects.All);
+
+			foreach ( var child in panel.Children )
+				Walk( child, depth + 1 );
+		}
+
+		Walk( app, 0 );
+		return found;
+	}
+
+	/// <summary>The most panels looked at to find a zone, so an app can't make this slow with a huge tree.</summary>
+	const int MaxZoneScan = 20000;
+
+	static bool AcceptsAny( Panel zone, NaviDrag drag )
+	{
+		var kinds = zone.GetAttribute( Navi.DragCalls.ZoneKindsAttribute, "" );
+		return string.IsNullOrEmpty( kinds ) || kinds.Split( ',' ).Any( x => drag.Find( x ) is not null );
+	}
+
+	static bool Contains( Panel panel )
+	{
+		var size = panel.Box.Rect.Size;
+		var at = panel.MousePosition;
+		return size.x > 0f && size.y > 0f && at.x >= 0f && at.y >= 0f && at.x < size.x && at.y < size.y;
+	}
 
 	/// <summary>
-	/// On this client: give the app's copy what the player dropped on its window. Every copy gets it, a shared app's viewer
-	/// too: the drop is the player's own and never leaves this client.
+	/// On this client: tell the app's copy about a drag over (or let go over) one of its zones. Every copy gets it, a shared
+	/// app's viewer too: it is the player's own and never leaves this client.
 	/// </summary>
-	internal void DeliverDrop( NaviDrag drag )
+	internal void DeliverDrag( string eventName, Panel zone, NaviDrag drag, Navi.DragEffects effect )
 	{
-		if ( app is not null && app.IsValid && AcceptsFiles )
-			app.CreateEvent( new PanelEvent( NaviEvents.Drop, app ) { Value = (drag.Kind, drag.Paths.ToArray()) } );
+		if ( zone is null || !zone.IsValid )
+			return;
+
+		var position = zone.MousePosition * zone.ScaleFromScreen;
+		var offers = drag.Offers.Select( x => (x.Kind, x.Items.ToArray()) ).ToArray();
+		zone.CreateEvent( new PanelEvent( eventName, zone ) { Value = (offers, position, (int)effect, zone) } );
+	}
+
+	/// <summary>
+	/// On this client: tell the source's copy its drag is over, and what the drop did.
+	/// </summary>
+	internal void DeliverDragEnded( Navi.DragEffects effect )
+	{
+		if ( app is not null && app.IsValid )
+			app.CreateEvent( new PanelEvent( NaviEvents.DragEnded, app ) { Value = (int)effect } );
 	}
 
 	/// <summary>

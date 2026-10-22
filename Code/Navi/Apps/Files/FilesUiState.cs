@@ -46,7 +46,7 @@ public sealed record ConflictItem( string Name, string Icon, string Choice );
 /// <summary>
 /// The question over the window when entries moved into <see cref="Folder"/> clash with what it has: one line for each.
 /// </summary>
-public sealed record ConflictDialog( string Folder, IReadOnlyList<ConflictItem> Items );
+public sealed record ConflictDialog( string Folder, IReadOnlyList<ConflictItem> Items, bool Copy = false );
 
 /// <summary>
 /// Everything the Files panel draws. Replaced whole by <see cref="FilesViewModel"/> on every change.

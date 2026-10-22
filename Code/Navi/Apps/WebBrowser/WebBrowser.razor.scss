@@ -14,6 +14,7 @@
 	// The tabs, only for the player browsing. They share the row and shrink to fit, up to eight.
 	.tabs
 	{
+		position: relative;
 		flex-shrink: 0;
 		flex-direction: row;
 		align-items: center;
@@ -76,6 +77,26 @@
 
 	// A tab being dragged to a new place (the panel moves it). It is drawn over the tabs it passes, and no tooltips pop up
 	// as they pass under the mouse.
+	// Where a dropped file's tab would open: an arrow over the gap between two tabs.
+	.tabs > .insert
+	{
+		display: none;
+		position: absolute;
+		top: -5px;
+		width: 16px;
+		height: 16px;
+		justify-content: center;
+		align-items: center;
+		font-size: 20px;
+		color: $ink-t;
+		pointer-events: none;
+
+		&.shown
+		{
+			display: flex;
+		}
+	}
+
 	.tabs.reordering
 	{
 		.tooltip

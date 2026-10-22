@@ -61,9 +61,6 @@
 					<div class="button close" @onclick=@(() => Computer.UserCloseWindow( app.Id, window.Id ))><i>close</i></div>
 				</div>
 
-				@* Drawn over the body while files are dragged over a window that takes them (UpdateDrop). *@
-				<div class="drop-hint"></div>
-
 				@if ( info.CanResize && !window.IsMaximized )
 				{
 					foreach ( var corner in Corners )
@@ -258,9 +255,17 @@
 		{
 			<i class="glyph">@drag.Icon</i>
 			<div class="name">@drag.Label</div>
-			@if ( drag.Paths.Count > 1 )
+			@if ( drag.Offers.FirstOrDefault()?.Items.Count > 1 )
 			{
-				<div class="count">@drag.Paths.Count</div>
+				<div class="count">@drag.Offers.First().Items.Count</div>
+			}
+			@if ( drag.Refused )
+			{
+				<i class="glyph effect refused">block</i>
+			}
+			else if ( drag.Effect != Navi.DragEffects.None )
+			{
+				<i class="glyph effect">@( drag.Effect == Navi.DragEffects.Copy ? "add" : drag.Effect == Navi.DragEffects.Link ? "shortcut" : "arrow_forward" )</i>
 			}
 		}
 	</div>
@@ -1135,75 +1140,149 @@
 
 	Panel Ghost;
 
-	/// <summary>The window panel marked as the place a drop would land.</summary>
-	Panel dropTarget;
+	void ClearGhost()
+	{
+		if ( Ghost.IsValid() )
+			Ghost.SetClass( "shown", false );
+	}
+
+	/// <summary>The class the drop zone under a drag has while a drop there would be taken.</summary>
+	const string ZoneOverClass = "navi-drop-over";
 
 	/// <summary>
-	/// Follow the player's drag between windows (<see cref="NaviComputer.CurrentDrag"/>): the cursor's ghost, the window under it
-	/// if it takes the drop, and the drop itself when the left button is let go. It ends if the player can no longer use the
-	/// screen or the window it came from is gone. Letting go is read from <c>Input.Keyboard</c>, which game code can't fake,
-	/// so an app can't drop anything by itself. Local to this client.
+	/// Run the player's drag between windows (<see cref="NaviComputer.CurrentDrag"/>), as an OS does. Each frame: find the
+	/// window under the mouse, its drop zone that takes the drag (<c>Navi.Drag.AcceptDrops</c>), and what a drop there would
+	/// do from what the source allows, what the zone accepts and the keys held. The zone's app hears enter, over and leave,
+	/// and the drop when the left button is let go, and the source hears how it ended. The ghost at the cursor shows the effect.
+	/// Letting go is read from <c>Input.Keyboard</c>, which game code can't fake, so an app can't drop anything by itself.
+	/// The window the drag came out of is a target like any other, but it draws its own drag (Files does it natively), so the
+	/// desktop's ghost hides over it and its zone isn't marked. Ends if the player can no longer use the screen or the source
+	/// is gone. Local to this client.
 	/// </summary>
 	void UpdateDrop( Panel screen )
 	{
 		var drag = Computer.CurrentDrag;
-		var target = drag is null ? null : WindowUnderMouse( screen, drag );
-		var host = target?.Children.OfType<NaviAppHost>().FirstOrDefault();
-		var accepts = host is not null && host.AcceptsFiles;
-
-		if ( dropTarget is not null && (dropTarget != target || !accepts || !dropTarget.IsValid) )
-		{
-			if ( dropTarget.IsValid )
-				dropTarget.SetClass( "drop-target", false );
-
-			dropTarget = null;
-		}
-
 		if ( drag is null )
 		{
-			if ( Ghost.IsValid() )
-				Ghost.SetClass( "shown", false );
-
+			ClearGhost();
 			return;
 		}
+
+		var hosts = screen.Children.Where( x => x.HasClass( "window" ) )
+			.Select( x => x.Children.OfType<NaviAppHost>().FirstOrDefault() ).Where( x => x?.Window is not null ).ToList();
 
 		if ( !Computer.CanUse || !Computer.IsUser || Computer.IsLocked || Computer.SecureEntryActive
 			|| !Computer.Windows.Contains( drag.Source ) )
 		{
-			Computer.EndDrag();
+			FinishDrop( drag, hosts, Navi.DragEffects.None, drop: false );
 			return;
 		}
 
-		if ( accepts && target != dropTarget )
+		var over = WindowUnderMouse( screen )?.Children.OfType<NaviAppHost>().FirstOrDefault();
+		var zone = default( Panel );
+		var effect = Navi.DragEffects.None;
+
+		if ( over is not null )
 		{
-			dropTarget = target;
-			dropTarget.SetClass( "drop-target", true );
+			var (found, accepts) = over.ZoneAt( drag );
+			effect = found is null ? Navi.DragEffects.None : Navi.DragCalls.ChooseEffect( drag.Allowed, accepts,
+				KeyDown( "CTRL", "RCTRL" ), KeyDown( "SHIFT", "RSHIFT" ), KeyDown( "ALT", "RALT" ) );
+
+			// A zone that takes none of what the drag allows is no target: the cursor says so.
+			zone = effect == Navi.DragEffects.None ? null : found;
 		}
+
+		// Leaving a zone, or entering a new one.
+		if ( zone != drag.Zone )
+		{
+			LeaveZone( drag );
+			drag.Zone = zone;
+			drag.ZoneHost = zone is null ? null : over;
+
+			if ( zone is not null )
+			{
+				if ( over.Window != drag.Source )
+					zone.SetClass( ZoneOverClass, true );
+
+				over.DeliverDrag( NaviEvents.DragEnter, zone, drag, effect );
+			}
+		}
+
+		drag.Effect = effect;
+		drag.Refused = over is not null && over.Window != drag.Source && zone is null;
+
+		if ( zone is not null )
+			over.DeliverDrag( NaviEvents.DragOver, zone, drag, effect );
+
+		// The source draws its own drag over its own window.
+		var ownWindow = over?.Window == drag.Source;
 
 		if ( Panel.IsValid() && Ghost.IsValid() )
 		{
 			var at = MousePosition( Panel );
 			Ghost.Style.Left = Length.Pixels( at.x + 14f );
 			Ghost.Style.Top = Length.Pixels( at.y + 14f );
+			Ghost.SetClass( "shown", !ownWindow );
 		}
 
 		if ( Input.Keyboard.Down( "MOUSE1" ) )
 			return;
 
-		// Let go. A window that takes it gets it, and comes to the front.
-		Computer.EndDrag();
-
-		if ( accepts && host.Window is { } window )
-		{
-			host.DeliverDrop( drag );
-			Computer.UserFocus( window.App.Id, window.Id );
-		}
+		// Let go.
+		FinishDrop( drag, hosts, effect, drop: zone is not null );
 	}
 
 	/// <summary>
-	/// The top window under the mouse, other than the one the drag came out of, or null.
+	/// End the drag. A drop goes to the zone it is over, whose window comes to the front; without one the zone is told the
+	/// drag left. The source hears the effect, or none.
 	/// </summary>
-	static Panel WindowUnderMouse( Panel screen, NaviDrag drag )
+	void FinishDrop( NaviDrag drag, List<NaviAppHost> hosts, Navi.DragEffects effect, bool drop )
+	{
+		var zone = drag.Zone;
+		var host = drag.ZoneHost;
+
+		if ( zone.IsValid() )
+			zone.SetClass( ZoneOverClass, false );
+
+		Computer.EndDrag();
+		ClearGhost();
+
+		if ( zone.IsValid() && host is not null && drop )
+		{
+			host.DeliverDrag( NaviEvents.Drop, zone, drag, effect );
+
+			if ( host.Window is { } window && window != drag.Source )
+				Computer.UserFocus( window.App.Id, window.Id );
+		}
+		else if ( zone.IsValid() && host is not null )
+		{
+			host.DeliverDrag( NaviEvents.DragLeave, zone, drag, drag.Effect );
+		}
+
+		hosts.FirstOrDefault( x => x.Window == drag.Source )?.DeliverDragEnded( drop ? effect : Navi.DragEffects.None );
+	}
+
+	/// <summary>
+	/// The drag left its zone (or the zone is gone): unmark it and tell its app.
+	/// </summary>
+	static void LeaveZone( NaviDrag drag )
+	{
+		if ( drag.Zone.IsValid() )
+		{
+			drag.Zone.SetClass( ZoneOverClass, false );
+			drag.ZoneHost?.DeliverDrag( NaviEvents.DragLeave, drag.Zone, drag, drag.Effect );
+		}
+
+		drag.Zone = null;
+		drag.ZoneHost = null;
+	}
+
+	static bool KeyDown( string left, string right ) => Input.Keyboard.Down( left ) || Input.Keyboard.Down( right );
+
+	/// <summary>
+	/// The top window under the mouse, or null.
+	/// </summary>
+	static Panel WindowUnderMouse( Panel screen )
 	{
 		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ).Reverse() )
 		{
@@ -1216,7 +1295,7 @@
 			if ( at.x < 0f || at.y < 0f || at.x >= size.x || at.y >= size.y )
 				continue;
 
-			return window == drag.Source ? null : panel;
+			return panel;
 		}
 
 		return null;
@@ -1522,6 +1601,6 @@
 		clockText = NaviClock.Text;
 
 		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion, Computer?.CurrentDrag?.Serial) );
+			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion, Computer?.CurrentDrag?.Serial, Computer?.CurrentDrag?.Effect, Computer?.CurrentDrag?.Refused) );
 	}
 }

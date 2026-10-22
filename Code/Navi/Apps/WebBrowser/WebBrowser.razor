@@ -33,6 +33,11 @@
 			<div class="button @( Tabs.CanAdd ? "" : "disabled" )" tooltip="New tab" @onclick=@( () => Tabs.NewTab() )>
 				<i>add</i>
 			</div>
+
+			@* The arrow between tabs where a file dropped on the tab bar would open (ShowInsert). *@
+			<div class="insert" @ref="InsertMarker">
+				<i>arrow_drop_down</i>
+			</div>
 		</div>
 
 		<div class="toolbar">
@@ -65,7 +70,7 @@
 
 	}
 
-	<div class="content">
+	<div class="content" @ref="Content">
 		@if ( Dino != DinoView.None )
 		{
 			<div class="offline">
@@ -225,7 +230,12 @@
 	{
 		base.Tick();
 
-		Navi.Drag.AcceptFiles( !Navi.IsWatching );
+		// Files dragged out of Files (Navi.Drag): the page area opens one in the tab shown, the tab bar opens each in a new tab
+		// where it is dropped. Only the seated player's own copy takes them: browsing is theirs alone. They are links: the
+		// browser shows a file where it is, and never moves or copies it.
+		var accepts = Navi.IsWatching ? Navi.DragEffects.None : Navi.DragEffects.Link;
+		Navi.Drag.AcceptDrops( Content, accepts, Navi.DragCalls.FilesKind );
+		Navi.Drag.AcceptDrops( TabBar, accepts, Navi.DragCalls.FilesKind );
 
 		if ( !Navi.IsViewer )
 		{
@@ -461,14 +471,76 @@
 			Shared.NetworkChanged( online );
 	}
 
-	/// <summary>
-	/// Files dragged out of Files and dropped here open as <c>file://</c> pages. Only the seated player's own copy takes them:
-	/// browsing is theirs alone.
-	/// </summary>
-	protected override void OnDrop( Navi.Drop drop )
+	/// <summary>The page area, a drop zone: a file dropped on it opens in the tab shown.</summary>
+	Panel Content;
+
+	/// <summary>The arrow shown between tabs while a file is dragged over the tab bar.</summary>
+	Panel InsertMarker;
+
+	/// <summary>The width of the arrow, in panel pixels, which is centered on the gap between tabs.</summary>
+	const float InsertWidth = 16f;
+
+	protected override void OnDragEnter( Navi.DragEvent e ) => ShowInsert( e );
+
+	protected override void OnDragOver( Navi.DragEvent e ) => ShowInsert( e );
+
+	protected override void OnDragLeave( Navi.DragEvent e ) => HideInsert();
+
+	protected override void OnDrop( Navi.DragEvent e )
 	{
-		if ( !Navi.IsWatching && drop.Kind == Navi.DragCalls.FilesKind )
-			Tabs.OpenDropped( drop.Paths );
+		HideInsert();
+
+		if ( Navi.IsWatching || e.Payload.Files is not { Count: > 0 } paths )
+			return;
+
+		if ( e.Zone == TabBar && Tabs.CanAdd )
+			Tabs.OpenDroppedAt( paths, SlotAt( e.Position.x ) );
+		else
+			Tabs.OpenDropped( paths );
+	}
+
+	/// <summary>
+	/// Where a tab dropped at <paramref name="x"/> (in the tab bar's panel pixels) would go: after each tab whose middle is left
+	/// of it. 0 is before the first.
+	/// </summary>
+	int SlotAt( float x )
+	{
+		var slot = 0;
+		foreach ( var panel in TabPanels )
+		{
+			var middle = ((panel.Box.Rect.Left + panel.Box.Rect.Right) * 0.5f - TabBar.Box.Rect.Left) * TabBar.ScaleFromScreen;
+			if ( x > middle )
+				slot++;
+		}
+
+		return slot;
+	}
+
+	/// <summary>
+	/// Show the arrow where a file dragged over the tab bar would open its tab, like a tab strip does: between the tabs the
+	/// mouse is nearest.
+	/// </summary>
+	void ShowInsert( Navi.DragEvent e )
+	{
+		var panels = TabPanels;
+		if ( e.Zone != TabBar || !Tabs.CanAdd || panels.Count == 0 || !InsertMarker.IsValid() )
+		{
+			HideInsert();
+			return;
+		}
+
+		var slot = SlotAt( e.Position.x );
+		var edge = slot == 0 ? panels[0].Box.Rect.Left : panels[slot - 1].Box.Rect.Right;
+		var left = (edge - TabBar.Box.Rect.Left) * TabBar.ScaleFromScreen - InsertWidth * 0.5f;
+
+		InsertMarker.Style.Left = Length.Pixels( left );
+		InsertMarker.SetClass( "shown", true );
+	}
+
+	void HideInsert()
+	{
+		if ( InsertMarker.IsValid() )
+			InsertMarker.SetClass( "shown", false );
 	}
 
 	protected override void OnAction( string action, string[] args )

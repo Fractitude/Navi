@@ -282,7 +282,7 @@
 
 				<div class="confirm-buttons">
 					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.CancelConflictAction ) )>Cancel</div>
-					<div class="tool wide primary" @onclick=@( () => Navi.Act( FilesViewModel.ResolveConflictAction ) )>Move</div>
+					<div class="tool wide primary" @onclick=@( () => Navi.Act( FilesViewModel.ResolveConflictAction ) )>@( conflict.Copy ? "Copy" : "Move" )</div>
 				</div>
 			</div>
 		</div>
@@ -290,10 +290,11 @@
 
 	@* What the cursor carries while entries are dragged inside the window. *@
 	<div class="drag-ghost" @ref="Ghost">
-		@if ( dragPaths is not null )
+		@if ( dragLabel is not null )
 		{
 			<i>@dragIcon</i>
 			<div class="name">@dragLabel</div>
+			<i class="plus">add</i>
 		}
 	</div>
 </root>
@@ -534,25 +535,56 @@
 		{
 			var (folder, _) = FolderUnderMouse();
 			var paths = dragPaths;
+			var copy = CtrlDown;
 			EndDrag();
 
 			if ( folder is not null )
-				Navi.Act( FilesViewModel.MoveIntoAction, [folder, .. paths] );
+				Navi.Act( copy ? FilesViewModel.CopyIntoAction : FilesViewModel.MoveIntoAction, [folder, .. paths] );
 
 			return;
 		}
 
-		// Out of the window it is the desktop's drag, for another app to take.
+		// Out of the window it is the desktop's drag, for another app to take. Back over this window it is ours again
+		// (OnDragOver).
 		if ( !Over( this ) )
 		{
 			var paths = dragPaths;
 			var label = dragLabel;
 			var icon = dragIcon;
 			EndDrag();
-			_ = Navi.Drag.BeginFilesAsync( label, icon, paths );
+			_ = HandOffAsync( label, icon, paths );
 			return;
 		}
 
+		ShowDrag( CtrlDown );
+	}
+
+	/// <summary>
+	/// The drag is carried by the desktop from here on, until it ends (<see cref="OnDragEnded"/>). Files allows every effect:
+	/// move and copy inside this window, and link for an app that only refers to a file, like the browser opening it.
+	/// </summary>
+	async System.Threading.Tasks.Task HandOffAsync( string label, string icon, List<string> paths )
+	{
+		if ( !await Navi.Drag.BeginFilesAsync( label, icon, paths ) )
+			return;
+
+		handoffPaths = paths;
+		handedOff = true;
+	}
+
+	/// <summary>The paths of the drag the desktop carries for this window, while it does.</summary>
+	List<string> handoffPaths;
+
+	bool handedOff;
+
+	static bool CtrlDown => Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" );
+
+	/// <summary>
+	/// Draw the drag at the mouse: the ghost, and the folder under it marked. The same whether the drag never left the window
+	/// or came back to it.
+	/// </summary>
+	void ShowDrag( bool copy )
+	{
 		var (_, over) = FolderUnderMouse();
 		SetDropPanel( over );
 
@@ -562,7 +594,60 @@
 			Ghost.Style.Left = Length.Pixels( at.x + 14f );
 			Ghost.Style.Top = Length.Pixels( at.y + 14f );
 			Ghost.SetClass( "shown", true );
+			Ghost.SetClass( "copy", copy );
 		}
+	}
+
+	// A drag this window handed to the desktop, back over it: the desktop tells it where the mouse is, and it draws the drag
+	// itself again and, on a drop, moves or copies the entries into the folder under the mouse. A drag from anywhere else is
+	// not ours to take.
+
+	protected override void OnDragEnter( Navi.DragEvent e ) => ResumeDrag();
+
+	protected override void OnDragOver( Navi.DragEvent e )
+	{
+		if ( ResumeDrag() )
+			ShowDrag( e.Effect == Navi.DragEffects.Copy );
+	}
+
+	protected override void OnDragLeave( Navi.DragEvent e ) => PauseDrag();
+
+	protected override void OnDrop( Navi.DragEvent e )
+	{
+		if ( !ResumeDrag() )
+			return;
+
+		var (folder, _) = FolderUnderMouse();
+		var paths = dragPaths;
+		PauseDrag();
+
+		if ( folder is not null )
+			Navi.Act( e.Effect == Navi.DragEffects.Copy ? FilesViewModel.CopyIntoAction : FilesViewModel.MoveIntoAction, [folder, .. paths] );
+	}
+
+	protected override void OnDragEnded( Navi.DragEffects effect )
+	{
+		handedOff = false;
+		handoffPaths = null;
+		PauseDrag();
+	}
+
+	bool ResumeDrag()
+	{
+		if ( !handedOff || handoffPaths is null )
+			return false;
+
+		dragPaths = handoffPaths;
+		return true;
+	}
+
+	void PauseDrag()
+	{
+		dragPaths = null;
+		SetDropPanel( null );
+
+		if ( Ghost.IsValid() )
+			Ghost.SetClass( "shown", false );
 	}
 
 	/// <summary>
@@ -662,6 +747,8 @@
 		FocusRename();
 		UpdateBand();
 		UpdateDrag();
+		Navi.Drag.AcceptDrops( this, Navi.IsWatching ? Navi.DragEffects.None : Navi.DragEffects.Move | Navi.DragEffects.Copy,
+			Navi.DragCalls.FilesKind );
 		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )

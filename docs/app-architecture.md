@@ -342,8 +342,23 @@ Tray items change what the app shows, so keep them like any other state: build t
 
 ## Dragging between apps
 
-The player can drag files from one window to another. The source (Files) calls `Navi.Drag.BeginFilesAsync( label, icon, paths )` once
-the mouse has moved with the button held; it needs the Files permission. The target calls `Navi.Drag.AcceptFiles()` and overrides
-`OnDrop( Navi.Drop )` (the Web Browser opens the path as `file://`). The desktop draws the ghost at the cursor and the dashed
-target outline, and ends the drag when the real mouse button is let go. A drop is only paths: it gives the target no access, so it
-reads them with its own permissions. It never leaves the client.
+The computer runs drag and drop for the whole desktop, like an OS does. It is local to the player's client and never synced.
+
+- **The source** calls `Navi.Drag.BeginAsync( payload, label, icon, allowed )` (or `BeginFilesAsync`) once the mouse has moved with
+  the button held. The payload is a list of offers (`files`: paths, which needs the Files permission; `text`), and `allowed` says
+  what a drop may do: `Copy`, `Move`, `Link`. It hears `OnDragEnded( effect )` when the drag is over: `None` if nothing took it.
+- **A target** makes drop zones of its panels with `Navi.Drag.AcceptDrops( panel, accepts, kinds )`: the app's own panel for
+  the whole window, or one part of it (the browser's page area, its tab bar). `accepts` is what the app can do: an app that only
+  refers to a file accepts `Link`, one that stores it accepts `Move` and `Copy`. Overlapping zones: the innermost one under the
+  mouse wins.
+- **The computer picks the effect** from what the source allows, what the zone accepts and the keys held
+  (`Navi.DragCalls.ChooseEffect`: Ctrl copies, Shift moves, Alt links; otherwise move, then copy, then link). A zone that
+  shares nothing with the source is no target, and the cursor says so.
+- **The zone's app is told** `OnDragEnter`, `OnDragOver` (every frame, with the position in the zone's pixels and the effect),
+  `OnDragLeave` and `OnDrop( e )`. The computer also puts the `navi-drop-over` class on the zone while a drop would be taken.
+- **The window a drag came from is a target too**, and draws its own drag: the desktop's ghost hides over it. Files uses this: its
+  own drag (a ghost, the folder under the mouse marked, `move-into` / `copy-into` on drop) runs inside its window without the
+  desktop; leaving the window hands the drag to the desktop, and coming back resumes it. See `Files.razor`.
+
+A drop is only a payload: it gives the target no access, so it reads paths with its own permissions. Only real mouse input starts
+or ends a drag.
