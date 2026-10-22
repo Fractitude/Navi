@@ -14,7 +14,8 @@ public sealed record Crumb( string Path, string Label, bool Ahead = false );
 /// <summary>
 /// An entry in the open folder. <see cref="Detail"/> is a file's size or a folder's item count; <see cref="Badge"/> marks
 /// a link ("link" for a symlink, "alias" for an alias, empty otherwise); <see cref="Faded"/> is a hidden entry shown
-/// anyway; <see cref="Cursor"/> is where the arrow keys move from.
+/// anyway; <see cref="Cursor"/> is where the arrow keys move from. <see cref="Thumbnail"/> is set on a picture, which
+/// grid view shows small (<see cref="FilesThumbnails"/>): it changes when the file does, so the thumbnail is made again.
 /// </summary>
 public sealed record FileRow(
 	string Path,
@@ -25,7 +26,8 @@ public sealed record FileRow(
 	string Badge,
 	bool Selected,
 	bool Faded,
-	bool Cursor );
+	bool Cursor,
+	string Thumbnail = "" );
 
 /// <summary>
 /// A question over the window before something that can't be undone, such as emptying the trash. <see cref="Button"/>

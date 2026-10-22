@@ -1269,6 +1269,12 @@ public sealed class Navi
 		public Task<byte[]> ReadBytesAsync( string path ) => navi.CallAsync<byte[]>( "files.read-bytes", path );
 
 		/// <summary>
+		/// A picture made small by the computer, at most 128 pixels on its longest side, as PNG: much less to read than the
+		/// picture. Null for a file that isn't a jpg or png picture, or one too big to make small.
+		/// </summary>
+		public Task<byte[]> GetThumbnailAsync( string path ) => navi.CallAsync<byte[]>( "files.thumbnail", path );
+
+		/// <summary>
 		/// Write a binary file (a picture, say), making it or replacing what is in it. Returns its path.
 		/// </summary>
 		public Task<string> WriteBytesAsync( string path, byte[] data ) =>

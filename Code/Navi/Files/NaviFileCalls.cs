@@ -62,6 +62,15 @@ public static class NaviFileCalls
 				return files.ReadBytes( path );
 			}
 
+			case "files.thumbnail":
+			{
+				// A picture made small here, so a client is sent the thumbnail and never the whole picture. Null for a file
+				// that isn't a picture, or is too big to decode.
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true, read: true );
+				return Thumbnail( files, path );
+			}
+
 			case "files.write-bytes":
 			{
 				var path = Arg( args, 0, method );
@@ -211,6 +220,34 @@ public static class NaviFileCalls
 		}
 
 		throw new System.NotSupportedException( $"Navi has no call '{method}'." );
+	}
+
+	/// <summary>The longest side of a thumbnail, in pixels.</summary>
+	public const int ThumbnailSize = 128;
+
+	/// <summary>The biggest picture made into a thumbnail, in bytes. Bigger ones get none.</summary>
+	public const int MaxThumbnailSource = 8 * 1024 * 1024;
+
+	/// <summary>
+	/// The picture at <paramref name="path"/>, no bigger than <see cref="ThumbnailSize"/> on its longest side, as PNG.
+	/// </summary>
+	static byte[] Thumbnail( NaviFileSystem files, string path )
+	{
+		var at = files.Resolve( path );
+		if ( at.Node.Kind != NaviFileKind.File )
+			throw new NaviFileException( at.Node.Kind == NaviFileKind.Folder ? NaviFileError.IsAFolder : NaviFileError.NotFound, at.Path );
+
+		if ( NaviDrive.Size( at.Node ) is <= 0 or > MaxThumbnailSource )
+			return null;
+
+		using var bitmap = Bitmap.CreateFromBytes( files.ReadBytes( at.Path ) );
+		if ( bitmap is not { Width: > 0, Height: > 0 } )
+			return null;
+
+		var scale = System.Math.Min( 1f, ThumbnailSize / (float)System.Math.Max( bitmap.Width, bitmap.Height ) );
+		using var small = bitmap.Resize( System.Math.Max( 1, (int)(bitmap.Width * scale) ),
+			System.Math.Max( 1, (int)(bitmap.Height * scale) ), true );
+		return small.ToPng();
 	}
 
 	/// <summary>

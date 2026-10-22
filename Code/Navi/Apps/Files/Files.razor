@@ -185,7 +185,7 @@
 					     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
 					     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
 					     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
-						@if ( UiState.GridView && !Navi.IsViewer && ViewModel.ThumbnailOf( row.Path ) is { } thumbnail )
+						@if ( UiState.GridView && Thumbnails.Of( row.Path ) is { } thumbnail )
 						{
 							<Image class="thumbnail" Texture=@thumbnail/>
 						}
@@ -254,6 +254,14 @@
 	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
 	FilesUiState UiState => Navi.IsViewer ? Navi.GetState<FilesUiState>() ?? FilesUiState.Empty : ViewModel.UiState;
+
+	/// <summary>
+	/// The thumbnails drawn in grid view: the view model's, or on a viewer this copy's own, which the seated player's
+	/// client makes from the rows the host published. The host makes each picture small and sends only that.
+	/// </summary>
+	FilesThumbnails Thumbnails => Navi.IsViewer ? ViewerThumbnails : ViewModel.Thumbnails;
+
+	FilesThumbnails ViewerThumbnails => field ??= new( Navi );
 
 	TextEntry RenameEntry;
 
@@ -390,7 +398,13 @@
 		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )
+		{
+			// Only the seated player's client may read the files from the host. Anyone else watching sees the icons.
+			if ( UiState.GridView && !Navi.IsWatching )
+				ViewerThumbnails.Tick( UiState.Rows );
+
 			return;
+		}
 
 		ViewModel.Tick();
 		Navi.Publish( ViewModel.UiState );
@@ -515,5 +529,5 @@
 	/// </summary>
 	protected override int BuildHash() =>
 		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText,
-			crumbsClipped, bandMoved ? BandRect : default );
+			crumbsClipped, bandMoved ? BandRect : default, Thumbnails.Version );
 }

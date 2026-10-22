@@ -26,7 +26,7 @@ namespace Sandbox;
 public sealed partial class NaviComputer
 {
 	/// <summary>The calls a client's copy of an app may make to read the host's files. None of them change anything.</summary>
-	static readonly string[] RemoteFileCalls = ["files.info", "files.list", "files.read", "files.read-bytes"];
+	static readonly string[] RemoteFileCalls = ["files.info", "files.list", "files.read", "files.read-bytes", "files.thumbnail"];
 
 	/// <summary>The most a file read from a client may be, in bytes. Bigger ones are refused on the host, before sending.</summary>
 	public const int MaxRemoteFileBytes = 4 * 1024 * 1024;
@@ -171,6 +171,10 @@ public sealed partial class NaviComputer
 			}
 
 			case byte[] bytes:
+				// A thumbnail is small, but the whole picture was decoded for it: that counts too.
+				if ( method == "files.thumbnail" && Files.TryResolve( path ) is { } source )
+					remoteBytesInWindow += NaviDrive.Size( source.Node );
+
 				return Sent( bytes.Length ) ? (RemoteOk, null, null, null, bytes) : TooBig();
 
 			case FileEntry entry:
@@ -242,7 +246,7 @@ public sealed partial class NaviComputer
 				reply.TrySetResult( System.Text.Encoding.UTF8.GetString( bytes ?? [] ) );
 				return;
 
-			case RemoteOk when waiting.Method == "files.read-bytes":
+			case RemoteOk when waiting.Method is "files.read-bytes" or "files.thumbnail":
 				reply.TrySetResult( bytes ?? [] );
 				return;
 
