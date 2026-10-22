@@ -178,6 +178,36 @@
 		cursor: pointer;
 	}
 
+	// Shown in place of the Store while the computer is offline.
+	.gate
+	{
+		flex-grow: 1;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 4px;
+		padding: 12px;
+		text-align: center;
+
+		i
+		{
+			font-size: 32px;
+			opacity: 0.6;
+		}
+
+		.heading
+		{
+			font-size: 13px;
+			font-weight: 700;
+		}
+
+		.hint
+		{
+			font-size: 11px;
+			opacity: 0.7;
+		}
+	}
+
 	.status
 	{
 		padding: 12px 4px;

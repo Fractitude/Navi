@@ -373,6 +373,7 @@ public sealed class PackagesViewModel
 		// A failed search leaves the page that is already listed, so the total it came with stays too.
 		var total = UiState.StoreTotal;
 		string status;
+		string offlineHint = null;
 
 		try
 		{
@@ -398,7 +399,8 @@ public sealed class PackagesViewModel
 			// Nothing listed can be installed without the network, so the list goes.
 			storePackages = [];
 			total = 0;
-			status = $"No network connection. {await OfflineHintAsync()}";
+			status = null;
+			offlineHint = await OfflineHintAsync();
 		}
 		catch ( System.Exception e )
 		{
@@ -415,7 +417,7 @@ public sealed class PackagesViewModel
 		refreshing = false;
 		Update( uiState => uiState with
 		{
-			Refreshing = false, StoreStatus = status, StoreRows = BuildStoreRows(), StoreTotal = total, StoreSearch = search,
+			Refreshing = false, StoreStatus = status, OfflineHint = offlineHint, StoreRows = BuildStoreRows(), StoreTotal = total, StoreSearch = search,
 		} );
 	}
 
@@ -467,7 +469,7 @@ public sealed class PackagesViewModel
 		catch ( Navi.NoNetworkException )
 		{
 			var hint = await OfflineHintAsync();
-			Update( uiState => uiState with { Notice = $"Couldn't {what}: no network connection. {hint}" } );
+			Update( uiState => uiState with { Notice = $"Couldn't {what}. {hint}" } );
 		}
 		catch ( System.Exception e )
 		{

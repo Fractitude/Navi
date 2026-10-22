@@ -61,6 +61,15 @@
 
 		@if ( UiState.ShowStore )
 		{
+			@if ( !UiState.Refreshing && UiState.OfflineHint is not null )
+			{
+				<div class="gate">
+					<i>wifi_off</i>
+					<div class="heading">No network connection</div>
+					<div class="hint">@UiState.OfflineHint</div>
+				</div>
+			}
+
 			@if ( UiState.Refreshing || UiState.StoreStatus is not null )
 			{
 				<div class="status">@( UiState.Refreshing ? "Connecting to the Wired..." : UiState.StoreStatus )</div>

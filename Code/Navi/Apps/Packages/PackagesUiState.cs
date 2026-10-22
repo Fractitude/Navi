@@ -170,6 +170,12 @@ public sealed record PackagesUiState
 	/// <summary>The result of the last Store search, or null. Never set while <see cref="Refreshing"/> is on.</summary>
 	public string StoreStatus { get; init; }
 
+	/// <summary>
+	/// Why the last Store search couldn't go out (<see cref="Navi.NetworkStatus.OfflineHint"/>), or null if the computer was
+	/// online. The view shows it in place of the Store.
+	/// </summary>
+	public string OfflineHint { get; init; }
+
 	/// <summary>The Store entries fetched so far. The backend pages them, so this grows with "More".</summary>
 	public IReadOnlyList<PackageRow> StoreRows { get; init; } = [];
 
