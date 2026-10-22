@@ -74,7 +74,8 @@
 	}
 
 	<div class="page">
-		<ScriptControl @ref="Editor" class="document @( IsCSharp ? "" : "plain" )" ShowStatusBar=@( true )
+		<ScriptControl @ref="Editor" class="document @( IsCSharp ? "" : "plain" ) @( UiState.LightTheme ? "light" : "" )"
+		               ShowStatusBar=@( true )
 		               DiagnosticDelay=@( IsCSharp ? DiagnosticDelay : float.PositiveInfinity )
 		               OnSourceChanged=@SourceEdited/>
 	</div>
