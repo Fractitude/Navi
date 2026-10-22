@@ -218,7 +218,11 @@
 
 			<div class="tray-clock">
 				<div class="tooltip">@NaviClock.DateText</div>
-				<label>@clockText</label>
+				@* One box per character, each digit as wide as any other, so the clock never changes width as it ticks. *@
+				@foreach ( var character in clockText )
+				{
+					<div class="@( char.IsDigit( character ) ? "digit" : "separator" )">@character</div>
+				}
 			</div>
 
 			@* The notification list's button, always last. It counts what the player hasn't seen. *@

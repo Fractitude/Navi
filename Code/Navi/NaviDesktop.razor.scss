@@ -847,6 +847,23 @@ NaviDesktop
 		font-weight: 700;
 		color: $ink-t;
 		pointer-events: all;
+		flex-direction: row;
+
+		.digit, .separator
+		{
+			flex-shrink: 0;
+			justify-content: center;
+		}
+
+		.digit
+		{
+			width: 8px;
+		}
+
+		.separator
+		{
+			width: 4px;
+		}
 
 		.tooltip
 		{
