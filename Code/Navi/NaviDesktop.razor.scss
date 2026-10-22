@@ -824,6 +824,52 @@ NaviDesktop
 		}
 	}
 
+	// The network indicator only shows: it isn't a button. Offline it is dimmed.
+	.tray-icon.network
+	{
+		cursor: default;
+
+		&.offline i
+		{
+			opacity: 0.55;
+		}
+	}
+
+	// The clock, between the network and the notifications.
+	.tray-clock
+	{
+		position: relative;
+		height: 26px;
+		padding: 0 4px;
+		justify-content: center;
+		align-items: center;
+		font-size: 13px;
+		font-weight: 700;
+		color: $ink-t;
+		pointer-events: all;
+
+		.tooltip
+		{
+			position: absolute;
+			bottom: 38px;
+			right: 0;
+			opacity: 0;
+			pointer-events: none;
+			padding: 3px 6px;
+			font-size: 12px;
+			font-weight: 400;
+			color: $paper-t;
+			background-color: $ink-bg;
+			border: 1px solid $paper-bc;
+			white-space: nowrap;
+		}
+
+		&:hover .tooltip
+		{
+			opacity: 1;
+		}
+	}
+
 	// The unread count on the notification list's button.
 	.tray-icon > .badge
 	{

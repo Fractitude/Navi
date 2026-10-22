@@ -209,6 +209,18 @@
 				</div>
 			}
 
+			@* The network and the clock are the computer's own, always there. The clock runs on each client from NaviClock, *@
+			@* so nothing is sent for it. *@
+			<div class="tray-icon network @( Computer.IsOnline ? "" : "offline" )">
+				<div class="tooltip">@( Computer.IsOnline ? $"Connected to the internet: {Computer.IpAddress}" : "No internet: this computer has no network card" )</div>
+				<i>@( Computer.IsOnline ? "wifi" : "wifi_off" )</i>
+			</div>
+
+			<div class="tray-clock">
+				<div class="tooltip">@NaviClock.DateText</div>
+				<label>@clockText</label>
+			</div>
+
 			@* The notification list's button, always last. It counts what the player hasn't seen. *@
 			@{
 				var unread = Computer.UnreadNotifications;
@@ -1382,7 +1394,16 @@
 	}
 
 	// InstalledApps can also be edited in the inspector, which doesn't bump Version.
-	protected override int BuildHash() =>
-		System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash) );
+	/// <summary>
+	/// What the tray's clock shows. Read in <see cref="BuildHash"/>, so the taskbar redraws when the minute changes.
+	/// </summary>
+	string clockText = "";
+
+	protected override int BuildHash()
+	{
+		clockText = NaviClock.Text;
+
+		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
+			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline) );
+	}
 }
