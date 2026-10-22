@@ -69,7 +69,8 @@ public abstract class NaviApp : Panel
 	/// The player is closing this window (its close button, the taskbar's Close, the tray's Quit), and the app asked to be
 	/// told first with <see cref="Navi.WindowCalls.SetCloseGuardAsync"/>. The window stays open: ask the player in it
 	/// (e.g. Save / Don't save / Cancel), then close it with <see cref="Navi.WindowCalls.CloseAsync()"/>, or don't. If the
-	/// player closes it again within a few seconds it closes anyway. A shared app gets it on the host's copy.
+	/// player closes it again within a few seconds, without clicking in the window, it closes anyway. A shared app gets it
+	/// on the host's copy.
 	/// </summary>
 	protected virtual void OnCloseRequested()
 	{
@@ -441,8 +442,9 @@ public sealed class Navi
 		/// <summary>
 		/// Ask to be told before the player closes the window this panel is in, e.g. while it has unsaved changes:
 		/// <see cref="NaviApp.OnCloseRequested"/> comes instead of the close. Turn it off once there is nothing to lose. It
-		/// can't keep the window open: closing it again within a few seconds closes it. Only the player's closes ask; the
-		/// app's own <see cref="CloseAsync()"/> doesn't. In multiplayer only a shared app is asked.
+		/// can't keep the window open: closing it again within a few seconds closes it, unless the player clicked in the
+		/// window since (e.g. on Cancel). Only the player's closes ask; the app's own <see cref="CloseAsync()"/> doesn't. In
+		/// multiplayer only a shared app is asked.
 		/// </summary>
 		public Task SetCloseGuardAsync( bool guard ) => navi.CallAsync( "window.close-guard", guard );
 

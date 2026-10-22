@@ -795,6 +795,18 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			Focus( id, windowId );
 	}
 
+	/// <summary>
+	/// The user really pressed the mouse in the window's content, e.g. on Cancel in the app's "Save before closing?"
+	/// question. They answered it, so the next close asks again instead of closing at once (<see cref="AskBeforeClosing"/>).
+	/// A press on the title bar, such as the close button itself, doesn't come here.
+	/// </summary>
+	[Rpc.Host]
+	public void UserPressWindow( string id, string windowId )
+	{
+		if ( Authorize() && GetWindow( id, windowId ) is { } window )
+			window.CloseAskedAt = null;
+	}
+
 	[Rpc.Host]
 	public void UserMinimize( string id, string windowId )
 	{

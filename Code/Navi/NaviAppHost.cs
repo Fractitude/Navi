@@ -399,6 +399,15 @@ public sealed class NaviAppHost : Panel
 					Computer.UserToggleMaximized( id, windowId );
 					e.StopPropagation();
 					return;
+
+				// A real press in the app's content answers its close question, so the next close asks again. Only a real
+				// one: an app that could fake it could keep its window from ever closing. It goes on bubbling to the app
+				// and the window.
+				case "onmousedown":
+					if ( e is MousePanelEvent { MouseButton: MouseButtons.Left } && Input.Keyboard.Down( "MOUSE1" ) )
+						Computer.UserPressWindow( id, windowId );
+
+					break;
 			}
 		}
 

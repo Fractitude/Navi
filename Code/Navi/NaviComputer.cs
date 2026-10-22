@@ -1503,7 +1503,8 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	/// <remarks>
 	/// The app can only ask to be asked; it can never keep a window open. Closing it again within
-	/// <see cref="ForceCloseSeconds"/> of the question closes it, whatever the app does or doesn't answer. Only the
+	/// <see cref="ForceCloseSeconds"/> of the question closes it, whatever the app does or doesn't answer, unless the
+	/// player really pressed in the window's content since (<see cref="UserPressWindow"/>, e.g. on Cancel). Only the
 	/// player's own closes ask: the app closing itself, another app with <see cref="NaviPermissions.ManageApps"/>,
 	/// uninstalling, loading a save and game code close at once. In multiplayer only a shared app is asked, since the
 	/// host's copy of any other app isn't the one the player sees.
