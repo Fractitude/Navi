@@ -147,6 +147,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		{
 			UpdateUserInput();
 			PruneAppStates();
+			UpdateSeatReach();
 		}
 
 		if ( !Networking.IsActive )
@@ -530,6 +531,77 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	}
 
 	/// <summary>
+	/// The body of the player in the seat, once it has been found. See <see cref="UpdateSeatReach"/>.
+	/// </summary>
+	PlayerController seatBody;
+
+	/// <summary>
+	/// On the host: stand the user up when their body is gone (they died, say) or has moved out of the screen's reach,
+	/// farther than the <see cref="WorldPanel.InteractionRange"/> they needed to sit down. In a game without a
+	/// <see cref="PlayerController"/> for the user, neither happens.
+	/// </summary>
+	void UpdateSeatReach()
+	{
+		if ( !HasUser )
+		{
+			seatBody = null;
+			return;
+		}
+
+		var owner = Networking.IsActive ? User : null;
+		var body = Scene.GetAllComponents<PlayerController>()
+			.FirstOrDefault( x => Networking.IsActive ? x.Network.Owner == owner : !x.IsProxy );
+
+		var lost = seatBody is not null && !body.IsValid();
+		seatBody = body.IsValid() ? body : seatBody;
+
+		if ( lost || (body.IsValid() && !InSeatReach( body.EyePosition )) )
+			Unseat();
+	}
+
+	/// <summary>
+	/// Is <paramref name="eye"/> within the reach of the screen: the nearest point of the panel no farther than its
+	/// <see cref="WorldPanel.InteractionRange"/>, as when the player sat down. A panel without a range reaches anywhere.
+	/// </summary>
+	bool InSeatReach( Vector3 eye )
+	{
+		if ( !Components.TryGet<WorldPanel>( out var panel ) )
+			return true;
+
+		var range = Components.Get<NaviInputCapture>()?.ReachOf( panel ) ?? panel.InteractionRange;
+		if ( range <= 0 )
+			return true;
+
+		// The panel's x runs along -Y and its y along -Z, around the center ScreenRect gives.
+		var (center, size) = ScreenRect( panel );
+		var local = WorldTransform.PointToLocal( eye );
+		var nearest = new Vector3(
+			center.x,
+			System.Math.Clamp( local.y, center.y - size.x * 0.5f, center.y + size.x * 0.5f ),
+			System.Math.Clamp( local.z, center.z - size.y * 0.5f, center.z + size.y * 0.5f ) );
+
+		return WorldTransform.PointToWorld( nearest ).DistanceSquared( eye ) <= range * range;
+	}
+
+	/// <summary>
+	/// On the host: stand the user up, as Escape does.
+	/// </summary>
+	void Unseat()
+	{
+		seatBody = null;
+
+		if ( Networking.IsActive )
+		{
+			SetUser( default, keepStartMenu: true );
+		}
+		else if ( seatedOffline )
+		{
+			seatedOffline = false;
+			ResetSession( keepStartMenu: true );
+		}
+	}
+
+	/// <summary>
 	/// Give the seat to someone else. Open permission prompts are dismissed: whoever sits down didn't ask for them, and
 	/// mustn't answer them for the player who did.
 	/// </summary>
@@ -544,6 +616,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		menuOwner = keepStartMenu ? UserId : default;
 
 		UserId = id;
+		seatBody = null;
 		ResetSession( keepStartMenu || returning );
 	}
 
@@ -923,15 +996,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		if ( LeaveSpectating() || !Authorize( whileLocked: true ) )
 			return;
 
-		if ( Networking.IsActive )
-		{
-			SetUser( default, keepStartMenu: true );
-		}
-		else if ( seatedOffline )
-		{
-			seatedOffline = false;
-			ResetSession( keepStartMenu: true );
-		}
+		Unseat();
 	}
 
 	// Shared apps (NaviAppInfo.Shared). The host's copy of each runs the app and publishes its state; the others draw it.

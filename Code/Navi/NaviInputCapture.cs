@@ -295,6 +295,20 @@ public sealed class NaviInputCapture : Component
 		}
 	}
 
+	/// <summary>
+	/// How far <paramref name="panel"/> reaches when the player isn't seated: its range before <see cref="WidenReach"/>.
+	/// </summary>
+	internal float ReachOf( WorldPanel panel )
+	{
+		foreach ( var (widened, range) in reaches )
+		{
+			if ( widened == panel )
+				return range;
+		}
+
+		return panel.InteractionRange;
+	}
+
 	void Begin()
 	{
 		if ( state == State.Idle )
