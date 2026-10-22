@@ -1130,6 +1130,10 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	internal void SendShortcut( NaviWindow window, string keys )
 	{
+		// A shared app that keeps the player's keys here gets no shortcuts: they would reach the host, letter by letter.
+		if ( window.App.Shared && window.KeepsInputLocal )
+			return;
+
 		if ( window.App.Shared )
 			UserShortcut( window.App.Id, window.Id, keys );
 		else if ( appHosts.TryGetValue( window.Key, out var host ) )

@@ -107,6 +107,10 @@ public sealed class NaviAppHost : Panel
 
 	bool IsShared => Window?.App.Shared ?? false;
 
+	/// <summary>The calls behind <c>Navi.Window.SetLocalTitleAsync</c> and <c>Navi.Input.KeepLocalAsync</c>, answered here and
+	/// never by the host.</summary>
+	const string LocalTitleCall = "window.local-title", KeepInputLocalCall = "input.keep-local";
+
 	public override void Tick()
 	{
 		base.Tick();
@@ -382,6 +386,22 @@ public sealed class NaviAppHost : Panel
 		{
 			switch ( e.Name )
 			{
+				// This client's own title bar, which is never sent or saved, so any copy may set it here, a viewer's too. See
+				// NaviComputer.SetLocalTitle.
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call
+					&& call.Item1 == LocalTitleCall:
+					call.Item3.TrySetResult( Computer.SetLocalTitle( Window, call.Item2 is [string title, ..] ? title : "" ) );
+					e.StopPropagation();
+					return;
+
+				// Only ever sends less to the host, so it is safe from any copy too. See NaviInputCapture.
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call
+					&& call.Item1 == KeepInputLocalCall:
+					Window.KeepsInputLocal = call.Item2 is [bool local, ..] && local;
+					call.Item3.TrySetResult( null );
+					e.StopPropagation();
+					return;
+
 				// A viewer's copy of a shared app only draws. Calls never cross the network, so no client can make one
 				// as an app on the host.
 				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call && viewer:

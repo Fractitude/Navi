@@ -121,11 +121,15 @@ public sealed class NaviInputCapture : Component
 	string sentInput;
 
 	/// <summary>
-	/// Tell the host which <see cref="ForwardedActions"/> the player holds, while a shared app has their controls.
+	/// Tell the host which <see cref="ForwardedActions"/> the player holds, while a shared app has their controls and
+	/// hasn't asked to keep them here (<see cref="NaviWindow.KeepsInputLocal"/>).
 	/// </summary>
 	void ForwardInput()
 	{
-		var down = state == State.Captured && Computer.IsSeated && Computer.InputCapture is { App.Shared: true }
+		var forward = state == State.Captured && Computer.IsSeated
+			&& Computer.InputCapture is { App.Shared: true, KeepsInputLocal: false };
+
+		var down = forward
 			? ForwardedActions.Where( x => Input.Down( x ) ).OrderBy( x => x ).ToArray()
 			: [];
 

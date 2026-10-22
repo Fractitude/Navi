@@ -103,6 +103,13 @@ public sealed class NaviWindow
 	/// </summary>
 	public string LocalTitle { get; set; }
 
+	/// <summary>
+	/// The app's copy on this client asked to keep the player's keys here (<c>Navi.Input.KeepLocalAsync</c>): while it is
+	/// true, <see cref="NaviInputCapture"/> sends a shared app's host neither the player's input actions nor their
+	/// shortcuts. Never synced or saved.
+	/// </summary>
+	public bool KeepsInputLocal { get; set; }
+
 	public NaviAppInfo App => Process.App;
 
 	/// <summary>
@@ -1607,22 +1614,13 @@ public sealed partial class NaviComputer : Component
 		if ( GetWindow( id, windowId ) is not { IsService: false } window )
 			return false;
 
-		title = NaviAppInfo.Cap( title?.Trim(), NaviWindow.MaxTitle );
-
 		if ( Networking.IsActive && !window.App.Shared )
-		{
-			title = string.IsNullOrEmpty( title ) ? null : title;
-			if ( window.LocalTitle != title )
-			{
-				window.LocalTitle = title;
-				LocalTitleVersion++;
-			}
-
-			return true;
-		}
+			return SetLocalTitle( window, title );
 
 		if ( !IsAuthority )
 			return false;
+
+		title = NaviAppInfo.Cap( title?.Trim(), NaviWindow.MaxTitle );
 
 		// An app may set it every frame; only a change redraws the desktop.
 		if ( window.Title == (string.IsNullOrEmpty( title ) ? window.Info.Title : title) )
@@ -1630,6 +1628,29 @@ public sealed partial class NaviComputer : Component
 
 		window.Title = title;
 		Version++;
+		return true;
+	}
+
+	/// <summary>
+	/// Change what a window's title bar says on this client only, and only while this client is the computer's user
+	/// (<see cref="NaviWindow.LocalTitle"/>). Never sent or saved, so any copy of an app may set it, a shared app's viewer
+	/// too (<c>Navi.Window.SetLocalTitleAsync</c>): the Web Browser's page title, which is the player's alone. Empty clears
+	/// it. Returns false if the window isn't open.
+	/// </summary>
+	public bool SetLocalTitle( NaviWindow window, string title )
+	{
+		if ( window is not { IsService: false } || !Windows.Contains( window ) )
+			return false;
+
+		title = NaviAppInfo.Cap( title?.Trim(), NaviWindow.MaxTitle );
+		title = string.IsNullOrEmpty( title ) ? null : title;
+
+		if ( window.LocalTitle != title )
+		{
+			window.LocalTitle = title;
+			LocalTitleVersion++;
+		}
+
 		return true;
 	}
 

@@ -90,7 +90,7 @@ public sealed class DinoRunGame
 	const float RestartDelay = 0.5f;
 
 	/// <summary>
-	/// The best score of this game session, on this client. Not saved. Static, so it survives the window being closed; not
+	/// The best score of this game session, on the host (whose copy of the browser runs the game). Not saved. Static, so it survives the window being closed; not
 	/// readonly, so a hot reload keeps it.
 	/// </summary>
 	static int highScore;

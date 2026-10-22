@@ -268,7 +268,9 @@ host's.
 - **The host's copy** (offline, the only one) owns the view model. Its `Tick` runs the view model and calls
   `Navi.Publish( ViewModel.UiState )`. Publishing the same object again sends nothing, which is why `Update`
   replaces the record instead of changing it.
-- **A viewer's copy** (`Navi.IsViewer`) has no view model and makes no calls: `NaviAppHost` refuses them.
+- **A viewer's copy** (`Navi.IsViewer`) has no view model and makes no calls: `NaviAppHost` refuses them,
+  except the two that never leave the client (`Navi.Window.SetLocalTitleAsync`, `Navi.Input.KeepLocalAsync`).
+  The Web Browser keeps what is the player's own in the seated player's copy, viewer or not, and shares only Dino Run.
   It draws `Navi.GetState<TUiState>()`, or an `Empty` state until the first one arrives. The class is set
   before the panel's first tick, so a viewer never creates a view model by accident.
 - **Controls are actions.** `@onclick=@( () => Navi.Act( CalculatorViewModel.PressAction, key.Label ) )`.

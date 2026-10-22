@@ -514,6 +514,13 @@ public sealed class Navi
 		/// </summary>
 		public Task SetTitleAsync( string title ) => navi.CallAsync( "window.title", title ?? "" );
 
+		/// <summary>
+		/// Change what the title bar says after the app's name, up to 32 characters, on this client only: only the player
+		/// using the computer from here sees it, and everyone else sees the title in the .napp. It is never sent, so any copy
+		/// may call it, a shared app's viewer too. For what is the player's own, such as a web page's title. Empty clears it.
+		/// </summary>
+		public Task SetLocalTitleAsync( string title ) => navi.CallAsync( "window.local-title", title ?? "" );
+
 
 		/// <summary>
 		/// Ask to be told before the player closes the window this panel is in, e.g. while it has unsaved changes:
@@ -1465,5 +1472,13 @@ public sealed class Navi
 				: navi.HasInput && Sandbox.Input.Pressed( action );
 
 		static bool Has( string list, string action ) => list.Split( ',' ).Contains( action );
+
+		/// <summary>
+		/// In a shared app, keep the player's keys on their own client while <paramref name="local"/> is true: neither
+		/// their input actions nor their shortcuts go to the host's copy, which then sees none. For what the player types
+		/// that is theirs alone, such as a web page. It is never sent, so any copy may call it, a shared app's viewer too;
+		/// call it on every copy that may be the player's. Does nothing in an app that isn't shared, whose keys stay here.
+		/// </summary>
+		public Task KeepLocalAsync( bool local ) => navi.CallAsync( "input.keep-local", local );
 	}
 }

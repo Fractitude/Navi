@@ -12,14 +12,15 @@ namespace NaviApps;
 /// <para>
 /// The address and history never leave the player's own client, and nothing from outside may set them. The page loads
 /// in the player's real browser engine, on their real connection, so an address another player could choose would let
-/// them send this player to any site they like, such as an IP logger. That is why the app isn't Shared (each client
-/// makes its own copy of this, and keeps it in memory only), why the page is hidden while someone else uses the
-/// computer (<c>Navi.IsWatching</c>), and why the only addresses opened are what this player typed, a link they followed
-/// in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
+/// them send this player to any site they like, such as an IP logger. The app is Shared only for Dino Run
+/// (<see cref="WebBrowserSharedViewModel"/>, run by the host's copy). This is made by the seated player's own copy,
+/// whether that is the host's or a viewer's, kept in memory only, and makes no calls but the local title. The page is
+/// hidden while someone else uses the computer (<c>Navi.IsWatching</c>), and the only addresses opened are what this
+/// player typed, a link they followed in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
 /// </para>
 /// <para>
-/// Never publish the address as app state, take one from an action, a launch argument, a file or the host, or make the
-/// app Shared.
+/// Never publish the address, the history or the page title (put them in <see cref="WebBrowserSharedState"/>, or set the
+/// synced title), and never take an address from an action, a launch argument, a file or the host.
 /// </para>
 /// </remarks>
 public sealed class WebBrowserViewModel
@@ -52,39 +53,31 @@ public sealed class WebBrowserViewModel
 
 	string reportedTitle;
 
+	/// <summary>Whether the computer is online, as the host's copy last said. Null until it has.</summary>
+	bool? online;
+
 	public WebBrowserViewModel( Navi navi )
 	{
 		this.navi = navi;
 		UiState = new WebBrowserUiState { Url = Home, LoadId = 1, AddressText = Home };
-		_ = CheckNetworkAsync();
-	}
-
-	async System.Threading.Tasks.Task CheckNetworkAsync()
-	{
-		try
-		{
-			NetworkChanged( await navi.Network.IsOnlineAsync() );
-		}
-		catch ( Exception e )
-		{
-			Log.Warning( e, $"Web Browser: couldn't ask whether the computer is online: {e.Message}" );
-			NetworkChanged( false );
-		}
 	}
 
 	/// <summary>
-	/// The computer went online or offline. Back online, the open page loads again.
+	/// The computer is online or offline, as the host's copy publishes it (<see cref="WebBrowserSharedState.Online"/>).
+	/// Called every frame; it does nothing unless it changed. Back online, the open page loads again.
 	/// </summary>
 	public void NetworkChanged( bool online )
 	{
-		if ( UiState.Online == online )
+		if ( this.online == online )
 			return;
+
+		this.online = online;
 
 		// Offline there is no page to take the title from. Back online, the page sets it again.
 		if ( !online )
 			ChangeTitle( "No internet" );
 
-		Update( uiState => uiState with { Online = online, LoadId = uiState.LoadId + 1, Notice = null } );
+		Update( uiState => uiState with { LoadId = uiState.LoadId + 1, Notice = null } );
 	}
 
 	/// <summary>
@@ -226,8 +219,8 @@ public sealed class WebBrowserViewModel
 
 	/// <summary>
 	/// The page title is the window's title bar text, and the app's name only while the page has none (the desktop lets a
-	/// pre-packaged app's title stand alone). It isn't drawn by the panel, so it isn't state. In multiplayer it stays on
-	/// this client, like the address: other players see "Web Browser" (<c>NaviComputer.SetTitle</c>).
+	/// pre-packaged app's title stand alone). It isn't drawn by the panel, so it isn't state. It stays on this client, like
+	/// the address: other players see "Web Browser" (<c>Navi.Window.SetLocalTitleAsync</c>).
 	/// </summary>
 	void ChangeTitle( string title )
 	{
@@ -236,7 +229,7 @@ public sealed class WebBrowserViewModel
 			return;
 
 		reportedTitle = title;
-		_ = navi.Window.SetTitleAsync( title.Length > MaxTitle ? title[..MaxTitle] : title );
+		_ = navi.Window.SetLocalTitleAsync( title.Length > MaxTitle ? title[..MaxTitle] : title );
 	}
 
 	/// <summary>
