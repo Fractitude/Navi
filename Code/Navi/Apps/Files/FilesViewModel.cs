@@ -42,6 +42,12 @@ public sealed class FilesViewModel
 	public const string CopyAction = "copy";
 	public const string CutAction = "cut";
 	public const string PasteAction = "paste";
+
+	/// <summary>
+	/// The menu's "Copy path". The host's copy does nothing with it but close the menu: the clipboard is the player's, so
+	/// the panel on their own client copies <see cref="FilesUiState.MenuPaths"/> when they click it.
+	/// </summary>
+	public const string CopyPathAction = "copy-path";
 	public const string ToggleHiddenAction = "toggle-hidden";
 	public const string ToggleGridAction = "toggle-grid";
 	public const string EjectAction = "eject";
@@ -752,6 +758,7 @@ public sealed class FilesViewModel
 				new( NewFolderAction, "New folder", "create_new_folder", "Ctrl+Shift+N" ),
 				new( NewFileAction, "New text file", "note_add" ),
 				new( PasteAction, "Paste", "content_paste", "Ctrl+V", clipboard is not null, Separator: true ),
+				new( CopyPathAction, "Copy path", "file_copy" ),
 				new( SelectAllAction, "Select all", "select_all", "Ctrl+A", shownPaths.Count > 0, Separator: true ),
 			], null);
 		}
@@ -773,6 +780,7 @@ public sealed class FilesViewModel
 				] ),
 				new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
 				new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
+				new( CopyPathAction, "Copy paths", "file_copy" ),
 				new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
 			], $"{selection.Count} items");
 		}
@@ -782,6 +790,7 @@ public sealed class FilesViewModel
 		{
 			return ([
 				new( OpenAction, "Open", "folder_open", "Enter" ),
+				new( CopyPathAction, "Copy path", "file_copy", Separator: true ),
 				new( EjectAction, "Eject", "eject", Separator: true ),
 			], null);
 		}
@@ -800,6 +809,7 @@ public sealed class FilesViewModel
 			] ),
 			new( CopyAction, "Copy", "content_copy", "Ctrl+C", Separator: true ),
 			new( CutAction, "Cut", "content_cut", "Ctrl+X", canChange ),
+			new( CopyPathAction, "Copy path", "file_copy" ),
 			new( TrashAction, "Move to trash", "delete", "Delete", canChange, Separator: true ),
 		], null);
 	}
@@ -1226,6 +1236,7 @@ public sealed class FilesViewModel
 			RenamePath = renamePath,
 			Menu = menu,
 			MenuHeading = menu.Count > 0 ? menuHeading : null,
+			MenuPaths = menu.Count == 0 ? [] : selection.Count > 0 ? selection.ToList() : [path],
 			MenuX = menuAt.x,
 			MenuY = menuAt.y,
 			Confirm = BuildConfirm(),

@@ -221,7 +221,7 @@
 	{
 		<div class="menu-backdrop" @onmousedown=@( () => Navi.Act( FilesViewModel.CloseMenuAction ) )></div>
 
-		<NaviMenu Heading=@UiState.MenuHeading MaxHeight=@MenuMaxHeight SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@( ( string id ) => Navi.Act( FilesViewModel.ChooseMenuAction, id ) )
+		<NaviMenu Heading=@UiState.MenuHeading MaxHeight=@MenuMaxHeight SubmenuLeft=@( MenuLeft + MenuWidth + SubmenuWidth > PanelSize.x ) Items=@UiState.Menu OnChoose=@ChooseMenu
 		          style="left: @( MenuLeft )px; top: @( MenuTop )px; width: @( MenuWidth )px;"/>
 	}
 
@@ -420,6 +420,34 @@
 		var mode = ctrl ? FilesViewModel.ToggleMode : shift ? FilesViewModel.RangeMode : "";
 
 		Navi.Act( FilesViewModel.SelectAction, path, mode );
+	}
+
+	/// <summary>
+	/// The player chose a menu item. It goes to the host's copy, except "Copy path", which is done here too: the clipboard
+	/// is this player's, on this client, and the host's copy can't reach it.
+	/// </summary>
+	void ChooseMenu( string id )
+	{
+		if ( id == FilesViewModel.CopyPathAction )
+			CopyPaths( UiState.MenuPaths );
+
+		Navi.Act( FilesViewModel.ChooseMenuAction, id );
+	}
+
+	/// <summary>The longest path copied, and the most paths copied at once.</summary>
+	const int MaxCopiedPath = 1024, MaxCopiedPaths = 256;
+
+	/// <summary>
+	/// Put paths on the player's clipboard, one a line. They come from the host's state, so only what is a path goes:
+	/// absolute, one line, of a sane length. A hostile host can't put a command there for the player to paste.
+	/// </summary>
+	static void CopyPaths( IReadOnlyList<string> paths )
+	{
+		if ( paths is not { Count: > 0 and <= MaxCopiedPaths }
+			|| paths.Any( x => x is null || !x.StartsWith( '/' ) || x.Length > MaxCopiedPath || x.Any( char.IsControl ) ) )
+			return;
+
+		Clipboard.SetText( string.Join( "\n", paths ) );
 	}
 
 	/// <summary>

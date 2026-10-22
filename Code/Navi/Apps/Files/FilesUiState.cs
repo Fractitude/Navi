@@ -96,6 +96,11 @@ public sealed record FilesUiState
 	/// <summary>The right-click menu's items, or empty while it is closed.</summary>
 	public IReadOnlyList<NaviMenuItem> Menu { get; init; } = [];
 
+	/// <summary>
+	/// What the open menu is about: the selected entries, or the open folder when none are. "Copy path" copies these.
+	/// </summary>
+	public IReadOnlyList<string> MenuPaths { get; init; } = [];
+
 	/// <summary>Over the menu when several entries are selected: how many. Null otherwise.</summary>
 	public string MenuHeading { get; init; }
 
