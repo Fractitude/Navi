@@ -402,8 +402,16 @@ public sealed class NaviAppHost : Panel
 					e.StopPropagation();
 					return;
 
-				// A viewer's copy of a shared app only draws. Calls never cross the network, so no client can make one
-				// as an app on the host.
+				// Reading the computer's files from a client's copy, the seated player's only: the host has them, and runs the
+				// read as this window's app. Nothing that changes a file crosses the network. See NaviComputer.ReadRemoteFiles.
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call
+					&& !Computer.IsAuthority && NaviComputer.IsRemoteFileCall( call.Item1 ):
+					Computer.ReadRemoteFiles( Window, call.Item1, call.Item2, call.Item3 );
+					e.StopPropagation();
+					return;
+
+				// A viewer's copy of a shared app only draws. Apart from reading files, calls never cross the network, so no
+				// client can make one as an app on the host.
 				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call && viewer:
 					call.Item3.TrySetException( new System.NotSupportedException( "This copy of the app only draws. Calls run on the host's copy." ) );
 					e.StopPropagation();

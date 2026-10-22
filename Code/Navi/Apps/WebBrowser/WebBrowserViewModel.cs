@@ -15,9 +15,9 @@ namespace NaviApps;
 /// them send this player to any site they like, such as an IP logger. The app is Shared only for Dino Run
 /// (<see cref="WebBrowserSharedViewModel"/>, run by the host's copy). This is made by the seated player's own copy,
 /// whether that is the host's or a viewer's, kept in memory only, and makes no calls but the local title and, for a file
-/// address, reading the computer's files. Those are on the host only, so a viewer's copy (a client in the seat) can't
-/// open one and says so. The page is
-/// hidden while someone else uses the computer (<c>Navi.IsWatching</c>), and the only addresses opened are what this
+/// address, reading the computer's files. Those are on the host only, so a viewer's copy (a client in the seat) asks the
+/// host for them, which reads them as this app and answers that client alone (<c>NaviComputer.ReadRemoteFiles</c>). The
+/// page is hidden while someone else uses the computer (<c>Navi.IsWatching</c>), and the only addresses opened are what this
 /// player typed, a link they followed in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
 /// </para>
 /// <para>
@@ -62,6 +62,12 @@ public sealed class WebBrowserViewModel
 
 	/// <summary>The biggest picture shown, in bytes. Bigger ones are refused before they are decoded.</summary>
 	const int MaxImageBytes = 32 * 1024 * 1024;
+
+	/// <summary>
+	/// The biggest picture shown on a client that isn't the host, which the host sends it: the most the host sends for one
+	/// read (<c>NaviComputer.MaxRemoteFileBytes</c>).
+	/// </summary>
+	const int MaxRemoteImageBytes = 4 * 1024 * 1024;
 
 	/// <summary>The files shown as pictures. Any other file is shown as text, if it is text.</summary>
 	static readonly string[] ImageExtensions = ["jpg", "jpeg", "png"];
@@ -299,7 +305,8 @@ public sealed class WebBrowserViewModel
 	}
 
 	/// <summary>
-	/// Read the file or folder at a file address and show it. Asks the player for Files access the first time.
+	/// Read the file or folder at a file address and show it. Asks the player for Files access the first time, on the
+	/// host's copy: a viewer's copy can't ask, so it says where to allow it.
 	/// </summary>
 	async System.Threading.Tasks.Task LoadFileAsync( string url, int load )
 	{
@@ -309,9 +316,7 @@ public sealed class WebBrowserViewModel
 
 		try
 		{
-			page = navi.IsViewer
-				? Error( "The computer's files are on the host. In multiplayer only the host's player can open file:// addresses." )
-				: await ReadFileAsync( path, x => picture = x );
+			page = await ReadFileAsync( path, x => picture = x );
 		}
 		catch ( Navi.MissingPermissionException )
 		{
@@ -324,7 +329,7 @@ public sealed class WebBrowserViewModel
 			{
 				Navi.FileError.NotFound => $"{e.Path} isn't there.",
 				Navi.FileError.LinkLoop => "Those links point at each other in a loop.",
-				Navi.FileError.Unavailable => "The computer's files are on the host.",
+				Navi.FileError.Unavailable => "The host didn't send the computer's files. Try again from the seat.",
 				_ => e.Message,
 			} );
 		}
@@ -342,7 +347,9 @@ public sealed class WebBrowserViewModel
 
 	async System.Threading.Tasks.Task<WebBrowserFilePage> ReadFileAsync( string path, Action<Texture> setPicture )
 	{
-		var info = await navi.WithPermissionAsync( () => navi.Files.GetInfoAsync( path ) );
+		var info = navi.IsViewer
+			? await navi.Files.GetInfoAsync( path )
+			: await navi.WithPermissionAsync( () => navi.Files.GetInfoAsync( path ) );
 		if ( info is null )
 			return Error( $"{path} isn't there." );
 
@@ -360,7 +367,8 @@ public sealed class WebBrowserViewModel
 		var dot = info.Name.LastIndexOf( '.' );
 		var image = dot >= 0 && ImageExtensions.Contains( info.Name[(dot + 1)..].ToLowerInvariant() );
 
-		if ( info.Size > (image ? MaxImageBytes : MaxTextBytes) )
+		var maxImage = navi.IsViewer ? MaxRemoteImageBytes : MaxImageBytes;
+		if ( info.Size > (image ? maxImage : MaxTextBytes) )
 			return Error( $"{info.Name} is too big to show here." );
 
 		var bytes = await navi.Files.ReadBytesAsync( info.Path ) ?? [];

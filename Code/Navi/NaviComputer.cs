@@ -764,7 +764,10 @@ public sealed partial class NaviComputer : Component
 		UpdateBeeps();
 
 		if ( !IsAuthority )
+		{
+			UpdateRemoteReads();
 			return;
+		}
 
 		UpdateFilesSave();
 		UpdateMessages();
