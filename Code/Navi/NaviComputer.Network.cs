@@ -548,14 +548,18 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 			return;
 		}
 
-		var owner = Networking.IsActive ? User : null;
-		var body = Scene.GetAllComponents<PlayerController>()
-			.FirstOrDefault( x => Networking.IsActive ? x.Network.Owner == owner : !x.IsProxy );
+		// Found once per seat and kept. Once found, it going invalid means it was destroyed.
+		if ( seatBody is null )
+		{
+			var owner = Networking.IsActive ? User : null;
+			seatBody = Scene.GetAllComponents<PlayerController>()
+				.FirstOrDefault( x => Networking.IsActive ? x.Network.Owner == owner : !x.IsProxy );
 
-		var lost = seatBody is not null && !body.IsValid();
-		seatBody = body.IsValid() ? body : seatBody;
+			if ( seatBody is null )
+				return;
+		}
 
-		if ( lost || (body.IsValid() && !InSeatReach( body.EyePosition )) )
+		if ( !seatBody.IsValid() || !InSeatReach( seatBody.EyePosition ) )
 			Unseat();
 	}
 
