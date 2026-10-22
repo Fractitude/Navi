@@ -133,7 +133,7 @@ public sealed class DinoRunBoard : Panel
 	readonly Panel standing, runningA, runningB, ducking, duckingB, crashed;
 	readonly Panel[] bumps = new Panel[GroundBumps];
 	readonly Panel[] clouds = new Panel[Clouds];
-	readonly Label score;
+	readonly Label score, highScore;
 	readonly Label message;
 	readonly Dictionary<int, Panel> obstaclePanels = new();
 
@@ -166,7 +166,11 @@ public sealed class DinoRunBoard : Panel
 		duckingB = Sprite( dino, DinoSprites.DuckingB, "pose" );
 		crashed = Sprite( dino, DinoSprites.Crashed, "pose" );
 
-		score = new Label { Parent = this };
+		// The best score above the current one, fainter. Its row is kept while there is none, so the score never moves.
+		var scores = Add.Panel( "scores" );
+		highScore = new Label { Parent = scores };
+		highScore.AddClass( "high-score" );
+		score = new Label { Parent = scores };
 		score.AddClass( "score" );
 		message = new Label { Parent = this };
 		message.AddClass( "message" );
@@ -248,8 +252,8 @@ public sealed class DinoRunBoard : Panel
 		DrawObstacles( frame );
 
 		var points = frame.Score.ToString( "00000" );
-		var high = frame.HighScore > 0 ? $"HI {frame.HighScore:00000}  " : "";
-		score.Text = high + points;
+		highScore.Text = frame.HighScore > 0 ? $"HI {frame.HighScore:00000}" : "";
+		score.Text = points;
 
 		message.Text = frame switch
 		{
