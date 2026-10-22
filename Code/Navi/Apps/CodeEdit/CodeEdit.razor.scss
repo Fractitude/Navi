@@ -129,6 +129,20 @@
 		{
 			display: none;
 		}
+
+		// The editor never wraps a line, so a long one scrolls sideways. Its bars are always there and, with no color of
+		// their own, drawn white on white. Here they only exist while something overflows, and are grey enough to be
+		// seen on both the light and the dark editor.
+		.script-entry
+		{
+			overflow: auto;
+			scrollbar-color: rgba( 128, 128, 128, 0.6 ) transparent;
+
+			scrollbar > .thumb
+			{
+				border-radius: 3px;
+			}
+		}
 	}
 
 	.status
