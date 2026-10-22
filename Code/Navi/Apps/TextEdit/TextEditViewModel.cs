@@ -413,6 +413,7 @@ public sealed class TextEditViewModel
 		var text = UiState.Text;
 		try
 		{
+			await CreateFoldersAsync( FolderOf( to ) );
 			var written = await navi.Files.WriteTextAsync( to, text );
 			path = (await navi.Files.GetInfoAsync( written ))?.Path ?? written;
 			savedText = text;
@@ -428,6 +429,21 @@ public sealed class TextEditViewModel
 			// Not saved, so the window stays, with what went wrong.
 			closeAfterSave = false;
 			Notify( Describe( e ) );
+		}
+	}
+
+	/// <summary>
+	/// Make the folders of <paramref name="folder"/> that don't exist yet, from the top down, so a path typed in Save as
+	/// can lead somewhere new.
+	/// </summary>
+	async Task CreateFoldersAsync( string folder )
+	{
+		var at = "";
+		foreach ( var part in folder.Split( '/', System.StringSplitOptions.RemoveEmptyEntries ) )
+		{
+			at = Join( at == "" ? "/" : at, part );
+			if ( await navi.Files.GetInfoAsync( at ) is null )
+				await navi.Files.CreateFolderAsync( at );
 		}
 	}
 
