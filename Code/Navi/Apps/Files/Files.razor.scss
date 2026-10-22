@@ -82,6 +82,19 @@
 			background-color: $ink-bg;
 		}
 
+		// The button that goes ahead with a dialog.
+		&.primary
+		{
+			color: $paper-t;
+			background-color: $ink-bg;
+			border-color: $ink-bc;
+
+			&:hover
+			{
+				background-color: $deep-bg;
+			}
+		}
+
 		&:hover
 		{
 			color: $paper-t;
@@ -526,6 +539,10 @@
 		{
 			width: 420px;
 			max-width: 96%;
+
+			// Solid and sharp whatever the Transparency and Blur settings say: the player reads and decides here.
+			background-color: rgba( $surface-bg, 1 );
+			backdrop-filter-blur: 0px;
 
 			.conflict-all, .conflict-row
 			{

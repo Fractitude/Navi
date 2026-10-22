@@ -248,10 +248,8 @@
 	{
 		<div class="confirm-backdrop">
 			<div class="confirm conflict">
-				<div class="confirm-title">
-					@( conflict.Items.Count == 1 ? "1 item" : $"{conflict.Items.Count} items" ) already there
-				</div>
-				<div class="confirm-text">"@conflict.Folder" has items with the same names. Choose what happens to each.</div>
+				<div class="confirm-title">Resolve conflicts</div>
+				<div class="confirm-text">Some files with the same name already exist in this folder.</div>
 
 				<div class="conflict-all">
 					<div class="conflict-label">All</div>
@@ -281,7 +279,7 @@
 
 				<div class="confirm-buttons">
 					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.CancelConflictAction ) )>Cancel</div>
-					<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.ResolveConflictAction ) )>Move</div>
+					<div class="tool wide primary" @onclick=@( () => Navi.Act( FilesViewModel.ResolveConflictAction ) )>Move</div>
 				</div>
 			</div>
 		</div>
