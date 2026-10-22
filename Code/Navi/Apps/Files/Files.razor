@@ -242,6 +242,15 @@
 			</div>
 		</div>
 	}
+
+	@* What the cursor carries while entries are dragged inside the window. *@
+	<div class="drag-ghost" @ref="Ghost">
+		@if ( dragPaths is not null )
+		{
+			<i>@dragIcon</i>
+			<div class="name">@dragLabel</div>
+		}
+	</div>
 </root>
 
 @code
@@ -390,12 +399,26 @@
 		Navi.Act( FilesViewModel.SelectManyAction, hit.ToArray() );
 	}
 
-	// Dragging an entry out of the window, to drop it on another app (Navi.Drag): pressing a row arms it, and moving the mouse
-	// DragThreshold with the button held starts the drag. The desktop draws and delivers it from there.
+	// Dragging entries. Pressing a row arms it, and moving the mouse DragThreshold with the button held starts the drag. Inside
+	// this window the drag is the app's own: a ghost follows the mouse, the folder under it is marked, and letting go moves the
+	// entries there (FilesViewModel.MoveIntoAction). Once the mouse leaves the window it becomes the desktop's drag
+	// (Navi.Drag), which carries the files to another app.
 	Panel pressedRow;
 	string pressedPath;
 	Vector2 pressedAt;
 	RealTimeSince sinceDragged = 1f;
+
+	/// <summary>The entries being dragged inside the window, or null.</summary>
+	List<string> dragPaths;
+
+	string dragLabel;
+	string dragIcon;
+
+	Panel Ghost;
+	Panel Sidebar;
+
+	/// <summary>The panel of the folder under the mouse that is marked as where the entries would go.</summary>
+	Panel dropPanel;
 
 	/// <summary>How far the mouse moves, in panel pixels, before pressing an entry becomes dragging it.</summary>
 	const float DragThreshold = 6f;
@@ -414,86 +437,95 @@
 	}
 
 	/// <summary>
-	/// Start the drag once the mouse has moved far enough with the button still held. An entry in the selection takes the
-	/// whole selection along; any other goes alone. Dropping on a window that takes files hands it the paths.
+	/// Follow the pressed row: start the drag once the mouse has moved far enough, mark the folder it is over, and on letting
+	/// go move the entries into that folder. An entry in the selection takes the whole selection along; any other goes alone.
 	/// </summary>
 	void UpdateDrag()
 	{
 		if ( pressedRow is null )
 			return;
 
-		if ( !pressedRow.IsValid || !pressedRow.HasActive || Navi.IsWatching )
+		if ( !pressedRow.IsValid || Navi.IsWatching || UiState.InTrash )
 		{
-			pressedRow = null;
+			EndDrag();
 			return;
 		}
 
-		if ( (MousePosition * ScaleFromScreen - pressedAt).Length < DragThreshold )
-			return;
+		var released = !pressedRow.HasActive;
 
-		var path = pressedPath;
-		pressedRow = null;
-
-		var rows = UiState.Rows;
-		var row = rows.FirstOrDefault( x => x.Path == path );
-		if ( row is null )
-			return;
-
-		var dragged = rows.Where( x => row.Selected ? x.Selected : x == row ).ToList();
-		var label = dragged.Count == 1 ? row.Name : $"{dragged.Count} items";
-		sinceDragged = 0;
-		_ = BeginDragAsync( label, row.Icon, dragged.Select( x => x.Path ).ToList() );
-	}
-
-	Panel Sidebar;
-
-	/// <summary>This window started a drag that is still going: the entries are carried over the window's own folders.</summary>
-	bool draggingOut;
-
-	/// <summary>The folder the mouse was over last while dragging, or null. Kept a moment after the button is let go, for the drop.</summary>
-	string dropFolder;
-
-	/// <summary>The panel of <see cref="dropFolder"/> that is marked as the place the entries would go.</summary>
-	Panel dropPanel;
-
-	RealTimeSince sinceDragEnded = 1f;
-
-	/// <summary>How long after the button is let go a drop is still taken, in seconds: the desktop delivers it a frame apart.</summary>
-	const float DropGraceTime = 0.5f;
-
-	async System.Threading.Tasks.Task BeginDragAsync( string label, string icon, List<string> paths )
-	{
-		if ( await Navi.Drag.BeginFilesAsync( label, icon, paths ) )
+		if ( dragPaths is null )
 		{
-			draggingOut = true;
-			dropFolder = null;
+			if ( released )
+			{
+				pressedRow = null;
+				return;
+			}
+
+			if ( (MousePosition * ScaleFromScreen - pressedAt).Length < DragThreshold )
+				return;
+
+			var rows = UiState.Rows;
+			var row = rows.FirstOrDefault( x => x.Path == pressedPath );
+			if ( row is null )
+			{
+				EndDrag();
+				return;
+			}
+
+			dragPaths = rows.Where( x => row.Selected ? x.Selected : x == row ).Select( x => x.Path ).ToList();
+			dragLabel = dragPaths.Count == 1 ? row.Name : $"{dragPaths.Count} items";
+			dragIcon = row.Icon;
+		}
+
+		if ( released )
+		{
+			var (folder, _) = FolderUnderMouse();
+			var paths = dragPaths;
+			EndDrag();
+
+			if ( folder is not null )
+				Navi.Act( FilesViewModel.MoveIntoAction, [folder, .. paths] );
+
+			return;
+		}
+
+		// Out of the window it is the desktop's drag, for another app to take.
+		if ( !Over( this ) )
+		{
+			var paths = dragPaths;
+			var label = dragLabel;
+			var icon = dragIcon;
+			EndDrag();
+			_ = Navi.Drag.BeginFilesAsync( label, icon, paths );
+			return;
+		}
+
+		var (_, over) = FolderUnderMouse();
+		SetDropPanel( over );
+
+		if ( Ghost.IsValid() )
+		{
+			var at = MousePosition * ScaleFromScreen;
+			Ghost.Style.Left = Length.Pixels( at.x + 14f );
+			Ghost.Style.Top = Length.Pixels( at.y + 14f );
+			Ghost.SetClass( "shown", true );
 		}
 	}
 
 	/// <summary>
-	/// While dragging, mark the folder under the mouse: a folder row, a place, a drive or a crumb that isn't being dragged.
-	/// Letting go ends the drag; the drop itself comes from the desktop (<see cref="OnDrop"/>) and moves the entries there.
+	/// The drag is over, dropped or not. A click that follows it is ignored for a moment.
 	/// </summary>
-	void UpdateDropTarget()
+	void EndDrag()
 	{
-		if ( draggingOut && !Input.Keyboard.Down( "MOUSE1" ) )
-		{
-			draggingOut = false;
-			sinceDragEnded = 0;
-		}
+		if ( dragPaths is not null )
+			sinceDragged = 0;
 
-		if ( !draggingOut && sinceDragEnded > DropGraceTime )
-			dropFolder = null;
+		pressedRow = null;
+		dragPaths = null;
+		SetDropPanel( null );
 
-		if ( !draggingOut )
-		{
-			SetDropPanel( null );
-			return;
-		}
-
-		var (folder, panel) = FolderUnderMouse();
-		dropFolder = folder;
-		SetDropPanel( panel );
+		if ( Ghost.IsValid() )
+			Ghost.SetClass( "shown", false );
 	}
 
 	void SetDropPanel( Panel panel )
@@ -530,7 +562,7 @@
 	/// </summary>
 	(string Path, Panel Panel) FolderUnderMouse()
 	{
-		if ( UiState.InTrash )
+		if ( UiState.InTrash || dragPaths is null )
 			return (null, null);
 
 		if ( Over( List ) )
@@ -538,8 +570,11 @@
 			var rows = List.Children.Where( x => x.HasClass( "row" ) ).ToList();
 			for ( var i = 0; i < rows.Count && i < UiState.Rows.Count; i++ )
 			{
-				if ( Over( rows[i] ) )
-					return UiState.Rows[i].Icon == "folder" && !UiState.Rows[i].Selected ? (UiState.Rows[i].Path, rows[i]) : (null, null);
+				if ( !Over( rows[i] ) )
+					continue;
+
+				var row = UiState.Rows[i];
+				return row.Icon == "folder" && !dragPaths.Contains( row.Path ) ? (row.Path, rows[i]) : (null, null);
 			}
 		}
 
@@ -567,20 +602,6 @@
 		return (null, null);
 	}
 
-	/// <summary>
-	/// The desktop delivers a drop on this window. One this window started moves the entries into the folder it was let go
-	/// over, on the host's copy. A drop from anywhere else is ignored.
-	/// </summary>
-	protected override void OnDrop( Navi.Drop drop )
-	{
-		if ( (draggingOut || sinceDragEnded < DropGraceTime) && dropFolder is { } folder )
-			Navi.Act( FilesViewModel.MoveIntoAction, [folder, .. drop.Paths] );
-
-		dropFolder = null;
-		draggingOut = false;
-		SetDropPanel( null );
-	}
-
 	public override void Tick()
 	{
 		base.Tick();
@@ -588,8 +609,6 @@
 		FocusRename();
 		UpdateBand();
 		UpdateDrag();
-		Navi.Drag.AcceptFiles( !Navi.IsWatching );
-		UpdateDropTarget();
 		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )
@@ -727,5 +746,5 @@
 	/// </summary>
 	protected override int BuildHash() =>
 		System.HashCode.Combine( UiState.Revision, RenameEntry is { HasFocus: true } ? null : UiState.RenameText,
-			crumbsClipped, bandMoved ? BandRect : default, Thumbnails.Version );
+			crumbsClipped, bandMoved ? BandRect : default, Thumbnails.Version, dragLabel );
 }

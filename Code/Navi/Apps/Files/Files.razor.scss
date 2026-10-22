@@ -542,4 +542,41 @@
 .theme-glass.scheme-light { @include files-style; }
 
 @import "../../Themes/_glass-dark.scss";
-.theme-glass.scheme-dark { @include files-style; }
+.theme-glass.scheme-dark { @include files-style; 
+
+	// What the cursor carries while entries are dragged inside the window.
+	.drag-ghost
+	{
+		display: none;
+		position: absolute;
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+		max-width: 240px;
+		padding: 3px 8px;
+		font-size: 11px;
+		font-weight: 700;
+		white-space: nowrap;
+		color: $ink-t;
+		background-color: $surface-bg;
+		border: 2px solid $ink-bc;
+		opacity: 0.92;
+		pointer-events: none;
+
+		&.shown
+		{
+			display: flex;
+		}
+
+		> i
+		{
+			font-size: 14px;
+		}
+
+		> .name
+		{
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
+}
