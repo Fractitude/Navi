@@ -252,7 +252,7 @@ public sealed class DinoRunBoard : Panel
 		DrawObstacles( frame );
 
 		var points = frame.Score.ToString( "00000" );
-		highScore.Text = frame.HighScore > 0 ? $"HI {frame.HighScore:00000}" : "";
+		highScore.Text = frame.HighScore > 0 ? $"BEST {frame.HighScore:00000}" : "";
 		score.Text = points;
 
 		message.Text = frame switch
