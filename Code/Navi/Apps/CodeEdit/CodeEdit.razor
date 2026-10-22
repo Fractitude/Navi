@@ -41,11 +41,9 @@
 
 		<div class="divider"></div>
 
-		<div class="tool" tooltip="@( UiState.LightTheme ? "Dark theme" : "Light theme" )"
-		     @onclick=@( () => Navi.Act( CodeEditViewModel.ToggleThemeAction ) )>
-			<i>@( UiState.LightTheme ? "dark_mode" : "light_mode" )</i>
+		<div class="tool" tooltip="Settings" @onclick=@( () => Navi.Act( CodeEditViewModel.OpenSettingsAction ) )>
+			<i>settings</i>
 		</div>
-
 	</div>
 
 	@if ( UiState.BarOpen )
@@ -75,12 +73,63 @@
 
 	<div class="page">
 		<ScriptControl @ref="Editor" class="document @( IsCSharp ? "" : "plain" ) @( UiState.LightTheme ? "light" : "" )"
-		               ShowStatusBar=@( true )
+		               ShowStatusBar=@( UiState.ShowStatusBar ) TabSize=@( UiState.TabSize )
 		               DiagnosticDelay=@( IsCSharp ? DiagnosticDelay : float.PositiveInfinity )
 		               OnSourceChanged=@SourceEdited/>
 	</div>
 
 	<div class="status">@UiState.Status</div>
+
+	@if ( UiState.SettingsOpen )
+	{
+		<div class="confirm-backdrop">
+			<div class="confirm settings">
+				<div class="settings-title">Settings</div>
+
+				<div class="setting">
+					<div class="setting-label">Theme</div>
+					<div class="choices">
+						@foreach ( var theme in System.Enum.GetValues<CodeEditTheme>() )
+						{
+							<div class="choice @( UiState.Theme == theme ? "selected" : "" )"
+							     @onclick=@( () => Navi.Act( CodeEditViewModel.SetThemeAction, theme.ToString() ) )>
+								@theme
+							</div>
+						}
+					</div>
+				</div>
+
+				<div class="setting">
+					<div class="setting-label">Tab size</div>
+					<div class="choices">
+						<div class="choice @( UiState.TabSize <= CodeEditViewModel.MinTabSize ? "disabled" : "" )"
+						     @onclick=@( () => Navi.Act( CodeEditViewModel.SetTabSizeAction, ( UiState.TabSize - 1 ).ToString() ) )>
+							-
+						</div>
+						<div class="tab-size">@UiState.TabSize</div>
+						<div class="choice @( UiState.TabSize >= CodeEditViewModel.MaxTabSize ? "disabled" : "" )"
+						     @onclick=@( () => Navi.Act( CodeEditViewModel.SetTabSizeAction, ( UiState.TabSize + 1 ).ToString() ) )>
+							+
+						</div>
+					</div>
+				</div>
+
+				<div class="setting">
+					<div class="setting-label">Show status bar</div>
+					<div class="choices">
+						<div class="choice @( UiState.ShowStatusBar ? "selected" : "" )"
+						     @onclick=@( () => Navi.Act( CodeEditViewModel.ToggleStatusBarAction ) )>
+							@( UiState.ShowStatusBar ? "On" : "Off" )
+						</div>
+					</div>
+				</div>
+
+				<div class="confirm-buttons">
+					<div class="button" @onclick=@( () => Navi.Act( CodeEditViewModel.CloseSettingsAction ) )>Close</div>
+				</div>
+			</div>
+		</div>
+	}
 
 	@if ( UiState.Confirming )
 	{

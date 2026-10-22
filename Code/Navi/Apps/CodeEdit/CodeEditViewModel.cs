@@ -56,13 +56,25 @@ public sealed class CodeEditViewModel
 	public const string CancelConfirmAction = "cancel-confirm";
 	public const string ConfirmOtherAction = "confirm-other";
 	public const string DismissNoticeAction = "dismiss-notice";
-	public const string ToggleThemeAction = "toggle-theme";
+	public const string OpenSettingsAction = "open-settings";
+	public const string CloseSettingsAction = "close-settings";
+	public const string SetThemeAction = "set-theme";
+	public const string SetTabSizeAction = "set-tab-size";
+	public const string ToggleStatusBarAction = "toggle-status-bar";
 	public const string RunAction = "run";
 
 	/// <summary>The file in the app's own folder that holds what the player chose, as JSON.</summary>
 	const string PreferencesName = "preferences.json";
 
 	const string ThemeKey = "theme";
+	const string TabSizeKey = "tabsize";
+	const string StatusBarKey = "statusbar";
+
+	public const int MinTabSize = 1;
+	public const int MaxTabSize = 8;
+
+	/// <summary>The computer's color scheme is light, as last asked.</summary>
+	bool systemLight;
 
 	// The document.
 
@@ -191,6 +203,17 @@ public sealed class CodeEditViewModel
 				AskToDiscard( () => LoadAsync( opened[^1] ) );
 
 			// The game can turn scripting on or off for the computer, so it is asked again every time.
+			var light = (await navi.Settings.GetThemeAsync()).Scheme == Navi.ColorScheme.Light;
+			if ( light != systemLight )
+			{
+				systemLight = light;
+				if ( UiState.Theme == CodeEditTheme.System )
+				{
+					UiState = UiState with { LightTheme = light };
+					Rebuild();
+				}
+			}
+
 			var scripting = await navi.Scripts.IsEnabledAsync();
 			if ( scripting != UiState.ScriptingEnabled )
 			{
@@ -231,6 +254,10 @@ public sealed class CodeEditViewModel
 
 		// While a question is open it covers the window: only its answers do anything. Typing still lands, so the text
 		// field and the document never part.
+		if ( UiState.SettingsOpen && action is not (CloseSettingsAction or SetThemeAction or SetTabSizeAction
+			or ToggleStatusBarAction or EditAction) )
+			return;
+
 		if ( confirmed is not null && action is not (ConfirmAction or ConfirmOtherAction or CancelConfirmAction or EditAction) )
 			return;
 
@@ -248,7 +275,17 @@ public sealed class CodeEditViewModel
 			case ConfirmOtherAction when confirmedOther is not null: _ = AnswerAsync( confirmedOther ); break;
 			case CancelConfirmAction: _ = AnswerAsync( null ); break;
 			case DismissNoticeAction: Notify( null ); break;
-			case ToggleThemeAction: _ = SetThemeAsync( !UiState.LightTheme ); break;
+			case OpenSettingsAction: UiState = UiState with { SettingsOpen = true }; Rebuild(); break;
+			case CloseSettingsAction: UiState = UiState with { SettingsOpen = false }; Rebuild(); break;
+			case SetThemeAction when System.Enum.TryParse<CodeEditTheme>( arg, out var theme ):
+				ApplyPreferences( UiState with { Theme = theme } );
+				break;
+			case SetTabSizeAction when int.TryParse( arg, out var size ):
+				ApplyPreferences( UiState with { TabSize = System.Math.Clamp( size, MinTabSize, MaxTabSize ) } );
+				break;
+			case ToggleStatusBarAction:
+				ApplyPreferences( UiState with { ShowStatusBar = !UiState.ShowStatusBar } );
+				break;
 			case RunAction: _ = RunAsync(); break;
 		}
 	}
@@ -328,38 +365,59 @@ public sealed class CodeEditViewModel
 	// Preferences.
 
 	/// <summary>
-	/// Take the theme the player chose last from the app's folder. The first time there is nothing there, so the
-	/// editor follows the computer's color scheme (a dark computer gets the dark editor).
+	/// Take the settings the player chose last from the app's folder. The first time there is nothing there, so the
+	/// theme is System: the editor follows the computer's color scheme (a dark computer gets the dark editor).
 	/// </summary>
 	async Task LoadPreferencesAsync()
 	{
-		var light = false;
+		var state = UiState;
 		try
 		{
+			systemLight = (await navi.Settings.GetThemeAsync()).Scheme == Navi.ColorScheme.Light;
+
 			var file = Join( await navi.Files.GetAppFolderAsync(), PreferencesName );
 			var chosen = await navi.Files.GetInfoAsync( file ) is { IsFolder: false }
 				? Json.Deserialize<Dictionary<string, string>>( await navi.Files.ReadTextAsync( file ) )
 				: null;
 
-			if ( chosen is not null && chosen.TryGetValue( ThemeKey, out var theme ) && theme is "light" or "dark" )
-				light = theme == "light";
-			else
-				light = (await navi.Settings.GetThemeAsync()).Scheme == Navi.ColorScheme.Light;
+			if ( chosen is not null )
+			{
+				if ( chosen.TryGetValue( ThemeKey, out var theme ) )
+				{
+					state = state with
+					{
+						Theme = theme switch { "light" => CodeEditTheme.Light, "dark" => CodeEditTheme.Dark, _ => CodeEditTheme.System },
+					};
+				}
+
+				if ( chosen.TryGetValue( TabSizeKey, out var tabs ) && int.TryParse( tabs, out var size ) )
+					state = state with { TabSize = System.Math.Clamp( size, MinTabSize, MaxTabSize ) };
+
+				if ( chosen.TryGetValue( StatusBarKey, out var bar ) )
+					state = state with { ShowStatusBar = bar != "false" };
+			}
 		}
 		catch ( System.Exception )
 		{
-			// Unreadable preferences: the dark editor, and the next choice writes them again.
+			// Unreadable preferences: the defaults, and the next choice writes them again.
 		}
 
-		UiState = UiState with { LightTheme = light, ThemeKnown = true };
+		UiState = state with { LightTheme = IsLight( state.Theme ), ThemeKnown = true };
 		Rebuild();
 	}
 
-	async Task SetThemeAsync( bool light )
-	{
-		UiState = UiState with { LightTheme = light, ThemeKnown = true };
-		Rebuild();
+	bool IsLight( CodeEditTheme theme ) => theme == CodeEditTheme.System ? systemLight : theme == CodeEditTheme.Light;
 
+	/// <summary>Take the changed settings of <paramref name="state"/>, show them, and save them.</summary>
+	void ApplyPreferences( CodeEditUiState state )
+	{
+		UiState = state with { LightTheme = IsLight( state.Theme ), ThemeKnown = true };
+		Rebuild();
+		_ = SavePreferencesAsync( UiState );
+	}
+
+	async Task SavePreferencesAsync( CodeEditUiState state )
+	{
 		try
 		{
 			var folder = await navi.Files.GetAppFolderAsync();
@@ -375,8 +433,12 @@ public sealed class CodeEditViewModel
 				}
 			}
 
-			await navi.Files.WriteTextAsync( Join( folder, PreferencesName ),
-				Json.Serialize( new Dictionary<string, string> { [ThemeKey] = light ? "light" : "dark" } ) );
+			await navi.Files.WriteTextAsync( Join( folder, PreferencesName ), Json.Serialize( new Dictionary<string, string>
+			{
+				[ThemeKey] = state.Theme.ToString().ToLowerInvariant(),
+				[TabSizeKey] = state.TabSize.ToString(),
+				[StatusBarKey] = state.ShowStatusBar ? "true" : "false",
+			} ) );
 		}
 		catch ( System.Exception e )
 		{

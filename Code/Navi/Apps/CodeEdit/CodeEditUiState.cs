@@ -10,6 +10,16 @@ public enum CodeEditBar
 }
 
 /// <summary>
+/// Which colors the editor uses. System follows the computer's color scheme.
+/// </summary>
+public enum CodeEditTheme
+{
+	System,
+	Light,
+	Dark,
+}
+
+/// <summary>
 /// Everything the Code Edit panel draws. Replaced whole by <see cref="CodeEditViewModel"/> on every change.
 /// </summary>
 public sealed record CodeEditUiState
@@ -31,8 +41,20 @@ public sealed record CodeEditUiState
 	/// </summary>
 	public int TextSession { get; init; }
 
-	/// <summary>The editor is drawn light. Saved in the app's preferences.</summary>
+	/// <summary>The theme the player chose. Saved in the app's preferences.</summary>
+	public CodeEditTheme Theme { get; init; }
+
+	/// <summary>The editor is drawn light: <see cref="Theme"/>, or for System the computer's color scheme.</summary>
 	public bool LightTheme { get; init; }
+
+	/// <summary>Spaces a tab inserts, 1 to 8. Saved in the app's preferences.</summary>
+	public int TabSize { get; init; } = 4;
+
+	/// <summary>The editor's own status bar (diagnostics) is shown. Saved in the app's preferences.</summary>
+	public bool ShowStatusBar { get; init; } = true;
+
+	/// <summary>The settings dialog is open.</summary>
+	public bool SettingsOpen { get; init; }
 
 	/// <summary>The theme is read from the preferences (or the computer's color scheme), so the panel can use it.</summary>
 	public bool ThemeKnown { get; init; }
