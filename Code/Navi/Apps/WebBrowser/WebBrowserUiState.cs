@@ -62,6 +62,11 @@ public sealed record WebBrowserSharedState
 	public bool? Online { get; init; }
 
 	/// <summary>
+	/// While offline, why and what to do about it (<see cref="Navi.NetworkStatus.OfflineHint"/>), or null if not known yet.
+	/// </summary>
+	public string OfflineHint { get; init; }
+
+	/// <summary>
 	/// The seated player opened <c>browser://dino</c>, so everyone sees the game without the offline notice. Set only by
 	/// their action (<see cref="WebBrowserSharedViewModel.ShowAction"/>); it never moves their own page.
 	/// </summary>

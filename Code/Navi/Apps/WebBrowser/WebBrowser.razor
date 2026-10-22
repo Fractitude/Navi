@@ -78,7 +78,7 @@
 				{
 					<div class="offline-text">
 						<i>wifi_off</i>
-						<label>No internet. This computer needs a network card to reach the web.</label>
+						<label>No internet. @( SharedState.OfflineHint ?? "This computer needs a network connection to reach the web." )</label>
 					</div>
 				}
 				<div class="dino-area" @ref="DinoArea">
@@ -549,5 +549,5 @@
 			Shared.Act( action, args );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( Tabs.Revision, Navi.IsWatching, SharedState.Online, SharedState.DinoShown );
+	protected override int BuildHash() => System.HashCode.Combine( Tabs.Revision, Navi.IsWatching, SharedState.Online, SharedState.OfflineHint, SharedState.DinoShown );
 }

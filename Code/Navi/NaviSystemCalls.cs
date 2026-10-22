@@ -123,7 +123,7 @@ public static class NaviSystemCalls
 					.ToArray();
 
 			case "network.status":
-				return (computer.IsOnline, computer.IsOnline ? computer.IpAddress : "");
+				return (computer.IsOnline, computer.IsOnline ? computer.IpAddress : "", computer.HasNetworkCard);
 
 			case "audio.status":
 				return computer.HasAudio;

@@ -45,25 +45,34 @@ public sealed class WebBrowserSharedViewModel
 	{
 		try
 		{
-			NetworkChanged( await navi.Network.IsOnlineAsync() );
+			var status = await navi.Network.GetStatusAsync();
+			Apply( status.Online, status.OfflineHint );
 		}
 		catch ( Exception e )
 		{
 			Log.Warning( e, $"Web Browser: couldn't ask whether the computer is online: {e.Message}" );
-			NetworkChanged( false );
+			Apply( false, null );
 		}
 	}
 
 	/// <summary>
-	/// The computer went online or offline.
+	/// The computer went online or offline, or the player turned the network off or on. Asks why, for the notice.
 	/// </summary>
 	public void NetworkChanged( bool online )
 	{
-		if ( this.online == online )
+		Apply( online, UiState.OfflineHint );
+		_ = CheckNetworkAsync();
+	}
+
+	void Apply( bool online, string hint )
+	{
+		hint = online ? null : hint;
+
+		if ( this.online == online && UiState.OfflineHint == hint )
 			return;
 
 		this.online = online;
-		UiState = UiState with { Online = online };
+		UiState = UiState with { Online = online, OfflineHint = hint };
 	}
 
 	/// <summary>

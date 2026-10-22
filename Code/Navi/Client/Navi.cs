@@ -1123,7 +1123,20 @@ public sealed class Navi
 	/// <summary>
 	/// Whether the computer is on the network, and its IP address there (empty while it isn't).
 	/// </summary>
-	public sealed record NetworkStatus( bool Online, string Address );
+	/// <remarks>
+	/// <paramref name="HasCard"/> is whether the computer has a network card at all: offline with one, the player turned the
+	/// network off.
+	/// </remarks>
+	public sealed record NetworkStatus( bool Online, string Address, bool HasCard = true )
+	{
+		/// <summary>
+		/// What to tell the player so they can get back online: the way to turn the network on, or that a card is missing.
+		/// For an app to show after saying what it can't do offline.
+		/// </summary>
+		public string OfflineHint => HasCard
+			? "The network is turned off. Right-click the network icon in the taskbar and choose Go online."
+			: "This computer has no network card.";
+	}
 
 	/// <summary>
 	/// Starts the message of the error a call that needs the network gets on a computer that is offline.
@@ -1146,8 +1159,8 @@ public sealed class Navi
 	{
 		public async Task<NetworkStatus> GetStatusAsync()
 		{
-			var (online, address) = await navi.CallAsync<(bool, string)>( "network.status" );
-			return new NetworkStatus( online, address ?? "" );
+			var (online, address, hasCard) = await navi.CallAsync<(bool, string, bool)>( "network.status" );
+			return new NetworkStatus( online, address ?? "", hasCard );
 		}
 
 		/// <summary>

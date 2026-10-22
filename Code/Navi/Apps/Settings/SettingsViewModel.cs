@@ -267,7 +267,7 @@ public sealed class SettingsViewModel
 				SnapDistanceOptions = BuildSnapDistanceOptions(),
 				SnapsToAnything = snapToScreenEdges || snapToWindows,
 				NotificationApps = BuildNotificationApps(),
-				NetworkText = network.Online ? $"Online. This computer's IP address is {network.Address}." : "Offline. Install a network card to connect.",
+				NetworkText = network.Online ? $"Online. This computer's IP address is {network.Address}." : $"Offline. {network.OfflineHint}",
 				HardwareRows = hardware.OrderBy( x => x.Name ).Select( x => new HardwareRow( x.Enabled ? x.Name : $"{x.Name} (off)", x.Description, x.Icon ) ).ToArray(),
 			} );
 		}

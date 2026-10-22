@@ -199,7 +199,20 @@ public sealed class PackagesViewModel
 	/// <summary>Search again from the first entry, with whatever the field holds.</summary>
 	public void SubmitSearch() => _ = FetchStoreAsync( false );
 
-	const string NoNetworkText = "No network connection. This computer needs a network card to reach the Store.";
+	/// <summary>
+	/// Why the computer is offline and what to do about it, for the Store's status line.
+	/// </summary>
+	async Task<string> OfflineHintAsync()
+	{
+		try
+		{
+			return (await navi.Network.GetStatusAsync()).OfflineHint;
+		}
+		catch ( System.Exception )
+		{
+			return "This computer needs a network connection to reach the Store.";
+		}
+	}
 
 	/// <summary>
 	/// The computer went online or offline. A Store list that was shown is fetched again: offline it empties and says why,
@@ -385,7 +398,7 @@ public sealed class PackagesViewModel
 			// Nothing listed can be installed without the network, so the list goes.
 			storePackages = [];
 			total = 0;
-			status = NoNetworkText;
+			status = $"No network connection. {await OfflineHintAsync()}";
 		}
 		catch ( System.Exception e )
 		{
@@ -453,7 +466,8 @@ public sealed class PackagesViewModel
 		}
 		catch ( Navi.NoNetworkException )
 		{
-			Update( uiState => uiState with { Notice = $"Couldn't {what}: no network connection." } );
+			var hint = await OfflineHintAsync();
+			Update( uiState => uiState with { Notice = $"Couldn't {what}: no network connection. {hint}" } );
 		}
 		catch ( System.Exception e )
 		{

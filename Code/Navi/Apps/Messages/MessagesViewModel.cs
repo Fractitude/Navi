@@ -183,11 +183,12 @@ public sealed class MessagesViewModel
 		try
 		{
 			// Messages travel over the network. Offline there is nothing to fetch; back online everything is fetched again.
-			var online = await navi.Network.IsOnlineAsync();
-			if ( online == UiState.Offline )
+			var network = await navi.Network.GetStatusAsync();
+			var online = network.Online;
+			if ( online == UiState.Offline || (!online && UiState.OfflineHint != network.OfflineHint) )
 			{
 				knownVersion = int.MinValue;
-				Update( uiState => uiState with { Offline = !online, Notice = null } );
+				Update( uiState => uiState with { Offline = !online, OfflineHint = online ? null : network.OfflineHint, Notice = null } );
 			}
 
 			if ( !online )
@@ -290,6 +291,7 @@ public sealed class MessagesViewModel
 		}
 		catch ( Navi.NoNetworkException )
 		{
+			// The next poll says why; until then the panel shows only that it is offline.
 			Update( uiState => uiState with { Offline = true } );
 		}
 		catch ( System.Exception e )

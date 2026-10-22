@@ -59,6 +59,9 @@ public sealed record MessagesUiState
 	/// <summary>The computer has no network connection, so there are no messages to fetch or send.</summary>
 	public bool Offline { get; init; }
 
+	/// <summary>While offline: why, and what to do (<see cref="Navi.NetworkStatus.OfflineHint"/>), or null if not known yet.</summary>
+	public string OfflineHint { get; init; }
+
 	/// <summary>Somebody is in the seat. Without them there are no messages to show.</summary>
 	public bool SignedIn { get; init; }
 
