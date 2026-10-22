@@ -270,6 +270,8 @@
 	/// </summary>
 	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
 
+	protected override void OnNetworkChanged( bool online ) => ViewModel.NetworkChanged( online );
+
 	/// <summary>
 	/// The Store search field reports every edit here. Typing doesn't redraw the list; Enter does.
 	/// </summary>

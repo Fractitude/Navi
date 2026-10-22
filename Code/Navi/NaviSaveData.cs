@@ -46,6 +46,17 @@ public sealed class NaviComputerSave
 	public bool SnapToWindows { get; set; } = true;
 	public int SnapDistance { get; set; } = NaviComputer.DefaultSnapDistance;
 	public List<NaviWindowPlacement> WindowPlacements { get; set; } = new();
+
+	/// <summary>
+	/// Ids of the installed hardware (<see cref="NaviComputer.Hardware"/>). Null in a save from before Navi had hardware,
+	/// which then keeps what the scene set up.
+	/// </summary>
+	public List<string> Hardware { get; set; }
+
+	/// <summary>
+	/// The computer's IP address, given to it the first time it started (<see cref="NaviComputer.IpAddress"/>).
+	/// </summary>
+	public string IpAddress { get; set; } = "";
 }
 
 /// <summary>
@@ -286,6 +297,56 @@ public static class NaviSaveData
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"Navi: couldn't clean up drive '{drive.Id}': {e.Message}" );
+		}
+	}
+
+	static string AddressBookPath => $"navi/saves/{Slot}/addresses.json";
+
+	/// <summary>
+	/// The IP addresses given out in the current slot, to the save key (<see cref="NaviComputer.SaveKey"/>) of the computer
+	/// that has each. It spans scenes, so a computer in one scene never gets the address of one in another.
+	/// </summary>
+	public static Dictionary<string, string> ReadAddressBook()
+	{
+		if ( FileSystem.Data is not { } data || !data.FileExists( AddressBookPath ) )
+			return new();
+
+		try
+		{
+			return data.ReadJson<Dictionary<string, string>>( AddressBookPath ) ?? new();
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't read the address book: {e.Message}" );
+			return new();
+		}
+	}
+
+	/// <summary>
+	/// Record that the computer with <paramref name="saveKey"/> has <paramref name="address"/>, and no other address.
+	/// </summary>
+	public static void WriteAddress( string saveKey, string address )
+	{
+		if ( !IsPlainName( saveKey ) || !NaviNetwork.IsAddress( address ) || FileSystem.Data is not { } data )
+			return;
+
+		var book = ReadAddressBook();
+		if ( book.TryGetValue( address, out var owner ) && owner == saveKey && book.Count( x => x.Value == saveKey ) == 1 )
+			return;
+
+		foreach ( var old in book.Where( x => x.Value == saveKey ).Select( x => x.Key ).ToList() )
+			book.Remove( old );
+
+		book[address] = saveKey;
+
+		try
+		{
+			data.CreateDirectory( $"navi/saves/{Slot}" );
+			data.WriteJson( AddressBookPath, book );
+		}
+		catch ( System.Exception e )
+		{
+			Log.Warning( e, $"Navi: couldn't write the address book: {e.Message}" );
 		}
 	}
 

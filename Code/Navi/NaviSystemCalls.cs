@@ -102,9 +102,37 @@ public static class NaviSystemCalls
 			}
 		}
 
-		// Direct messages. The host has them, and they are the seated player's.
+		// Hardware, the network and the speakers. Every client has them in the host's state. Sound calls never fail: without
+		// a sound card they answer false and play nothing.
+		switch ( method )
+		{
+			case "hardware.list":
+				return computer.InstalledHardware
+					.Select( x => (x.Id, x.Name, x.Description ?? "", x.Icon ?? "", x.Capabilities?.ToArray() ?? []) )
+					.ToArray();
+
+			case "network.status":
+				return (computer.IsOnline, computer.IsOnline ? computer.IpAddress : "");
+
+			case "audio.status":
+				return computer.HasAudio;
+
+			case "audio.play":
+				return computer.PlayAppSound( window, Opt( args, 0, "" ), Opt( args, 1, 1f ) );
+
+			case "audio.beep":
+				return computer.AppBeep( window );
+		}
+
+		// Direct messages. The host has them, and they are the seated player's. They go over the network, except asking
+		// who the player is and whether anything changed.
 		if ( method.StartsWith( "messages." ) )
+		{
+			if ( method is not ("messages.version" or "messages.me") )
+				NaviNetwork.Require( computer );
+
 			return NaviMessageCalls.Run( computer, process, method, args );
+		}
 
 		// Files. The host has them; a client's own copy of an app gets an error.
 		if ( method.StartsWith( "files." ) )
@@ -272,6 +300,8 @@ public static class NaviSystemCalls
 			// The Store.
 			case "store.search":
 			{
+				NaviNetwork.Require( computer );
+
 				var (packages, total) = await NaviStore.SearchAsync(
 					Opt( args, 0, "" ), Opt( args, 1, 0 ), Opt( args, 2, NaviStore.PageSize ) );
 
@@ -286,6 +316,7 @@ public static class NaviSystemCalls
 
 			case "store.install":
 				Require( process, NaviPermissions.InstallFromStore );
+				NaviNetwork.Require( computer );
 				return await computer.InstallPackageAsync( Arg<string>( args, 0, method ) );
 
 			case "store.uninstall":

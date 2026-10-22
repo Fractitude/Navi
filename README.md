@@ -207,6 +207,9 @@ An app's panel derives from `NaviApp`, and its `Navi` property is the computer, 
 | `Navi.Files.OpenAsync( path )`, `OpenWithAsync( path, appId )`, `GetOpenersAsync( path )`, `TakeOpenedAsync()` | Open a file with the app for its kind, or with one of the apps that open it (the Files app offers them under "Open with..." when there are several); take the files opened with this app. See "Files" | a path the app can reach |
 | `Navi.Messages.GetMeAsync()`, `ListContactsAsync()`, `GetHistoryAsync( playerId, take )`, `SendAsync( playerId, text )`, `MarkReadAsync( playerId )`, `GetVersionAsync()` | The direct messages of the player in the seat. See "Messages" | `navi.messages.access` |
 | `Navi.Permissions.GetAsync()`, `RequestAsync`, `HasRootAsync` | See below | |
+| `Navi.Hardware.ListAsync()` | The hardware installed in the computer, with what each provides. See "Hardware" | |
+| `Navi.Network.GetStatusAsync()`, `IsOnlineAsync()` | Whether the computer is online, and its IP address | |
+| `Navi.Audio.PlayAsync( sound, volume )`, `BeepAsync()`, `IsAvailableAsync()` | Play a `.sound` from the computer, or beep. Never throws: without a sound card it answers false and plays nothing (a beep always plays) | |
 
 ## Asking before closing
 
@@ -241,6 +244,18 @@ var id = await Navi.Notifications.SendAsync( "Download finished", "notes.txt is 
 - **Limits.** The list keeps the newest 50, and 10 per app. An app dismisses only its own (`DismissAsync`). Uninstalling an app forgets its notifications and that it was muted.
 - **Saved and shared.** The list and the muted apps are saved with the computer, and sent to every client with its state. In a shared app only the host's copy should send; a client's own copy of an app that isn't shared sends nothing.
 - **Game code** can send one for any installed app with `NaviComputer.Notify( appId, title, text, sound )`, on the host.
+
+## Hardware
+
+What a computer can do beyond its own screen and files depends on its hardware. Navi comes with a **network card** (`navi/hardware/networkcard.nhw`) and a **sound card** (`soundcard.nhw`); a new computer has both.
+
+- **Hardware is an asset** (Navi Hardware, `.nhw`): a title, a description, an icon and the **capabilities** it provides. The computer only ever asks for a capability (`NaviComputer.HasCapability`), never for a particular card, so a game adds its own hardware (a USB modem, a better sound card) as an asset that provides `network` or `audio`, or a capability of its own. A hardware's id is its asset path, as with apps: don't move one once saves use it.
+- **Set in the inspector, changed by game code.** The computer's Hardware group lists what a new computer starts with. After that the save has it, and game code calls `InstallHardware( id )` / `RemoveHardware( id )` on the host. No app call or `User…` RPC can, so an app can't give itself a network card. Hardware isn't physical yet; a world item installed onto the computer would call the same methods. For testing: `navi_hardware`, `navi_hardware_install <name>`, `navi_hardware_remove <name>` (host only).
+- **Apps hear about it.** Every window of every app gets `OnHardwareChanged()`, and `OnNetworkChanged( online )` when the computer goes online or offline; they can also ask at any time (`Navi.Hardware`, `Navi.Network`, `Navi.Audio`). Game code implements `INaviHardwareEvents` on a component. Settings shows the hardware and the IP address on its Hardware page.
+- **Offline.** Without a network card every call that goes out fails with `Navi.NoNetworkException`: the Store's search and install (and `NaviComputer.InstallPackageAsync`), and Messages, except `GetMeAsync` and `GetVersionAsync`. Nothing is sent. Installed Store apps still load. The Web Browser shows Dino Run instead of the web, Packages and Messages say why they are empty. A new call that reaches another computer, a server or the internet must call `NaviNetwork.Require( computer )` first.
+- **IP addresses.** Each computer gets an address in `10.0.0.0/8` the first time it starts (`NaviComputer.IpAddress`), kept in its save and recorded in the save slot's address book (`navi/saves/{slot}/addresses.json`), so no two computers in the slot share one, across scenes too. Game code can give a computer a fixed one with `SetIpAddress` (a server the story points to). `NaviNetwork.Find( scene, address )` finds a computer by address; `NaviNetwork.Reach( from, address )` finds it only when both are online, which is what anything one computer does to another should use.
+- **Sound.** With a sound card an app plays sounds through `Navi.Audio.PlayAsync`, from the computer, for everyone near it, at most `MaxSoundsPerSecond` a second. Without one it plays nothing and answers false, never an exception, and notifications beep instead of playing their sound. `BeepAsync` (and `NaviComputer.Beep`) is the computer's own speaker: it works with no sound card, for telling the player something finished or needs them. In multiplayer the sound comes from the copy of the app the player hears: the host's for a shared app, the seated player's own for any other, which the host passes on to everyone else.
+- **It stops what goes through Navi, not hostile code.** An app's code can still use the engine's `WebPanel`, HTTP or `Sound` directly; the built-in apps don't. Every package's code shares one sandbox, so Navi can't prevent it.
 
 ## Files
 
@@ -328,7 +343,7 @@ A color that isn't a palette variable (a danger red, a warning yellow) is the sa
 The desktop's own chrome (windows, taskbar, menus, the wallpaper) is in `NaviDesktop.razor.scss`, where Glass also gets its blur (`backdrop-filter-blur`) and its fill transparency from the `blur-N` and `clear-N` classes.
 ## Saving
 
-Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, settings such as the display scale and the theme, the notification list and muted apps, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
+Each `NaviComputer` saves what the player changed on it: installed apps and Store packages, granted permissions, accepted root, its hardware and IP address, settings such as the display scale and the theme, the notification list and muted apps, and where each window was. Open windows and the apps running in the tray aren't saved: after a load, headless apps are not running until the player opens them. The save goes to the game's local data (`FileSystem.Data`), in `navi/saves/{slot}/{computer}.json`.
 
 - **Windows open where they were.** Like a window manager, the computer remembers each window's position, size and whether it was maximized (`WindowPlacements`, one per window key) when it closes and when the computer saves, and opens it there next time. Apps don't do anything for it and can't set it. What the app's manifest no longer allows (resizing, maximizing) is dropped, and the desktop keeps the window inside the screen. Uninstalling an app forgets its windows. Only the host keeps placements; clients aren't sent them.
 - **Automatic by default.** With `AutoSave` on, a computer loads its save when it starts, replacing what the scene set up. It saves a second after a change, and again when it is disabled.

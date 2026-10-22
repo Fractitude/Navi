@@ -1,0 +1,10 @@
+{
+  "Title": "Sound Card",
+  "Description": "Lets the computer play sounds. Without one it can only beep.",
+  "Icon": "speaker",
+  "Capabilities": [
+    "audio"
+  ],
+  "__references": [],
+  "__version": 0
+}

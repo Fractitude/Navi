@@ -24,6 +24,14 @@
 			}
 		</div>
 	}
+	else if ( UiState.Offline )
+	{
+		<div class="gate">
+			<i>wifi_off</i>
+			<div class="heading">No network connection</div>
+			<div class="hint">This computer needs a network card to send and receive messages.</div>
+		</div>
+	}
 	else if ( !UiState.SignedIn )
 	{
 		<div class="gate">

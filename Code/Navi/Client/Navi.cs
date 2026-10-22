@@ -76,6 +76,23 @@ public abstract class NaviApp : Panel
 	{
 	}
 
+	/// <summary>
+	/// Hardware was installed in or removed from the computer. Ask <see cref="Navi.Hardware"/>, <see cref="Navi.Network"/>
+	/// or <see cref="Navi.Audio"/> what it has now. Every window of every app gets it, on the copy that runs here.
+	/// </summary>
+	protected virtual void OnHardwareChanged()
+	{
+	}
+
+	/// <summary>
+	/// The computer went online or offline: a network card was installed or taken out. Offline, every call that goes out
+	/// (the Store, Messages) throws <see cref="Navi.NoNetworkException"/>, and the app should stop trying until it is
+	/// online again. Comes after <see cref="OnHardwareChanged"/>.
+	/// </summary>
+	protected virtual void OnNetworkChanged( bool online )
+	{
+	}
+
 	protected override void OnEvent( PanelEvent e )
 	{
 		if ( Navi.TryGetAction( e, out var action, out var args ) )
@@ -106,6 +123,20 @@ public abstract class NaviApp : Panel
 			return;
 		}
 
+		if ( Navi.TryGetHardwareChange( e ) )
+		{
+			OnHardwareChanged();
+			e.StopPropagation();
+			return;
+		}
+
+		if ( Navi.TryGetNetworkChange( e, out var online ) )
+		{
+			OnNetworkChanged( online );
+			e.StopPropagation();
+			return;
+		}
+
 		base.OnEvent( e );
 	}
 }
@@ -132,6 +163,9 @@ public sealed class Navi
 		Files = new FileCalls( this );
 		Messages = new MessageCalls( this );
 		Camera = new CameraCalls( this );
+		Hardware = new HardwareCalls( this );
+		Network = new NetworkCalls( this );
+		Audio = new AudioCalls( this );
 		Input = new InputState( this );
 	}
 
@@ -186,6 +220,21 @@ public sealed class Navi
 	public CameraCalls Camera { get; }
 
 	/// <summary>
+	/// The hardware installed in the computer.
+	/// </summary>
+	public HardwareCalls Hardware { get; }
+
+	/// <summary>
+	/// Whether the computer is online, and its address.
+	/// </summary>
+	public NetworkCalls Network { get; }
+
+	/// <summary>
+	/// The computer's speakers.
+	/// </summary>
+	public AudioCalls Audio { get; }
+
+	/// <summary>
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
 	/// </summary>
 	public InputState Input { get; }
@@ -228,6 +277,11 @@ public sealed class Navi
 			when ( e is not MissingPermissionException && e.Message.StartsWith( MissingPrefix ) )
 		{
 			throw new MissingPermissionException( e.Message[MissingPrefix.Length..], e );
+		}
+		catch ( InvalidOperationException e )
+			when ( e is not NoNetworkException && e.Message.StartsWith( NoNetworkPrefix ) )
+		{
+			throw new NoNetworkException( e );
 		}
 		catch ( InvalidOperationException e )
 			when ( e is not FileException && FileException.TryParse( e.Message, out var error, out var path ) )
@@ -364,6 +418,27 @@ public sealed class Navi
 
 		action = null;
 		args = null;
+		return false;
+	}
+
+	/// <summary>
+	/// Is this event the computer's hardware changing? See <see cref="TryGetAction"/> and <see cref="NaviApp.OnHardwareChanged"/>.
+	/// </summary>
+	public static bool TryGetHardwareChange( PanelEvent e ) => e.Name == "navi.hardware";
+
+	/// <summary>
+	/// Is this event the computer going online or offline? See <see cref="TryGetAction"/> and
+	/// <see cref="NaviApp.OnNetworkChanged"/>.
+	/// </summary>
+	public static bool TryGetNetworkChange( PanelEvent e, out bool online )
+	{
+		if ( e.Name == "navi.network" && e.Value is bool value )
+		{
+			online = value;
+			return true;
+		}
+
+		online = false;
 		return false;
 	}
 
@@ -859,6 +934,109 @@ public sealed class Navi
 		/// <see cref="GetViewAsync"/> has to have been asked for a moment ago.
 		/// </summary>
 		public Task<byte[]> TakePhotoAsync() => navi.CallAsync<byte[]>( "camera.photo" );
+	}
+
+	// Hardware.
+
+	/// <summary>
+	/// What hardware can provide. A computer is online with <see cref="Network"/> and plays sounds with <see cref="Audio"/>;
+	/// a game may add its own.
+	/// </summary>
+	public static class Capability
+	{
+		public const string Network = "network";
+		public const string Audio = "audio";
+	}
+
+	/// <summary>
+	/// A piece of hardware installed in the computer, and the <see cref="Capability"/> values it provides.
+	/// </summary>
+	public sealed record HardwareInfo( string Id, string Name, string Description, string Icon, IReadOnlyList<string> Capabilities );
+
+	/// <summary>
+	/// The hardware installed in the computer. The game installs and removes it; apps hear of it in
+	/// <see cref="NaviApp.OnHardwareChanged"/>.
+	/// </summary>
+	public sealed class HardwareCalls( Navi navi )
+	{
+		public async Task<IReadOnlyList<HardwareInfo>> ListAsync()
+		{
+			var list = await navi.CallAsync<(string, string, string, string, string[])[]>( "hardware.list" );
+			return list.Select( x => new HardwareInfo( x.Item1, x.Item2, x.Item3, x.Item4, x.Item5 ) ).ToArray();
+		}
+	}
+
+	/// <summary>
+	/// Whether the computer is on the network, and its IP address there (empty while it isn't).
+	/// </summary>
+	public sealed record NetworkStatus( bool Online, string Address );
+
+	/// <summary>
+	/// Starts the message of the error a call that needs the network gets on a computer that is offline.
+	/// </summary>
+	public const string NoNetworkPrefix = "No network: ";
+
+	/// <summary>
+	/// A call that goes over the network (the Store, Messages) failed because the computer has no network connection: it
+	/// has no network card. Nothing was sent. Check <see cref="NetworkCalls.GetStatusAsync"/> first, or wait for
+	/// <see cref="NaviApp.OnNetworkChanged"/>.
+	/// </summary>
+	public sealed class NoNetworkException( Exception inner = null )
+		: InvalidOperationException( NoNetworkPrefix + "this computer has no network connection.", inner );
+
+	/// <summary>
+	/// The computer's network connection. A computer without a network card is offline: it can't reach the Store, Messages
+	/// or other computers, and those calls throw <see cref="NoNetworkException"/>.
+	/// </summary>
+	public sealed class NetworkCalls( Navi navi )
+	{
+		public async Task<NetworkStatus> GetStatusAsync()
+		{
+			var (online, address) = await navi.CallAsync<(bool, string)>( "network.status" );
+			return new NetworkStatus( online, address ?? "" );
+		}
+
+		/// <summary>
+		/// Is the computer online?
+		/// </summary>
+		public async Task<bool> IsOnlineAsync() => (await GetStatusAsync()).Online;
+	}
+
+	/// <summary>
+	/// The computer's speakers. Sounds play from the computer, for everyone near it. Without a sound card the computer
+	/// plays no sounds, only a beep. Nothing here throws: a sound that can't play is just not played.
+	/// </summary>
+	public sealed class AudioCalls( Navi navi )
+	{
+		/// <summary>
+		/// Does the computer have a sound card?
+		/// </summary>
+		public Task<bool> IsAvailableAsync() => Quietly( "audio.status" );
+
+		/// <summary>
+		/// Play a sound (a <c>.sound</c> resource path, e.g. "sounds/kenney/ui/ui.button.press.sound") at
+		/// <paramref name="volume"/> (0 to 1). Returns false, playing nothing, without a sound card, or when the app plays
+		/// too many at once.
+		/// </summary>
+		public Task<bool> PlayAsync( string sound, float volume = 1f ) => Quietly( "audio.play", sound ?? "", volume );
+
+		/// <summary>
+		/// Beep from the computer's own speaker, which works without a sound card. For telling the player something finished
+		/// or needs them. Returns false if the computer beeped a moment ago.
+		/// </summary>
+		public Task<bool> BeepAsync() => Quietly( "audio.beep" );
+
+		async Task<bool> Quietly( string method, params object[] args )
+		{
+			try
+			{
+				return await navi.CallAsync( method, args ) is true;
+			}
+			catch ( Exception )
+			{
+				return false;
+			}
+		}
 	}
 
 	/// <summary>

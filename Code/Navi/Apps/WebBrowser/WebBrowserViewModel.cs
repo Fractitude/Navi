@@ -42,6 +42,35 @@ public sealed class WebBrowserViewModel
 	{
 		this.navi = navi;
 		UiState = new WebBrowserUiState { Url = Home, LoadId = 1, AddressText = Home };
+		_ = CheckNetworkAsync();
+	}
+
+	async System.Threading.Tasks.Task CheckNetworkAsync()
+	{
+		try
+		{
+			NetworkChanged( await navi.Network.IsOnlineAsync() );
+		}
+		catch ( Exception e )
+		{
+			Log.Warning( e, $"Web Browser: couldn't ask whether the computer is online: {e.Message}" );
+			NetworkChanged( false );
+		}
+	}
+
+	/// <summary>
+	/// The computer went online or offline. Back online, the open page loads again.
+	/// </summary>
+	public void NetworkChanged( bool online )
+	{
+		if ( UiState.Online == online )
+			return;
+
+		// Offline there is no page to take the title from. Back online, the page sets it again.
+		if ( !online )
+			ChangeTitle( "No internet" );
+
+		Update( uiState => uiState with { Online = online, LoadId = uiState.LoadId + 1, Notice = null } );
 	}
 
 	/// <summary>

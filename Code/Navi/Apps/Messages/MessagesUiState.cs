@@ -56,6 +56,9 @@ public sealed record MessagesUiState
 	/// <summary>The app lacks the permission to read messages: the panel offers to ask.</summary>
 	public bool NeedsPermission { get; init; }
 
+	/// <summary>The computer has no network connection, so there are no messages to fetch or send.</summary>
+	public bool Offline { get; init; }
+
 	/// <summary>Somebody is in the seat. Without them there are no messages to show.</summary>
 	public bool SignedIn { get; init; }
 

@@ -1,0 +1,10 @@
+{
+  "Title": "Network Card",
+  "Description": "Connects the computer to the network: the Store, Messages, the web and other computers.",
+  "Icon": "lan",
+  "Capabilities": [
+    "network"
+  ],
+  "__references": [],
+  "__version": 0
+}

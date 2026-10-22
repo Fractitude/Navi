@@ -25,6 +25,12 @@ public sealed record WebBrowserUiState
 	public bool CanGoBack { get; init; }
 	public bool CanGoForward { get; init; }
 
+	/// <summary>
+	/// Whether the computer is online, once it has said. Until then, and while it is offline, no page is drawn: a computer
+	/// without a network card can't reach the web.
+	/// </summary>
+	public bool? Online { get; init; }
+
 	/// <summary>A message about the last thing the player tried, e.g. an address that can't be opened. Null for none.</summary>
 	public string Notice { get; init; }
 }

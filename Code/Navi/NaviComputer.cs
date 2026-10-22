@@ -594,7 +594,10 @@ public sealed partial class NaviComputer : Component
 		if ( Files is null )
 			LoadFiles( read: AutoSave );
 
+		EnsureIpAddress();
+
 		hasNotifications = true;
+		hasHardware = true;
 	}
 
 	/// <summary>
@@ -737,6 +740,8 @@ public sealed partial class NaviComputer : Component
 		UpdateNetwork();
 		UpdateNotificationArrivals();
 		UpdateCamera();
+		UpdateHardwareEvents();
+		UpdateBeeps();
 
 		if ( !IsAuthority )
 			return;
@@ -763,6 +768,7 @@ public sealed partial class NaviComputer : Component
 		solidCollider = null;
 
 		DestroyCamera();
+		UpdateBeeps( all: true );
 
 		// On clients this runs when the computer goes out of range too, and the stand-in must stay for that. The host's
 		// computer is never out of range, so here it was really turned off.
@@ -848,8 +854,12 @@ public sealed partial class NaviComputer : Component
 		savedJson = Json.Serialize( CaptureSave() );
 		savedVersion = Version;
 
-		// After the saved state is recorded, so what this installs counts as a change and is saved.
+		// After the saved state is recorded, so what this installs counts as a change and is saved. So does an address
+		// given out now, to a save that had none.
 		InstallSceneApps();
+
+		if ( IpAddress != (save.IpAddress ?? "") )
+			Version++;
 
 		_ = DownloadInstalledPackagesAsync();
 		return true;
@@ -893,6 +903,8 @@ public sealed partial class NaviComputer : Component
 		SnapToWindows = SnapToWindows,
 		SnapDistance = SnapDistance,
 		WindowPlacements = placements ? CapturePlacements() : new(),
+		Hardware = InstalledHardware.Select( x => x.Id ).ToList(),
+		IpAddress = IpAddress ?? "",
 	};
 
 	/// <summary>
@@ -914,8 +926,11 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void RestoreSave( NaviComputerSave save )
 	{
-		if ( IsAuthority )
-			ApplySave( save );
+		if ( !IsAuthority )
+			return;
+
+		ApplySave( save );
+		EnsureIpAddress();
 	}
 
 	void ApplySave( NaviComputerSave save )
@@ -930,6 +945,8 @@ public sealed partial class NaviComputer : Component
 		StartFavorites = save.StartFavorites?.Distinct().ToList() ?? new();
 		InstalledAt = save.InstalledAt is null ? new() : new( save.InstalledAt );
 		ApplyNotifications( save );
+		ApplyHardware( save );
+		IpAddress = NaviNetwork.IsAddress( save.IpAddress ) ? save.IpAddress : "";
 
 		// A lock needs its salt, and on the host its verifier: clients are never sent that one.
 		var hasLock = System.Enum.IsDefined( save.LockKind ) && save.LockKind != NaviLockKind.None
@@ -1191,12 +1208,12 @@ public sealed partial class NaviComputer : Component
 	public IEnumerable<string> DownloadingPackages => downloading;
 
 	/// <summary>
-	/// Download an app from the Store and install it. Returns false if the download failed, or the game doesn't allow
-	/// the package (<see cref="NaviStore.IsAllowed"/>).
+	/// Download an app from the Store and install it. Returns false if the computer is offline (<see cref="IsOnline"/>), the
+	/// download failed, or the game doesn't allow the package (<see cref="NaviStore.IsAllowed"/>).
 	/// </summary>
 	public async Task<bool> InstallPackageAsync( string packageIdent )
 	{
-		if ( !IsAuthority || !NaviStore.IsAllowed( packageIdent ) || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
+		if ( !IsAuthority || !IsOnline || !NaviStore.IsAllowed( packageIdent ) || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
 			return false;
 
 		var app = await DownloadPackageAsync( packageIdent );

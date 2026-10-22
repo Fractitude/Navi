@@ -182,6 +182,17 @@ public sealed class MessagesViewModel
 
 		try
 		{
+			// Messages travel over the network. Offline there is nothing to fetch; back online everything is fetched again.
+			var online = await navi.Network.IsOnlineAsync();
+			if ( online == UiState.Offline )
+			{
+				knownVersion = int.MinValue;
+				Update( uiState => uiState with { Offline = !online, Notice = null } );
+			}
+
+			if ( !online )
+				return;
+
 			var version = await navi.Messages.GetVersionAsync();
 
 			// What is on screen is what the player has read: while the window is in front, an open conversation is read.
@@ -276,6 +287,10 @@ public sealed class MessagesViewModel
 		catch ( Navi.MissingPermissionException )
 		{
 			Update( uiState => uiState with { NeedsPermission = true } );
+		}
+		catch ( Navi.NoNetworkException )
+		{
+			Update( uiState => uiState with { Offline = true } );
 		}
 		catch ( System.Exception e )
 		{

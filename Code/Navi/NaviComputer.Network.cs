@@ -478,6 +478,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 		permissionRequests.Clear();
 		permissionRequests.AddRange( requests );
 		hasNotifications = true;
+		hasHardware = true;
 		Version++;
 	}
 

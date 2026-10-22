@@ -27,6 +27,7 @@ public sealed class SettingsViewModel
 		(SettingsCategory.Windows, "Windows", "web_asset"),
 		(SettingsCategory.Notifications, "Notifications", "notifications"),
 		(SettingsCategory.Security, "Security", "shield"),
+		(SettingsCategory.Hardware, "Hardware", "memory"),
 	];
 
 	/// <summary>The distances the Windows page offers for snapping, in panel pixels.</summary>
@@ -49,6 +50,8 @@ public sealed class SettingsViewModel
 
 	IReadOnlyList<Navi.AppInfo> apps = [];
 	IReadOnlyList<Navi.NotificationApp> notificationApps = [];
+	IReadOnlyList<Navi.HardwareInfo> hardware = [];
+	Navi.NetworkStatus network = new( false, "" );
 
 	/// <summary>The computer's version when the settings were last fetched. They are fetched again when it changes.</summary>
 	int? knownVersion;
@@ -247,6 +250,8 @@ public sealed class SettingsViewModel
 			(snapToScreenEdges, snapToWindows, snapDistance) = await navi.Settings.GetSnappingAsync();
 			apps = await navi.Apps.ListAsync();
 			notificationApps = await navi.Notifications.ListAppsAsync();
+			hardware = await navi.Hardware.ListAsync();
+			network = await navi.Network.GetStatusAsync();
 
 			Update( uiState => uiState with
 			{
@@ -262,6 +267,8 @@ public sealed class SettingsViewModel
 				SnapDistanceOptions = BuildSnapDistanceOptions(),
 				SnapsToAnything = snapToScreenEdges || snapToWindows,
 				NotificationApps = BuildNotificationApps(),
+				NetworkText = network.Online ? $"Online. This computer's IP address is {network.Address}." : "Offline. Install a network card to connect.",
+				HardwareRows = hardware.OrderBy( x => x.Name ).Select( x => new HardwareRow( x.Name, x.Description, x.Icon ) ).ToArray(),
 			} );
 		}
 		catch ( System.Exception e )

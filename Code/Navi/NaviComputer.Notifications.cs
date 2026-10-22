@@ -52,7 +52,8 @@ public sealed partial class NaviComputer
 	[Property] public List<string> MutedNotificationApps { get; set; } = new();
 
 	/// <summary>
-	/// The sound a notification plays when its app asks for one. Empty plays the engine's message pop.
+	/// The sound a notification plays when its app asks for one. Empty plays the engine's message pop. It needs a sound card
+	/// (<see cref="HasAudio"/>); without one the computer beeps instead.
 	/// </summary>
 	[Property] public SoundEvent NotificationSound { get; set; }
 
@@ -304,9 +305,14 @@ public sealed partial class NaviComputer
 		}
 	}
 
+	/// <summary>
+	/// The notification sound, or without a sound card (<see cref="HasAudio"/>) a beep from the computer's own speaker.
+	/// </summary>
 	void PlayNotificationSound()
 	{
-		if ( NotificationSound is not null )
+		if ( !HasAudio )
+			PlayLocalBeep();
+		else if ( NotificationSound is not null )
 			Sound.Play( NotificationSound, WorldPosition );
 		else
 			Sound.Play( DefaultNotificationSound, WorldPosition );

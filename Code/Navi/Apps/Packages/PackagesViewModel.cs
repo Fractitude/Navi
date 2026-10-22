@@ -199,6 +199,18 @@ public sealed class PackagesViewModel
 	/// <summary>Search again from the first entry, with whatever the field holds.</summary>
 	public void SubmitSearch() => _ = FetchStoreAsync( false );
 
+	const string NoNetworkText = "No network connection. This computer needs a network card to reach the Store.";
+
+	/// <summary>
+	/// The computer went online or offline. A Store list that was shown is fetched again: offline it empties and says why,
+	/// online it fills.
+	/// </summary>
+	public void NetworkChanged( bool online )
+	{
+		if ( storeLoaded )
+			_ = FetchStoreAsync( false );
+	}
+
 	/// <summary>Fetch the page of the Store after the entries listed.</summary>
 	public void LoadMore() => _ = FetchStoreAsync( true );
 
@@ -368,6 +380,13 @@ public sealed class PackagesViewModel
 				: text.Length > 0 ? "No apps found matching your filter."
 				: "No apps have been published yet.";
 		}
+		catch ( Navi.NoNetworkException )
+		{
+			// Nothing listed can be installed without the network, so the list goes.
+			storePackages = [];
+			total = 0;
+			status = NoNetworkText;
+		}
 		catch ( System.Exception e )
 		{
 			Log.Warning( e, $"Packages: Store search failed: {e.Message}" );
@@ -399,7 +418,8 @@ public sealed class PackagesViewModel
 			// What was installed when the app was downloaded, before the backend's word on the latest.
 			installedVersions[ident] = NaviStore.InstalledVersion( ident );
 
-			if ( await Package.FetchAsync( ident, false ) is { } full )
+			// The computer has no way out without a network card, so the backend isn't asked either.
+			if ( await navi.Network.IsOnlineAsync() && await Package.FetchAsync( ident, false ) is { } full )
 				details[ident] = full;
 		}
 		catch ( System.Exception e )
@@ -430,6 +450,10 @@ public sealed class PackagesViewModel
 		catch ( System.UnauthorizedAccessException )
 		{
 			Update( uiState => uiState with { Notice = $"Packages isn't allowed to {what}." } );
+		}
+		catch ( Navi.NoNetworkException )
+		{
+			Update( uiState => uiState with { Notice = $"Couldn't {what}: no network connection." } );
 		}
 		catch ( System.Exception e )
 		{

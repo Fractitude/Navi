@@ -137,6 +137,33 @@
 				</div>
 				break;
 
+			case SettingsCategory.Hardware:
+				<div class="heading">Hardware</div>
+
+				<div class="setting">
+					<div class="name">Network</div>
+					<div class="description">@UiState.NetworkText</div>
+				</div>
+
+				<div class="setting">
+					<div class="name">Installed</div>
+					<div class="description">The game installs and removes hardware. Apps can't.</div>
+				</div>
+
+				@foreach ( var row in UiState.HardwareRows )
+				{
+					<div class="app-row" tooltip=@row.Description>
+						<div class="icon"><i>@row.Icon</i></div>
+						<div class="name">@row.Name</div>
+					</div>
+				}
+
+				@if ( UiState.HardwareRows.Count == 0 )
+				{
+					<div class="empty">No hardware is installed.</div>
+				}
+				break;
+
 			case SettingsCategory.Theming:
 				<div class="heading">Theming</div>
 

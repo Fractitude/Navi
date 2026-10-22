@@ -94,6 +94,113 @@
 		}
 	}
 
+	// Offline: Dino Run, under a line saying why there is no page.
+	.offline
+	{
+		flex-grow: 1;
+		flex-shrink: 1;
+		min-height: 0;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 8px;
+		overflow: hidden;
+	}
+
+	.offline-text
+	{
+		flex-shrink: 0;
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+		font-size: 11px;
+		color: $ink-t;
+
+		i
+		{
+			font-size: 18px;
+		}
+	}
+
+	// The board is drawn at the game's own size, in game units, and scaled to fit by the panel. Every sprite is panels
+	// laid out by hand.
+	.dino-run
+	{
+		position: relative;
+		flex-shrink: 0;
+		overflow: hidden;
+		cursor: pointer;
+		transform-origin: 50% 50%;
+		font-family: monospace;
+
+		.sprite, .px, .ground, .bump, .obstacle, .dino, .score, .message
+		{
+			position: absolute;
+		}
+
+		.px, .ground, .bump
+		{
+			background-color: $ink-t;
+		}
+
+		.ground
+		{
+			left: 0;
+			width: 100%;
+			height: 1px;
+		}
+
+		.bump
+		{
+			height: 1px;
+		}
+
+		.cloud .px
+		{
+			opacity: 0.35;
+		}
+
+		.hidden
+		{
+			display: none;
+		}
+
+		.score
+		{
+			top: 2px;
+			right: 4px;
+			font-size: 8px;
+			color: $ink-t;
+		}
+
+		.message
+		{
+			top: 26px;
+			width: 100%;
+			text-align: center;
+			letter-spacing: 1px;
+			font-size: 9px;
+			font-weight: 700;
+			color: $ink-t;
+		}
+
+		// Night: the colors swap, as in Chrome.
+		&.night
+		{
+			background-color: $ink-t;
+
+			.px, .ground, .bump
+			{
+				background-color: $paper-bg;
+			}
+
+			.score, .message
+			{
+				color: $paper-bg;
+			}
+		}
+	}
+
 	// The web page takes the rest of the window. White, because a page without a background of its own is drawn on it.
 	.page
 	{

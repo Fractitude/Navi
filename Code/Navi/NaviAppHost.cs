@@ -65,6 +65,18 @@ public static class NaviEvents
 	/// on the app's panel. See <c>NaviApp.OnCloseRequested</c>.
 	/// </summary>
 	public const string CloseRequest = "navi.close-request";
+
+	/// <summary>
+	/// Hardware was installed in or removed from the computer. Raised on every panel of every app. See
+	/// <c>NaviApp.OnHardwareChanged</c>.
+	/// </summary>
+	public const string Hardware = "navi.hardware";
+
+	/// <summary>
+	/// The computer went online or offline, raised on every panel of every app with whether it is online now. See
+	/// <c>NaviApp.OnNetworkChanged</c>.
+	/// </summary>
+	public const string Network = "navi.network";
 }
 
 /// <summary>
@@ -323,6 +335,24 @@ public sealed class NaviAppHost : Panel
 
 		app.CreateEvent( new PanelEvent( NaviEvents.CloseRequest, app ) );
 		return true;
+	}
+
+	/// <summary>
+	/// On this client: tell the app's copy the computer's hardware changed. A viewer's copy only draws, so it isn't told.
+	/// </summary>
+	internal void DeliverHardwareChanged()
+	{
+		if ( app is not null && app.IsValid && !viewer )
+			app.CreateEvent( new PanelEvent( NaviEvents.Hardware, app ) );
+	}
+
+	/// <summary>
+	/// On this client: tell the app's copy the computer went online or offline.
+	/// </summary>
+	internal void DeliverNetworkChanged( bool online )
+	{
+		if ( app is not null && app.IsValid && !viewer )
+			app.CreateEvent( new PanelEvent( NaviEvents.Network, app ) { Value = online } );
 	}
 
 	/// <summary>

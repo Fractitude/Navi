@@ -2,8 +2,9 @@
 @inherits NaviApp
 @namespace NaviApps
 
-@* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. It makes no calls to *@
-@* the computer but the window title. The page itself is the engine's WebPanel. *@
+@* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. It asks the computer *@
+@* only whether it is online, and sets the window title. The page itself is the engine's WebPanel. Offline it shows Dino *@
+@* Run instead (DinoRunGame), as Chrome does. *@
 @* It isn't shared: a web page is drawn from the client's own pixels, so each player browses on their own copy. *@
 
 <root>
@@ -44,7 +45,20 @@
 			</div>
 		}
 
-		<WebPanel @ref="Web" class="page"/>
+		@if ( UiState.Online is false )
+		{
+			<div class="offline" @ref="Offline">
+				<div class="offline-text">
+					<i>wifi_off</i>
+					<label>No internet. This computer needs a network card to reach the web.</label>
+				</div>
+				<DinoRunBoard @ref="Board" Clicked=@( () => Dino.Click() )></DinoRunBoard>
+			</div>
+		}
+		else if ( UiState.Online is true )
+		{
+			<WebPanel @ref="Web" class="page"/>
+		}
 	}
 </root>
 
@@ -63,6 +77,15 @@
 
 	WebPanel Web;
 
+	Panel Offline;
+	DinoRunBoard Board;
+	float boardScale;
+
+	/// <summary>
+	/// The offline game. Made the first time the computer is offline, and kept, so a best score lasts while the window does.
+	/// </summary>
+	DinoRunGame Dino => field ??= new(Navi);
+
 	/// <summary>The <see cref="WebBrowserUiState.LoadId"/> the page was last told to load.</summary>
 	int loadedId = -1;
 
@@ -73,6 +96,13 @@
 	public override void Tick()
 	{
 		base.Tick();
+
+		if ( UiState.Online is false && !Navi.IsWatching && Board.IsValid() )
+		{
+			Dino.Tick( Time.Delta, Navi.HasInput );
+			Board.DrawFrame( Dino.Frame );
+			ScaleBoard();
+		}
 
 		if ( Navi.IsWatching || !Web.IsValid() )
 		{
@@ -88,6 +118,28 @@
 		}
 
 		ViewModel.PageChanged( Web.Surface?.Url, Web.Surface?.PageTitle );
+	}
+
+	/// <summary>
+	/// Scale the game to the widest it fits in the page. Layout boxes ignore transforms, so the board keeps its own size to
+	/// measure, and the page centers it. What the panel does to its own tree, like Pac-Man's frame.
+	/// </summary>
+	void ScaleBoard()
+	{
+		if ( !Offline.IsValid() || Offline.Box.Rect.Width <= 0f || Board.Box.Rect.Width <= 0f )
+			return;
+
+		// The text above the game takes some of the height.
+		var scale = System.MathF.Min( Offline.Box.Rect.Width * 0.95f / Board.Box.Rect.Width,
+			Offline.Box.Rect.Height * 0.7f / Board.Box.Rect.Height );
+
+		if ( !float.IsFinite( scale ) || scale <= 0f || System.MathF.Abs( scale - boardScale ) < 0.001f )
+			return;
+
+		boardScale = scale;
+		var transform = new PanelTransform();
+		transform.AddScale( scale );
+		Board.Style.Transform = transform;
 	}
 
 	/// <summary>
@@ -109,6 +161,8 @@
 	/// The address field reports every edit here. Typing doesn't redraw; Enter loads.
 	/// </summary>
 	void AddressEdited( string text ) => ViewModel.SetAddressText( text );
+
+	protected override void OnNetworkChanged( bool online ) => ViewModel.NetworkChanged( online );
 
 	protected override int BuildHash() => System.HashCode.Combine( ViewModel.Revision, Navi.IsWatching );
 }

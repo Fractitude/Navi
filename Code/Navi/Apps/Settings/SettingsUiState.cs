@@ -10,6 +10,7 @@ public enum SettingsCategory
 	Windows,
 	Notifications,
 	Security,
+	Hardware,
 }
 
 /// <summary>
@@ -32,6 +33,11 @@ public sealed record ThemeOption( int Value, string Label, bool Selected );
 /// An app on the Notifications page, with its two choices: On, and Muted.
 /// </summary>
 public sealed record NotificationAppRow( string AppId, string Name, string Icon, string Color, IReadOnlyList<ThemeOption> Options );
+
+/// <summary>
+/// A piece of hardware on the Hardware page.
+/// </summary>
+public sealed record HardwareRow( string Name, string Description, string Icon );
 
 /// <summary>
 /// Everything the Settings panel draws. Replaced whole by <see cref="SettingsViewModel"/> on every change.
@@ -79,6 +85,12 @@ public sealed record SettingsUiState
 
 	/// <summary>Notifications: every installed app, by name, each with whether it is muted.</summary>
 	public IReadOnlyList<NotificationAppRow> NotificationApps { get; init; } = [];
+
+	/// <summary>Hardware: whether the computer is online, and its address, as a line.</summary>
+	public string NetworkText { get; init; } = "";
+
+	/// <summary>Hardware: what is installed, by name.</summary>
+	public IReadOnlyList<HardwareRow> HardwareRows { get; init; } = [];
 
 	/// <summary>A message about the last change that failed, or null. Clicking it dismisses it.</summary>
 	public string Notice { get; init; }
