@@ -251,13 +251,16 @@
 				<div class="confirm-title">Resolve conflicts</div>
 				<div class="confirm-text">Some files with the same name already exist in this folder.</div>
 
-				<div class="conflict-all">
-					<div class="conflict-label">All</div>
-					@foreach ( var (choice, label) in ConflictChoices )
-					{
-						<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.SetConflictAction, "-1", choice ) )>@label</div>
-					}
-				</div>
+				@if ( conflict.Items.Count > 1 )
+				{
+					<div class="conflict-all">
+						<div class="conflict-label">All</div>
+						@foreach ( var (choice, label) in ConflictChoices )
+						{
+							<div class="tool wide" @onclick=@( () => Navi.Act( FilesViewModel.SetConflictAction, "-1", choice ) )>@label</div>
+						}
+					</div>
+				}
 
 				<div class="conflict-list">
 					@for ( var i = 0; i < conflict.Items.Count; i++ )
