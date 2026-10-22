@@ -11,7 +11,9 @@ namespace Sandbox;
 /// The seated player's client asks as the app, like every remote read (<see cref="ReadRemoteFiles"/>), with the app's
 /// permissions. A client watching the screen may ask only for the pictures a shared app's host copy listed last
 /// (<see cref="UserWatchThumbnail"/>), which that app draws for everyone near the screen: a watcher can't reach anything
-/// the screen doesn't show, and is never sent anything but a thumbnail.
+/// the screen doesn't show, and is never sent anything but a thumbnail. The one exception is the preview of the single
+/// picture a shared app's host copy asked for last (<c>files.preview</c>, a picture viewer's open image), made small
+/// enough to send but big enough to look at (<see cref="PreviewSize"/>).
 /// </para>
 /// </remarks>
 public sealed partial class NaviComputer
@@ -21,6 +23,12 @@ public sealed partial class NaviComputer
 
 	/// <summary>The biggest picture made into a thumbnail, in bytes. Bigger ones get none.</summary>
 	public const int MaxThumbnailSource = 8 * 1024 * 1024;
+
+	/// <summary>The longest side of a preview, in pixels: a picture made small enough to send, but big enough to zoom into.</summary>
+	public const int PreviewSize = 1600;
+
+	/// <summary>The biggest picture made into a preview, in bytes. Bigger ones get none.</summary>
+	public const int MaxPreviewSource = 32 * 1024 * 1024;
 
 	/// <summary>The files thumbnails are made of.</summary>
 	static readonly string[] ThumbnailExtensions = [".jpg", ".jpeg", ".png"];
@@ -48,6 +56,12 @@ public sealed partial class NaviComputer
 	/// </summary>
 	readonly Dictionary<string, List<HashSet<string>>> shownPictures = new();
 
+	/// <summary>
+	/// On the host, by shared app id: the one picture whose preview watchers may ask for, the one that app's host copy
+	/// asked for last (<c>files.preview</c>).
+	/// </summary>
+	readonly Dictionary<string, string> shownPreview = new();
+
 	/// <summary>On the host: what each watching client asked for this second, by connection.</summary>
 	readonly Dictionary<System.Guid, (RealTimeSince Since, int Asks, long Bytes)> watchAsks = new();
 
@@ -58,22 +72,38 @@ public sealed partial class NaviComputer
 	/// On the host: the thumbnail of the file at <paramref name="at"/>, made now if there is none for its contents. Null for
 	/// a file that isn't a picture, or is too big.
 	/// </summary>
-	internal byte[] ThumbnailOf( NaviFileLocation at )
+	internal byte[] ThumbnailOf( NaviFileLocation at ) => PictureOf( at, ThumbnailSize, MaxThumbnailSource, "" );
+
+	/// <summary>
+	/// On the host: the preview of the file at <paramref name="at"/>, a picture made small enough to send to a client
+	/// (<see cref="PreviewSize"/>), made now if there is none for its contents. Null for a file that isn't a picture, or
+	/// is too big. For a shared app's <paramref name="process"/>, it is the picture watchers may ask the preview of.
+	/// </summary>
+	internal byte[] PreviewOf( NaviProcess process, NaviFileLocation at )
+	{
+		var png = PictureOf( at, PreviewSize, MaxPreviewSource, ":preview" );
+		if ( IsAuthority && process.App.Shared )
+			shownPreview[process.App.Id] = at.Path;
+
+		return png;
+	}
+
+	byte[] PictureOf( NaviFileLocation at, int size, int maxSource, string kind )
 	{
 		if ( at.Node.Kind != NaviFileKind.File )
 			throw new NaviFileException( at.Node.Kind == NaviFileKind.Folder ? NaviFileError.IsAFolder : NaviFileError.NotFound, at.Path );
 
-		if ( !IsThumbnailPicture( at.Node.Name ) || NaviDrive.Size( at.Node ) is <= 0 or > MaxThumbnailSource )
+		if ( !IsThumbnailPicture( at.Node.Name ) || NaviDrive.Size( at.Node ) is <= 0 || NaviDrive.Size( at.Node ) > maxSource )
 			return null;
 
-		var key = at.Drive.HashOf( at.Node );
+		var key = at.Drive.HashOf( at.Node ) + kind;
 		if ( thumbnailCache.TryGetValue( key, out var cached ) )
 		{
 			thumbnailCache[key] = cached with { Used = ++thumbnailUse };
 			return cached.Png;
 		}
 
-		var png = MakeThumbnail( at );
+		var png = MakeThumbnail( at, size );
 		thumbnailCacheBytes += png?.Length ?? 0;
 		thumbnailCache[key] = (png, ++thumbnailUse);
 
@@ -87,7 +117,11 @@ public sealed partial class NaviComputer
 		return png;
 	}
 
-	byte[] MakeThumbnail( NaviFileLocation at )
+	/// <summary>
+	/// The picture at <paramref name="at"/> with its longest side at most <paramref name="size"/>, as PNG. A big one that
+	/// doesn't fit in what a client may be sent is made smaller until it does.
+	/// </summary>
+	byte[] MakeThumbnail( NaviFileLocation at, int size )
 	{
 		try
 		{
@@ -95,10 +129,17 @@ public sealed partial class NaviComputer
 			if ( bitmap is not { Width: > 0, Height: > 0 } )
 				return null;
 
-			var scale = System.Math.Min( 1f, ThumbnailSize / (float)System.Math.Max( bitmap.Width, bitmap.Height ) );
-			using var small = bitmap.Resize( System.Math.Max( 1, (int)(bitmap.Width * scale) ),
-				System.Math.Max( 1, (int)(bitmap.Height * scale) ), true );
-			return small.ToPng();
+			var scale = System.Math.Min( 1f, size / (float)System.Math.Max( bitmap.Width, bitmap.Height ) );
+			for ( var attempt = 0; attempt < 4; attempt++, scale *= 0.75f )
+			{
+				using var small = bitmap.Resize( System.Math.Max( 1, (int)(bitmap.Width * scale) ),
+					System.Math.Max( 1, (int)(bitmap.Height * scale) ), true );
+				var png = small.ToPng();
+				if ( png.Length <= MaxRemoteFileBytes )
+					return png;
+			}
+
+			return null;
 		}
 		catch ( System.Exception )
 		{
@@ -145,10 +186,12 @@ public sealed partial class NaviComputer
 		if ( appId is not null )
 		{
 			shownPictures.Remove( appId );
+			shownPreview.Remove( appId );
 			return;
 		}
 
 		shownPictures.Clear();
+		shownPreview.Clear();
 		thumbnailCache.Clear();
 		thumbnailCacheBytes = 0;
 	}
@@ -159,24 +202,26 @@ public sealed partial class NaviComputer
 	/// screen is locked.
 	/// </summary>
 	[Rpc.Host]
-	void UserWatchThumbnail( string id, string windowId, int request, string path )
+	void UserWatchThumbnail( string id, string windowId, int request, string path, bool preview )
 	{
 		if ( Rpc.Caller is not { } caller )
 			return;
 
-		var (status, bytes) = WatchThumbnail( caller, id, windowId, path );
+		var (status, bytes) = WatchThumbnail( caller, id, windowId, path, preview );
 		var message = status == RemoteFailed ? new NaviFileException( NaviFileError.Unavailable, "" ).Message : "";
 
 		using ( Rpc.FilterInclude( caller ) )
 			RemoteFilesRead( request, status, message, [], [], bytes ?? [] );
 	}
 
-	(int Status, byte[] Bytes) WatchThumbnail( Connection caller, string id, string windowId, string path )
+	(int Status, byte[] Bytes) WatchThumbnail( Connection caller, string id, string windowId, string path, bool preview )
 	{
 		if ( !IsAuthority || IsLocked || Files is null || path is null || path.Length > NaviDrive.MaxPath
 			|| !((Component.INetworkVisible)this).IsVisibleToConnection( caller, default )
 			|| GetWindow( id, windowId ) is not { App.Shared: true } window
-			|| !shownPictures.TryGetValue( window.App.Id, out var folders ) || !folders.Any( x => x.Contains( path ) ) )
+			|| !(preview
+				? shownPreview.TryGetValue( window.App.Id, out var shown ) && shown == path
+				: shownPictures.TryGetValue( window.App.Id, out var folders ) && folders.Any( x => x.Contains( path ) )) )
 			return (RemoteFailed, null);
 
 		var asks = watchAsks.TryGetValue( caller.Id, out var counted ) && counted.Since <= 1f
@@ -189,7 +234,7 @@ public sealed partial class NaviComputer
 		if ( Files.TryResolve( path ) is not { Node.Kind: NaviFileKind.File } at )
 			return (RemoteNull, null);
 
-		var png = ThumbnailOf( at );
+		var png = preview ? PictureOf( at, PreviewSize, MaxPreviewSource, ":preview" ) : ThumbnailOf( at );
 		watchAsks[caller.Id] = (asks.Since, asks.Asks + 1, asks.Bytes + (png?.Length ?? 0));
 		return png is null ? (RemoteNull, null) : (RemoteOk, png);
 	}

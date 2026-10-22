@@ -26,7 +26,7 @@ namespace Sandbox;
 public sealed partial class NaviComputer
 {
 	/// <summary>The calls a client's copy of an app may make to read the host's files. None of them change anything.</summary>
-	static readonly string[] RemoteFileCalls = ["files.info", "files.list", "files.read", "files.read-bytes", "files.thumbnail"];
+	static readonly string[] RemoteFileCalls = ["files.info", "files.list", "files.read", "files.read-bytes", "files.thumbnail", "files.preview"];
 
 	/// <summary>The most a file read from a client may be, in bytes. Bigger ones are refused on the host, before sending.</summary>
 	public const int MaxRemoteFileBytes = 4 * 1024 * 1024;
@@ -57,12 +57,12 @@ public sealed partial class NaviComputer
 	/// <summary>
 	/// On a client: read the host's files as <paramref name="window"/>'s app, and answer <paramref name="reply"/> with what
 	/// the same call gives the host's copy. Only the seated user's client reads; a client watching the screen may only ask
-	/// for the thumbnail of a picture a shared app shows (<see cref="UserWatchThumbnail"/>). Anything else gets
+	/// for the thumbnail of a picture a shared app shows, or the preview of the one it has open (<see cref="UserWatchThumbnail"/>). Anything else gets
 	/// <see cref="NaviFileError.Unavailable"/> at once.
 	/// </summary>
 	internal void ReadRemoteFiles( NaviWindow window, string method, object[] args, TaskCompletionSource<object> reply )
 	{
-		var watching = !IsUser && method == "files.thumbnail" && window is { App.Shared: true };
+		var watching = !IsUser && method is ("files.thumbnail" or "files.preview") && window is { App.Shared: true };
 		if ( IsAuthority || (!IsUser && !watching) || !IsRemoteFileCall( method ) || window is null )
 		{
 			reply.TrySetException( new NaviFileException( NaviFileError.Unavailable, "" ) );
@@ -82,7 +82,7 @@ public sealed partial class NaviComputer
 		remoteReads[request] = (reply, method, 0);
 
 		if ( watching )
-			UserWatchThumbnail( window.App.Id, window.Id, request, path );
+			UserWatchThumbnail( window.App.Id, window.Id, request, path, method == "files.preview" );
 		else
 			UserReadFiles( window.App.Id, window.Id, request, method, path, follow );
 	}
@@ -248,7 +248,7 @@ public sealed partial class NaviComputer
 				reply.TrySetResult( System.Text.Encoding.UTF8.GetString( bytes ?? [] ) );
 				return;
 
-			case RemoteOk when waiting.Method is "files.read-bytes" or "files.thumbnail":
+			case RemoteOk when waiting.Method is "files.read-bytes" or "files.thumbnail" or "files.preview":
 				reply.TrySetResult( bytes ?? [] );
 				return;
 

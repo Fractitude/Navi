@@ -1275,6 +1275,14 @@ public sealed class Navi
 		public Task<byte[]> GetThumbnailAsync( string path ) => navi.CallAsync<byte[]>( "files.thumbnail", path );
 
 		/// <summary>
+		/// A picture made small enough to send, at most 1600 pixels on its longest side, as PNG: enough to look at and zoom
+		/// into. A shared app that shows a picture asks for this on the host's copy, and a client's copy (the seated
+		/// player's, or anyone watching the screen) is sent this one picture, never the file. Null for a file that isn't a
+		/// jpg or png picture, or one too big to make small.
+		/// </summary>
+		public Task<byte[]> GetPreviewAsync( string path ) => navi.CallAsync<byte[]>( "files.preview", path );
+
+		/// <summary>
 		/// Each file's version by its contents: the SHA-256 of what is in it, as hex, which changes whenever the contents
 		/// do. Empty for a path that isn't a file, or that the app may not read. At most 1024 paths.
 		/// </summary>

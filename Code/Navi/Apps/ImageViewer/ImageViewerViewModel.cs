@@ -5,10 +5,23 @@ namespace NaviApps;
 /// <summary>
 /// Everything the Image Viewer app does: it takes the files the player opened with it, reads their bytes from the
 /// computer's files and decodes them into a texture. The panel (<c>ImageViewer.razor</c>) draws <see cref="UiState"/>
-/// and <see cref="Picture"/>.
+/// and <see cref="Picture"/>. The app is shared: this runs in the host's copy, and what the player does in any copy (Open,
+/// zooming, panning) arrives in <see cref="Act"/>.
 /// </summary>
 public sealed class ImageViewerViewModel
 {
+	/// <summary>The player pressed Open...</summary>
+	public const string OpenAction = "open";
+
+	/// <summary>The player zoomed or panned: the zoom, then the pan across and down, as numbers.</summary>
+	public const string ViewAction = "view";
+
+	/// <summary>The biggest zoom, as a multiple of the size that fits the window.</summary>
+	public const float MaxZoom = 16f;
+
+	/// <summary>The furthest the pan is taken from the host, as a fraction of the window. The panel keeps it well inside.</summary>
+	const float MaxPan = 8f;
+
 	readonly Navi navi;
 
 	/// <summary>How often the files opened from the file explorer are asked for, in seconds.</summary>
@@ -40,6 +53,45 @@ public sealed class ImageViewerViewModel
 
 	void Update( System.Func<ImageViewerUiState, ImageViewerUiState> change ) =>
 		UiState = change( UiState ) with { Revision = UiState.Revision + 1 };
+
+	/// <summary>
+	/// What the player did in the app, from any client. Arguments are text; what doesn't parse is ignored.
+	/// </summary>
+	public void Act( string action, string[] args )
+	{
+		switch ( action )
+		{
+			case OpenAction:
+				ShowPicker();
+				break;
+
+			case ViewAction when args.Length == 3 && TryNumber( args[0], out var zoom ) && TryNumber( args[1], out var panX )
+				&& TryNumber( args[2], out var panY ):
+				SetView( zoom, panX, panY );
+				break;
+		}
+	}
+
+	static bool TryNumber( string text, out float value ) =>
+		float.TryParse( text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
+			out value ) && float.IsFinite( value );
+
+	/// <summary>
+	/// Zoom and pan the picture, for everyone. Replaces the state without going through <see cref="Update"/>: the panel
+	/// puts the picture where the state says every frame, so a drag doesn't rebuild it.
+	/// </summary>
+	public void SetView( float zoom, float panX, float panY )
+	{
+		if ( !UiState.HasImage )
+			return;
+
+		UiState = UiState with
+		{
+			Zoom = System.Math.Clamp( zoom, 1f, MaxZoom ),
+			PanX = System.Math.Clamp( panX, -MaxPan, MaxPan ),
+			PanY = System.Math.Clamp( panY, -MaxPan, MaxPan ),
+		};
+	}
 
 	/// <summary>Called by the panel each frame.</summary>
 	public void Tick()
@@ -153,6 +205,10 @@ public sealed class ImageViewerViewModel
 				return;
 			}
 
+			// The computer makes the preview now, before the state says there is a new picture, so the clients that
+			// draw it can ask for it at once. It is also what makes this the picture they may ask for.
+			var preview = await PreviewOfAsync( info.Path );
+
 			Picture = texture;
 			Update( uiState => uiState with
 			{
@@ -161,12 +217,32 @@ public sealed class ImageViewerViewModel
 				Name = info.Name,
 				SizeText = $"{bitmap.Width} x {bitmap.Height} px",
 				PathText = info.Path,
+				PictureWidth = bitmap.Width,
+				PictureHeight = bitmap.Height,
+				PictureVersion = uiState.PictureVersion + 1,
+				HasPreview = preview,
+				Zoom = 1f,
+				PanX = 0f,
+				PanY = 0f,
 				Notice = "",
 			} );
 		}
 		catch ( System.Exception e )
 		{
 			Fail( Describe( e ) );
+		}
+	}
+
+	/// <summary>Is there a preview of the picture to send to the clients?</summary>
+	async Task<bool> PreviewOfAsync( string path )
+	{
+		try
+		{
+			return await navi.Files.GetPreviewAsync( path ) is { Length: > 0 };
+		}
+		catch ( System.Exception )
+		{
+			return false;
 		}
 	}
 

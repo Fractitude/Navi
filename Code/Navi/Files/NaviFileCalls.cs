@@ -75,6 +75,15 @@ public static class NaviFileCalls
 				return computer.ThumbnailOf( files.Resolve( path ) );
 			}
 
+			case "files.preview":
+			{
+				// A picture made small enough to send, but big enough to look at and zoom into. Asking for it makes it the
+				// picture a shared app shows, whose preview watchers may ask for (see NaviComputer.PreviewOf).
+				var path = Arg( args, 0, method );
+				Check( files, process, path, followLast: true, read: true );
+				return computer.PreviewOf( process, files.Resolve( path ) );
+			}
+
 			case "files.hashes":
 			{
 				// Each file's version by its contents (SHA-256, hex), empty for one that isn't there, isn't a file, or that

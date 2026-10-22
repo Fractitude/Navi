@@ -3,11 +3,13 @@
 @namespace NaviApps
 
 @* A Navi app like any other: a plain panel, described by Assets/navi/apps/imageviewer.napp. It opens the pictures the *@
-@* player sends it from the file explorer, or picks in the file picker, and shows them scaled to the window. Not shared. *@
+@* player sends it from the file explorer, or picks in the file picker, and shows them scaled to the window. Shared: *@
+@* everyone at the screen sees the same picture, zoomed and panned the same. The host's copy has the picture; a client *@
+@* is sent a preview of it (ImageViewerPreview). *@
 
 <root>
 	<div class="bar">
-		<div class="button @( UiState.Loading || UiState.Picking ? "disabled" : "" )" @onclick=@( () => ViewModel.ShowPicker() )>
+		<div class="button @( UiState.Loading || UiState.Picking ? "disabled" : "" )" @onclick=@( () => Open() )>
 			<i>folder_open</i>
 			Open...
 		</div>
@@ -20,9 +22,16 @@
 	}
 
 	<div class="screen" @ref="Screen">
-		@if ( UiState.HasImage )
+		@if ( UiState.HasImage && (!Navi.IsViewer || UiState.HasPreview) )
 		{
-			<Image class="picture" @ref="PictureView" Texture=@ViewModel.Picture/>
+			<Image class="picture" @ref="PictureView" Texture=@Picture/>
+		}
+		else if ( UiState.HasImage )
+		{
+			<div class="empty">
+				<i>image</i>
+				<div class="text">This picture is too big to show on this screen.</div>
+			</div>
 		}
 		else
 		{
@@ -45,14 +54,22 @@
 @code
 {
 	/// <summary>
-	/// The app's logic and its state. Made on first use, with the panel's Navi (the panel is a NaviApp).
+	/// The app's logic and its state, in the host's copy only.
 	/// </summary>
 	ImageViewerViewModel ViewModel => field ??= new( Navi );
 
 	/// <summary>
-	/// What is drawn above. Read only.
+	/// What is drawn above. Read only: the view model's, or on a viewer what the host's copy published.
 	/// </summary>
-	ImageViewerUiState UiState => ViewModel.UiState;
+	ImageViewerUiState UiState => Navi.IsViewer ? Navi.GetState<ImageViewerUiState>() ?? ImageViewerUiState.Empty : ViewModel.UiState;
+
+	/// <summary>The picture on a client, which the host sends as a preview. Only a viewer's copy asks for it.</summary>
+	ImageViewerPreview Preview => field ??= new( Navi );
+
+	/// <summary>
+	/// The picture drawn: the view model's, or on a viewer the preview, once it is the one the state is about.
+	/// </summary>
+	Texture Picture => Navi.IsViewer ? Preview.IsCurrent( UiState ) ? Preview.Texture : null : ViewModel.Picture;
 
 	/// <summary>The black area the picture is shown in.</summary>
 	Panel Screen;
@@ -60,16 +77,30 @@
 	/// <summary>The panel drawing the picture. Made again whenever the page is rebuilt.</summary>
 	Image PictureView;
 
-	/// <summary>The biggest zoom, as a multiple of the size that fits the window.</summary>
-	const float MaxZoom = 16f;
-
 	/// <summary>How much one notch of the wheel zooms by.</summary>
 	const float WheelZoom = 1.15f;
 
-	// The view is the player's own: it is not part of the app's state and is not shared.
-	float zoom = 1f;
-	Vector2 pan;
-	Texture shownPicture;
+	/// <summary>How often the player's zooming and panning is sent to the host, in seconds.</summary>
+	const float SendInterval = 0.05f;
+
+	/// <summary>
+	/// How long the player's own zoom and pan are drawn instead of the host's after they last changed them, at most, in
+	/// seconds: the host's lags a moment behind and would pull the picture back.
+	/// </summary>
+	const float LocalHold = 1.5f;
+
+	// The zoom and pan are the app's state (shared), not this panel's. The seated player's copy on a client draws its own
+	// while they zoom or drag, and sends them to the host, so the picture follows the hand without waiting for it. Pan is
+	// a fraction of the window, so every client's window shows the same part of the picture.
+	bool localActive;
+	float localZoom = 1f;
+	Vector2 localPan;
+	int localVersion;
+	RealTimeSince sinceLocal;
+	float sentZoom = float.NaN;
+	Vector2 sentPan;
+	RealTimeSince sinceSent;
+
 	Image styledView;
 	float styledZoom;
 	Vector2 styledPan;
@@ -81,46 +112,132 @@
 	{
 		base.Tick();
 
-		ViewModel.Tick();
+		if ( Navi.IsViewer )
+		{
+			Preview.Tick( UiState );
+		}
+		else
+		{
+			ViewModel.Tick();
+			Navi.Publish( ViewModel.UiState );
+		}
+
 		UpdateView();
 	}
 
+	protected override void OnAction( string action, string[] args ) => ViewModel.Act( action, args );
+
+	/// <summary>
+	/// The Open... button. In a viewer's copy it is an action for the host, which opens the picker.
+	/// </summary>
+	void Open()
+	{
+		if ( Navi.IsWatching )
+			return;
+
+		if ( Navi.IsViewer )
+			Navi.Act( ImageViewerViewModel.OpenAction );
+		else
+			ViewModel.ShowPicker();
+	}
+
 	Vector2 ScreenSize => Screen is { IsValid: true } ? Screen.Box.Rect.Size * Screen.ScaleFromScreen : Vector2.Zero;
+
+	/// <summary>
+	/// The zoom and pan (a fraction of the window) to draw: the player's own while they are still changing them, otherwise
+	/// the state's.
+	/// </summary>
+	(float Zoom, Vector2 Pan) CurrentView()
+	{
+		var uiState = UiState;
+		if ( localActive )
+		{
+			var caughtUp = sentZoom == localZoom && sentPan == localPan
+				&& System.MathF.Abs( uiState.Zoom - localZoom ) < 0.001f
+				&& System.MathF.Abs( uiState.PanX - localPan.x ) < 0.001f
+				&& System.MathF.Abs( uiState.PanY - localPan.y ) < 0.001f;
+
+			if ( localVersion == uiState.PictureVersion && !caughtUp && sinceLocal < LocalHold )
+				return (localZoom, localPan);
+
+			localActive = false;
+			sentZoom = float.NaN;
+		}
+
+		return (uiState.Zoom, new Vector2( uiState.PanX, uiState.PanY ));
+	}
+
+	/// <summary>
+	/// The player changed the zoom or pan. The host's copy changes the state; a viewer's copy keeps it and sends it.
+	/// </summary>
+	void ApplyView( float zoom, Vector2 pan )
+	{
+		if ( !Navi.IsViewer )
+		{
+			ViewModel.SetView( zoom, pan.x, pan.y );
+			return;
+		}
+
+		localZoom = zoom;
+		localPan = pan;
+		localVersion = UiState.PictureVersion;
+		localActive = true;
+		sinceLocal = 0;
+	}
+
+	/// <summary>
+	/// A viewer's copy tells the host where the player has put the picture, a few times a second, and only a change.
+	/// </summary>
+	void SendView()
+	{
+		if ( !Navi.IsViewer || !localActive || sinceSent < SendInterval || (sentZoom == localZoom && sentPan == localPan) )
+			return;
+
+		sentZoom = localZoom;
+		sentPan = localPan;
+		sinceSent = 0;
+
+		var culture = System.Globalization.CultureInfo.InvariantCulture;
+		Navi.Act( ImageViewerViewModel.ViewAction, localZoom.ToString( "R", culture ), localPan.x.ToString( "R", culture ),
+			localPan.y.ToString( "R", culture ) );
+	}
 
 	/// <summary>
 	/// Zoom with the wheel, keeping the point under the mouse where it is.
 	/// </summary>
 	public override void OnMouseWheel( Vector2 value )
 	{
-		if ( Screen is not { IsValid: true, HasHovered: true } || !UiState.HasImage || value.y == 0 )
+		var size = ScreenSize;
+		if ( Screen is not { IsValid: true, HasHovered: true } || !UiState.HasImage || value.y == 0 || Navi.IsWatching
+			|| size.x <= 0 || size.y <= 0 )
 		{
 			base.OnMouseWheel( value );
 			return;
 		}
 
+		var (zoom, panFraction) = CurrentView();
+
 		// Scrolling up zooms in.
-		var newZoom = System.Math.Clamp( zoom * System.MathF.Pow( WheelZoom, -value.y ), 1f, MaxZoom );
-		var fromCentre = Screen.MousePosition * Screen.ScaleFromScreen - ScreenSize * 0.5f;
-		pan = (pan - fromCentre) * (newZoom / zoom) + fromCentre;
-		zoom = newZoom;
-		ClampPan();
+		var newZoom = System.Math.Clamp( zoom * System.MathF.Pow( WheelZoom, -value.y ), 1f, ImageViewerViewModel.MaxZoom );
+		var fromCentre = Screen.MousePosition * Screen.ScaleFromScreen - size * 0.5f;
+		var pan = (panFraction * size - fromCentre) * (newZoom / zoom) + fromCentre;
+		ApplyView( newZoom, ClampPan( pan, newZoom, size ) / size );
 	}
 
-	void ClampPan()
+	/// <summary>
+	/// Keep the picture in the window: an edge can't come further in than the window's own edge, and a side that is
+	/// smaller than the window stays centred. The picture is drawn contained in the zoomed box. Pan and window are in
+	/// pixels.
+	/// </summary>
+	Vector2 ClampPan( Vector2 pan, float zoom, Vector2 window )
 	{
-		// The picture can't leave the window: an edge can't come further in than the window's own edge, and a side that
-		// is smaller than the window stays centred. The picture is drawn contained in the zoomed box.
-		var window = ScreenSize;
-		var picture = ViewModel.Picture is { } texture ? (Vector2)texture.Size : Vector2.Zero;
+		var picture = new Vector2( UiState.PictureWidth, UiState.PictureHeight );
 		if ( picture.x <= 0 || picture.y <= 0 || window.x <= 0 || window.y <= 0 )
-		{
-			pan = Vector2.Zero;
-			return;
-		}
+			return Vector2.Zero;
 
 		var shown = picture * System.MathF.Min( window.x / picture.x, window.y / picture.y ) * zoom;
 		var limit = new Vector2( System.MathF.Max( 0, shown.x - window.x ), System.MathF.Max( 0, shown.y - window.y ) ) * 0.5f;
-		pan = new Vector2( System.Math.Clamp( pan.x, -limit.x, limit.x ), System.Math.Clamp( pan.y, -limit.y, limit.y ) );
+		return new Vector2( System.Math.Clamp( pan.x, -limit.x, limit.x ), System.Math.Clamp( pan.y, -limit.y, limit.y ) );
 	}
 
 	/// <summary>
@@ -132,44 +249,46 @@
 		if ( Screen is not { IsValid: true } )
 			return;
 
-		if ( ViewModel.Picture != shownPicture )
-		{
-			shownPicture = ViewModel.Picture;
-			zoom = 1f;
-			pan = Vector2.Zero;
-		}
-
+		var size = ScreenSize;
 		var mouse = Screen.MousePosition * Screen.ScaleFromScreen;
-		var held = UiState.HasImage && Screen.HasActive;
+		var held = UiState.HasImage && !Navi.IsWatching && Screen.HasActive;
 
-		if ( held && dragging )
+		if ( held && dragging && size.x > 0 && size.y > 0 )
 		{
-			pan += mouse - lastMouse;
-			ClampPan();
+			var (zoom, panFraction) = CurrentView();
+			var pan = ClampPan( panFraction * size + (mouse - lastMouse), zoom, size );
+			ApplyView( zoom, pan / size );
 		}
 
 		dragging = held;
 		lastMouse = mouse;
 
+		SendView();
+
 		if ( PictureView is not { IsValid: true } )
 			return;
 
-		var size = ScreenSize;
-		if ( PictureView == styledView && zoom == styledZoom && pan == styledPan && size == styledSize )
+		var (shownZoom, shownFraction) = CurrentView();
+		var shownPan = ClampPan( shownFraction * size, shownZoom, size );
+		if ( PictureView == styledView && shownZoom == styledZoom && shownPan == styledPan && size == styledSize )
 			return;
 
 		styledView = PictureView;
-		styledZoom = zoom;
-		styledPan = pan;
+		styledZoom = shownZoom;
+		styledPan = shownPan;
 		styledSize = size;
 
 		var style = PictureView.Style;
 		style.Position = PositionMode.Absolute;
-		style.Width = Length.Pixels( size.x * zoom );
-		style.Height = Length.Pixels( size.y * zoom );
-		style.Left = Length.Pixels( (size.x - size.x * zoom) * 0.5f + pan.x );
-		style.Top = Length.Pixels( (size.y - size.y * zoom) * 0.5f + pan.y );
+		style.Width = Length.Pixels( size.x * shownZoom );
+		style.Height = Length.Pixels( size.y * shownZoom );
+		style.Left = Length.Pixels( (size.x - size.x * shownZoom) * 0.5f + shownPan.x );
+		style.Top = Length.Pixels( (size.y - size.y * shownZoom) * 0.5f + shownPan.y );
 	}
 
-	protected override int BuildHash() => ViewModel.Revision;
+	/// <summary>
+	/// The engine rebuilds this panel when the hash changes. The zoom and pan aren't in it: they are applied every frame.
+	/// </summary>
+	protected override int BuildHash() =>
+		System.HashCode.Combine( UiState.Revision, Navi.IsViewer ? Preview.Version : 0, Navi.IsViewer );
 }
