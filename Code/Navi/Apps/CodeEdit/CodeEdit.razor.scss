@@ -56,6 +56,19 @@
 		pointer-events: none;
 	}
 
+	// Cannot be used, but still takes the mouse so its tooltip can say why.
+	.unavailable
+	{
+		opacity: 0.35;
+		cursor: default;
+
+		&:hover
+		{
+			color: inherit;
+			background-color: transparent;
+		}
+	}
+
 	.bar
 	{
 		flex-shrink: 0;

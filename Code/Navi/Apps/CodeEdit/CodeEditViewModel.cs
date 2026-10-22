@@ -57,6 +57,7 @@ public sealed class CodeEditViewModel
 	public const string ConfirmOtherAction = "confirm-other";
 	public const string DismissNoticeAction = "dismiss-notice";
 	public const string ToggleThemeAction = "toggle-theme";
+	public const string RunAction = "run";
 
 	/// <summary>The file in the app's own folder that holds what the player chose, as JSON.</summary>
 	const string PreferencesName = "preferences.json";
@@ -91,6 +92,9 @@ public sealed class CodeEditViewModel
 	bool? guardingClose;
 
 	bool polling;
+
+	/// <summary>A script is running, or the player is being asked for the permission to run one.</summary>
+	bool running;
 
 	/// <summary>The File Picker is open for this app, so Open doesn't ask for a second one.</summary>
 	bool picking;
@@ -185,6 +189,14 @@ public sealed class CodeEditViewModel
 			var opened = await navi.Files.TakeOpenedAsync();
 			if ( opened.Count > 0 )
 				AskToDiscard( () => LoadAsync( opened[^1] ) );
+
+			// The game can turn scripting on or off for the computer, so it is asked again every time.
+			var scripting = await navi.Scripts.IsEnabledAsync();
+			if ( scripting != UiState.ScriptingEnabled )
+			{
+				UiState = UiState with { ScriptingEnabled = scripting };
+				Rebuild();
+			}
 		}
 		catch ( System.Exception e )
 		{
@@ -237,6 +249,7 @@ public sealed class CodeEditViewModel
 			case CancelConfirmAction: _ = AnswerAsync( null ); break;
 			case DismissNoticeAction: Notify( null ); break;
 			case ToggleThemeAction: _ = SetThemeAsync( !UiState.LightTheme ); break;
+			case RunAction: _ = RunAsync(); break;
 		}
 	}
 
@@ -260,6 +273,56 @@ public sealed class CodeEditViewModel
 			case "ctrl+s": _ = SaveAsync(); break;
 			case "ctrl+shift+s": OpenBar( CodeEditBar.SaveAs ); break;
 		}
+	}
+
+	// Running.
+
+	/// <summary>
+	/// Run the document as a script, if the game allows it. The first time the player is asked for the permission. What
+	/// went wrong is shown with its line; a script that ran says so.
+	/// </summary>
+	async Task RunAsync()
+	{
+		if ( running || !UiState.ScriptingEnabled )
+			return;
+
+		running = true;
+		var text = UiState.Text;
+		try
+		{
+			var result = await navi.WithPermissionAsync( () => navi.Scripts.RunAsync( text ) );
+			Notify( result.Ok ? "The script ran." : Where( text, result ) + result.Message );
+		}
+		catch ( Navi.MissingPermissionException )
+		{
+			Notify( "Code Edit isn't allowed to run scripts. Allow it \"Run scripts\" in the taskbar's \"Permissions...\"." );
+		}
+		catch ( System.Exception e )
+		{
+			Notify( Describe( e ) );
+		}
+		finally
+		{
+			running = false;
+		}
+	}
+
+	/// <summary>
+	/// "Line 3: " for the place in the text an error is about, or nothing when it isn't about a place.
+	/// </summary>
+	static string Where( string text, Navi.ScriptResult result )
+	{
+		if ( result.Length <= 0 && result.Start <= 0 )
+			return "";
+
+		var line = 1;
+		for ( var i = 0; i < System.Math.Min( result.Start, text.Length ); i++ )
+		{
+			if ( text[i] == '\n' )
+				line++;
+		}
+
+		return $"Line {line}: ";
 	}
 
 	// Preferences.

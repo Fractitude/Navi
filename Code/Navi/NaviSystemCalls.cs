@@ -76,6 +76,16 @@ public static class NaviSystemCalls
 				: computer.TakeCameraPhoto();
 		}
 
+		// Scripts. The game turns them on for a computer; an app also needs the permission, and they run on the host.
+		if ( method == "scripting.enabled" )
+			return computer.ScriptingEnabled;
+
+		if ( method == "scripting.run" )
+		{
+			Require( process, NaviPermissions.Scripts );
+			return computer.RunScript( Arg<string>( args, 0, method ) );
+		}
+
 		// The system file picker: any app may ask the player for a file, and gets only the one chosen. The File Picker
 		// window itself answers with the picker.* calls, which no other app may make.
 		if ( method == "files.pick" )

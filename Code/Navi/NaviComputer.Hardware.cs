@@ -75,7 +75,7 @@ public sealed partial class NaviComputer
 	/// <inheritdoc cref="InstallHardware(string)"/>
 	public bool InstallHardware( NaviHardwareResource hardware )
 	{
-		if ( !IsAuthority || hardware is null || HasHardware( hardware.Id ) )
+		if ( !IsAuthority || NaviScriptGuard.Active || hardware is null || HasHardware( hardware.Id ) )
 			return false;
 
 		Hardware = InstalledHardware.Append( hardware ).ToList();
@@ -88,7 +88,7 @@ public sealed partial class NaviComputer
 	/// </summary>
 	public bool RemoveHardware( string id )
 	{
-		if ( !IsAuthority || !HasHardware( id ) )
+		if ( !IsAuthority || NaviScriptGuard.Active || !HasHardware( id ) )
 			return false;
 
 		Hardware = InstalledHardware.Where( x => x.Id != id ).ToList();
@@ -186,7 +186,7 @@ public sealed partial class NaviComputer
 	/// </summary>
 	public bool SetIpAddress( string address )
 	{
-		if ( !IsAuthority || !NaviNetwork.IsAddress( address ) || AddressTaken( address, AddressBook() ) )
+		if ( !IsAuthority || NaviScriptGuard.Active || !NaviNetwork.IsAddress( address ) || AddressTaken( address, AddressBook() ) )
 			return false;
 
 		if ( IpAddress != address )

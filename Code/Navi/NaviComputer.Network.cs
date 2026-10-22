@@ -953,7 +953,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	public bool Lock()
 	{
-		if ( !IsAuthority || IsLocked )
+		if ( !IsAuthority || NaviScriptGuard.Active || IsLocked )
 			return false;
 
 		IsLocked = true;
@@ -969,7 +969,7 @@ public sealed partial class NaviComputer : Component.INetworkVisible
 	/// </summary>
 	public bool Unlock()
 	{
-		if ( !IsAuthority || !IsLocked )
+		if ( !IsAuthority || NaviScriptGuard.Active || !IsLocked )
 			return false;
 
 		IsLocked = false;

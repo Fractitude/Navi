@@ -23,6 +23,15 @@
 
 		<div class="divider"></div>
 
+		@* Not "disabled": that class takes the mouse, and the tooltip says why it can't be used. *@
+		<div class="tool @( UiState.ScriptingEnabled ? "" : "unavailable" )"
+		     tooltip="@( UiState.ScriptingEnabled ? "Run" : "Running scripts is disabled" )"
+		     @onclick=@Run>
+			<i>play_arrow</i>
+		</div>
+
+		<div class="divider"></div>
+
 		<div class="tool @( Editor is { CanUndo: true } ? "" : "disabled" )" tooltip="Undo (Ctrl+Z)" @onclick=@Undo>
 			<i>undo</i>
 		</div>
@@ -159,6 +168,15 @@
 	void Undo() => Editor?.Undo();
 
 	void Redo() => Editor?.Redo();
+
+	/// <summary>
+	/// Run the document as a script. The computer lets it only while the game has scripting on; the host's copy checks too.
+	/// </summary>
+	void Run()
+	{
+		if ( UiState.ScriptingEnabled )
+			Navi.Act( CodeEditViewModel.RunAction );
+	}
 
 	/// <summary>
 	/// Give the editor the saved theme, once it is known and whenever it changes. The preference is the app's, so every

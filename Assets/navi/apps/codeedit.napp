@@ -9,7 +9,8 @@
   "CanResize": true,
   "Shared": true,
   "Permissions": [
-    "navi.files.access"
+    "navi.files.access",
+    "navi.scripts.run"
   ],
   "FileTypes": [
     "cs",

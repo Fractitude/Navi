@@ -224,6 +224,7 @@ public sealed class Navi
 		Files = new FileCalls( this );
 		Messages = new MessageCalls( this );
 		Camera = new CameraCalls( this );
+		Scripts = new ScriptCalls( this );
 		Hardware = new HardwareCalls( this );
 		Network = new NetworkCalls( this );
 		Audio = new AudioCalls( this );
@@ -280,6 +281,11 @@ public sealed class Navi
 	/// The camera on top of the computer's screen.
 	/// </summary>
 	public CameraCalls Camera { get; }
+
+	/// <summary>
+	/// Running scripts, when the game allows it.
+	/// </summary>
+	public ScriptCalls Scripts { get; }
 
 	/// <summary>
 	/// The hardware installed in the computer.
@@ -715,6 +721,11 @@ public sealed class Navi
 		/// See through the camera on top of the computer's screen (<see cref="CameraCalls"/>).
 		/// </summary>
 		public const string Camera = "navi.camera.access";
+
+		/// <summary>
+		/// Run scripts on the computer (<see cref="ScriptCalls"/>). A script can reach most of the game.
+		/// </summary>
+		public const string Scripts = "navi.scripts.run";
 	}
 
 	/// <summary>
@@ -1045,6 +1056,34 @@ public sealed class Navi
 		/// <see cref="GetViewAsync"/> has to have been asked for a moment ago.
 		/// </summary>
 		public Task<byte[]> TakePhotoAsync() => navi.CallAsync<byte[]>( "camera.photo" );
+	}
+
+	/// <summary>
+	/// How a script ran: <see cref="Ok"/>, or <see cref="Message"/> with where in the source it went wrong (a range of
+	/// characters, 0 and 0 when it isn't about a place).
+	/// </summary>
+	public sealed record ScriptResult( bool Ok, string Message, int Start, int Length );
+
+	/// <summary>
+	/// Scripts, the engine's experimental run-time scripting. The game turns them on for a computer and it is off by default,
+	/// so ask <see cref="IsEnabledAsync"/> before offering to run one.
+	/// </summary>
+	public sealed class ScriptCalls( Navi navi )
+	{
+		/// <summary>
+		/// Whether the game lets this computer run scripts.
+		/// </summary>
+		public Task<bool> IsEnabledAsync() => navi.CallAsync<bool>( "scripting.enabled" );
+
+		/// <summary>
+		/// Run the source as a script on the host's computer. Needs <see cref="Permission.Scripts"/>, and scripting on. It
+		/// stops after a fixed number of instructions. Failing to run is a <see cref="ScriptResult"/>, not an exception.
+		/// </summary>
+		public async Task<ScriptResult> RunAsync( string source )
+		{
+			var (ok, message, start, length) = await navi.CallAsync<(bool, string, int, int)>( "scripting.run", source ?? "" );
+			return new ScriptResult( ok, message, start, length );
+		}
 	}
 
 	// Hardware.

@@ -49,6 +49,12 @@ public static class NaviPermissions
 	public const string Camera = "navi.camera.access";
 
 	/// <summary>
+	/// Run scripts on the computer. A script can reach most of the game, so this is as strong as it sounds. Needs the game to
+	/// have turned scripting on (<see cref="NaviComputer.ScriptingEnabled"/>).
+	/// </summary>
+	public const string Scripts = "navi.scripts.run";
+
+	/// <summary>
 	/// How a permission is shown to the player.
 	/// </summary>
 	public record Info( string Id, string Title, string Description, string Icon );
@@ -63,6 +69,7 @@ public static class NaviPermissions
 		new( Files, "Files", "See, change and delete every file on this computer.", "folder" ),
 		new( Messages, "Messages", "Read and send direct messages as the player using this computer.", "chat" ),
 		new( Camera, "Camera", "See through the computer's webcam.", "videocam" ),
+		new( Scripts, "Run scripts", "Run code that can change the game around you, not only this computer.", "terminal" ),
 	};
 
 	public static bool IsKnown( string id ) => All.Any( x => x.Id == id );

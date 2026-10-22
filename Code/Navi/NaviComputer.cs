@@ -891,7 +891,8 @@ public sealed partial class NaviComputer : Component
 	/// <summary>
 	/// What the player changed on this computer, as it would be saved.
 	/// </summary>
-	public NaviComputerSave CaptureSave() => CaptureSave( placements: true, secrets: true );
+	public NaviComputerSave CaptureSave() =>
+		NaviScriptGuard.Active ? null : CaptureSave( placements: true, secrets: true );
 
 	/// <summary>
 	/// What the player changed on this computer. Without <paramref name="placements"/>, it leaves out where windows
@@ -949,7 +950,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void RestoreSave( NaviComputerSave save )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || NaviScriptGuard.Active )
 			return;
 
 		ApplySave( save );
@@ -1236,7 +1237,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public async Task<bool> InstallPackageAsync( string packageIdent )
 	{
-		if ( !IsAuthority || !IsOnline || !NaviStore.IsAllowed( packageIdent ) || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
+		if ( !IsAuthority || NaviScriptGuard.Active || !IsOnline || !NaviStore.IsAllowed( packageIdent ) || IsPackageInstalled( packageIdent ) || IsDownloading( packageIdent ) )
 			return false;
 
 		var app = await DownloadPackageAsync( packageIdent );
@@ -1272,7 +1273,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public bool UninstallPackage( string packageIdent )
 	{
-		if ( !IsAuthority || InstalledPackages is null )
+		if ( !IsAuthority || NaviScriptGuard.Active || InstalledPackages is null )
 			return false;
 
 		var id = appPackages.FirstOrDefault( x => x.Value == packageIdent ).Key;
@@ -1312,7 +1313,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public bool Install( string id )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || NaviScriptGuard.Active )
 			return false;
 
 		// A Store app's id is its package ident; other apps' ids are asset paths, which aren't.
@@ -1354,7 +1355,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public bool Uninstall( string id )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || NaviScriptGuard.Active )
 			return false;
 
 		var app = NaviAppRegistry.Find( id );
@@ -1721,7 +1722,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void SetPermissions( NaviAppInfo app, IEnumerable<string> permissions )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || NaviScriptGuard.Active )
 			return;
 
 		var granted = permissions?.Where( app.Permissions.Contains ).Distinct().ToArray() ?? [];
@@ -1767,7 +1768,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void ReviewPermissions( string id, bool launch = false )
 	{
-		if ( !IsAuthority )
+		if ( !IsAuthority || NaviScriptGuard.Active )
 			return;
 
 		var app = NaviAppRegistry.Find( id );
@@ -1831,7 +1832,7 @@ public sealed partial class NaviComputer : Component
 	/// </summary>
 	public void AnswerPermissionRequest( NaviPermissionRequest request, IEnumerable<string> ticked )
 	{
-		if ( !IsAuthority || !permissionRequests.Remove( request ) )
+		if ( !IsAuthority || NaviScriptGuard.Active || !permissionRequests.Remove( request ) )
 			return;
 
 		var answer = ticked?.Where( request.Permissions.Contains ).ToArray() ?? [];

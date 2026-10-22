@@ -37,6 +37,9 @@ public sealed record CodeEditUiState
 	/// <summary>The theme is read from the preferences (or the computer's color scheme), so the panel can use it.</summary>
 	public bool ThemeKnown { get; init; }
 
+	/// <summary>The game lets this computer run scripts (<c>NaviComputer.ScriptingEnabled</c>), so Run works.</summary>
+	public bool ScriptingEnabled { get; init; }
+
 	/// <summary>The file's name, or "Untitled" for a document never saved.</summary>
 	public string Name { get; init; } = "Untitled";
 

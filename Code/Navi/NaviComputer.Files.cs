@@ -109,7 +109,7 @@ public sealed partial class NaviComputer
 	/// </summary>
 	public string MountDrive( NaviDrive drive )
 	{
-		if ( !IsAuthority || Files is null || drive is null )
+		if ( !IsAuthority || NaviScriptGuard.Active || Files is null || drive is null )
 			return null;
 
 		var path = Files.Mount( drive );
@@ -122,7 +122,7 @@ public sealed partial class NaviComputer
 	/// </summary>
 	public bool EjectDrive( NaviDrive drive )
 	{
-		if ( !IsAuthority || Files is null || drive is null || Files.MountPathOf( drive ) is null || !drive.Removable )
+		if ( !IsAuthority || NaviScriptGuard.Active || Files is null || drive is null || Files.MountPathOf( drive ) is null || !drive.Removable )
 			return false;
 
 		SaveDrive( drive );
