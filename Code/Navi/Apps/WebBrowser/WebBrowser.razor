@@ -77,7 +77,9 @@
 	{
 		@if ( file.Kind == WebBrowserFileKind.Text )
 		{
-			<div class="file-page file-text">
+			@* A label holds a selection but doesn't make one: a drag is handled by an ancestor with AllowChildSelection, *@
+			@* as in the Calculator. *@
+			<div class="file-page file-text" AllowChildSelection=@true AcceptsFocus=@true>
 				<label class="text" @ref="FileText">@file.Text</label>
 			</div>
 		}
@@ -253,16 +255,14 @@
 	}
 
 	/// <summary>
-	/// A text file's text can be selected with the mouse, and Ctrl+C copies the selection to this player's clipboard. The
-	/// keys are read here: the browser keeps them on this client (<c>Navi.Input.KeepLocalAsync</c>), so no shortcut
-	/// reaches the app, and the clipboard is this client's anyway.
+	/// A text file's text is selected with the mouse (its page allows child selection), and Ctrl+C copies the selection to
+	/// this player's clipboard. The keys are read here: the browser keeps them on this client
+	/// (<c>Navi.Input.KeepLocalAsync</c>), so no shortcut reaches the app, and the clipboard is this client's anyway.
 	/// </summary>
 	void TickFileText()
 	{
 		if ( !FileText.IsValid() )
 			return;
-
-		FileText.Selectable = true;
 
 		var ctrl = Input.Keyboard.Down( "CTRL" ) || Input.Keyboard.Down( "RCTRL" );
 		if ( Navi.HasInput && ctrl && Input.Keyboard.Pressed( "c" ) && FileText.GetSelectedText() is { Length: > 0 } selected )
