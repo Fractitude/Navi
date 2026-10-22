@@ -110,6 +110,12 @@
 		min-height: 0;
 		font-family: monospace;
 		font-size: 12px;
+
+		// Not C#: the editor's diagnostics are hidden, so its "Editing…" message would never change.
+		&.plain .status-message
+		{
+			display: none;
+		}
 	}
 
 	.status

@@ -65,7 +65,9 @@
 	}
 
 	<div class="page">
-		<ScriptControl @ref="Editor" class="document" ShowStatusBar=@( true ) OnSourceChanged=@SourceEdited/>
+		<ScriptControl @ref="Editor" class="document @( IsCSharp ? "" : "plain" )" ShowStatusBar=@( true )
+		               DiagnosticDelay=@( IsCSharp ? DiagnosticDelay : float.PositiveInfinity )
+		               OnSourceChanged=@SourceEdited/>
 	</div>
 
 	<div class="status">@UiState.Status</div>
@@ -106,6 +108,15 @@
 
 	ScriptControl Editor;
 	TextEntry BarEntry;
+
+	/// <summary>The editor's own wait before it shows diagnostics, in seconds.</summary>
+	const float DiagnosticDelay = 0.75f;
+
+	/// <summary>
+	/// The document is C#, the only language the editor's analysis knows (Game.Scripting). An untitled document counts,
+	/// since it is saved as .cs. Any other file keeps the colours, but gets no diagnostics, completion or popups.
+	/// </summary>
+	bool IsCSharp => UiState.Path is not { } path || path.EndsWith( ".cs", System.StringComparison.OrdinalIgnoreCase );
 
 	/// <summary>The theme the editor was last given, so it is only set again when it changes.</summary>
 	bool? appliedLight;
@@ -187,6 +198,7 @@
 
 		SyncText();
 		FocusFields();
+		HideIntelliSense();
 		FixPopups();
 		ApplyTheme();
 
@@ -225,6 +237,17 @@
 	/// The player is closing the window while there are unsaved changes: the host's copy asks them in the window.
 	/// </summary>
 	protected override void OnCloseRequested() => ViewModel.CloseRequested();
+
+	/// <summary>
+	/// The editor has no setting to turn off completion, hover text or parameter help, so for a file that isn't C# they
+	/// are closed every frame. They open on a key or the mouse, before the frame's ticks, so none is ever drawn. Closing
+	/// also forgets the hovered word, so the hover text's delay never runs out.
+	/// </summary>
+	void HideIntelliSense()
+	{
+		if ( Editor is not null && !IsCSharp )
+			Editor.DismissIntelliSense();
+	}
 
 	/// <summary>
 	/// The editor's completion, hover and signature popups are put where the caret is, but the engine works out where
