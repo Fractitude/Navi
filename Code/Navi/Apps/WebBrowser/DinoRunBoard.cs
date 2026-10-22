@@ -249,7 +249,7 @@ public sealed class DinoRunBoard : Panel
 
 		var points = frame.Score.ToString( "00000" );
 		var high = frame.HighScore > 0 ? $"HI {frame.HighScore:00000}  " : "";
-		score.Text = high + (frame.ScoreBlink ? "" : points);
+		score.Text = high + points;
 
 		message.Text = frame switch
 		{

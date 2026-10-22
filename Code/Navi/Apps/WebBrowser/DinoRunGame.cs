@@ -52,9 +52,6 @@ public sealed record DinoRunFrame
 	public int Score { get; init; }
 	public int HighScore { get; init; }
 
-	/// <summary>The score just passed a hundred, and blinks.</summary>
-	public bool ScoreBlink { get; init; }
-
 	/// <summary>Every 700 points the track turns to night, and back.</summary>
 	public bool Night { get; init; }
 
@@ -103,7 +100,7 @@ public sealed class DinoRunGame
 	readonly List<DinoObstacle> obstacles = new();
 
 	DinoRunPhase phase;
-	float height, velocity, speed = StartSpeed, distance, animation, sinceCrash, sinceBlink = 10;
+	float height, velocity, speed = StartSpeed, distance, animation, sinceCrash;
 	float nextGap;
 	bool ducking, jumpHeld;
 	int nextId, lastHundred;
@@ -171,7 +168,6 @@ public sealed class DinoRunGame
 		var step = speed * delta;
 		distance += step;
 		animation += delta;
-		sinceBlink += delta;
 
 		// The dino. A jump starts on the ground; ducking in the air drops it faster.
 		var grounded = height <= 0f && velocity >= 0f;
@@ -207,12 +203,11 @@ public sealed class DinoRunGame
 		if ( obstacles.Count == 0 || obstacles[^1].X + obstacles[^1].Width < Width - nextGap )
 			Spawn();
 
-		// The score, with a blink and a sound at every hundred.
+		// A sound at every hundred points. Chrome blinks the score too; here it stays put.
 		var hundred = Score / 100;
 		if ( hundred > lastHundred )
 		{
 			lastHundred = hundred;
-			sinceBlink = 0;
 			_ = navi.Audio.PlayAsync( "sounds/kenney/ui/ui.upvote.sound", 0.6f );
 		}
 
@@ -244,7 +239,6 @@ public sealed class DinoRunGame
 		speed = StartSpeed;
 		distance = 0;
 		lastHundred = 0;
-		sinceBlink = 10;
 		nextGap = 0;
 		ducking = false;
 		Jump();
@@ -314,7 +308,6 @@ public sealed class DinoRunGame
 		Distance = distance,
 		Score = Score,
 		HighScore = highScore,
-		ScoreBlink = sinceBlink < 1f && (int)(sinceBlink * 4) % 2 == 0,
 		Night = Score / NightEvery % 2 == 1,
 		Paused = paused,
 	};
