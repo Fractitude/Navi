@@ -94,17 +94,26 @@
 		}
 	}
 
-	// Offline: Dino Run, under a line saying why there is no page.
+	// Offline: a line at the top saying why there is no page, and Dino Run in the room below it.
 	.offline
 	{
 		flex-grow: 1;
 		flex-shrink: 1;
 		min-height: 0;
 		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		overflow: hidden;
+	}
+
+	.dino-area
+	{
+		flex-grow: 1;
+		flex-shrink: 1;
+		min-height: 0;
+		align-self: stretch;
 		justify-content: center;
 		align-items: center;
-		gap: 8px;
-		overflow: hidden;
 	}
 
 	.offline-text

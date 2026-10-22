@@ -47,12 +47,14 @@
 
 		@if ( UiState.Online is false )
 		{
-			<div class="offline" @ref="Offline">
+			<div class="offline">
 				<div class="offline-text">
 					<i>wifi_off</i>
 					<label>No internet. This computer needs a network card to reach the web.</label>
 				</div>
-				<DinoRunBoard @ref="Board" Clicked=@( () => Dino.Click() )></DinoRunBoard>
+				<div class="dino-area" @ref="DinoArea">
+					<DinoRunBoard @ref="Board" Clicked=@( () => Dino.Click() )></DinoRunBoard>
+				</div>
 			</div>
 		}
 		else if ( UiState.Online is true )
@@ -77,7 +79,8 @@
 
 	WebPanel Web;
 
-	Panel Offline;
+	/// <summary>The room below the offline message, which the game is scaled to fill.</summary>
+	Panel DinoArea;
 	DinoRunBoard Board;
 	float boardScale;
 
@@ -121,17 +124,17 @@
 	}
 
 	/// <summary>
-	/// Scale the game to the widest it fits in the page. Layout boxes ignore transforms, so the board keeps its own size to
-	/// measure, and the page centers it. What the panel does to its own tree, like Pac-Man's frame.
+	/// Scale the game to the biggest it fits in its area. Layout boxes ignore transforms, so the board keeps its own size to
+	/// measure, and the area centers it; scaled to fit the area, it never reaches the message above. What the panel does to
+	/// its own tree, like Pac-Man's frame.
 	/// </summary>
 	void ScaleBoard()
 	{
-		if ( !Offline.IsValid() || Offline.Box.Rect.Width <= 0f || Board.Box.Rect.Width <= 0f )
+		if ( !DinoArea.IsValid() || DinoArea.Box.Rect.Width <= 0f || DinoArea.Box.Rect.Height <= 0f || Board.Box.Rect.Width <= 0f )
 			return;
 
-		// The text above the game takes some of the height.
-		var scale = System.MathF.Min( Offline.Box.Rect.Width * 0.95f / Board.Box.Rect.Width,
-			Offline.Box.Rect.Height * 0.7f / Board.Box.Rect.Height );
+		var scale = System.MathF.Min( DinoArea.Box.Rect.Width * 0.95f / Board.Box.Rect.Width,
+			DinoArea.Box.Rect.Height * 0.95f / Board.Box.Rect.Height );
 
 		if ( !float.IsFinite( scale ) || scale <= 0f || System.MathF.Abs( scale - boardScale ) < 0.001f )
 			return;
