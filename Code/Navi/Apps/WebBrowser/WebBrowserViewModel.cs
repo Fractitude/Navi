@@ -4,7 +4,8 @@ using Sandbox.UI;
 namespace NaviApps;
 
 /// <summary>
-/// Everything the Web Browser does. The panel (<c>WebBrowser.razor</c>) draws <see cref="UiState"/> and hosts the engine's
+/// Everything one tab of the Web Browser does: each tab is one of these, with a page, a history and an address of its
+/// own (<see cref="WebBrowserTabs"/>). The panel (<c>WebBrowser.razor</c>) draws <see cref="UiState"/> and hosts the engine's
 /// <c>WebPanel</c>, which shows the page. The engine's web surface can't go back or forward, so the history is kept
 /// here, and the panel tells this what address the page is on (<see cref="PageChanged"/>) so a followed link joins it.
 /// </summary>
@@ -14,8 +15,8 @@ namespace NaviApps;
 /// in the player's real browser engine, on their real connection, so an address another player could choose would let
 /// them send this player to any site they like, such as an IP logger. The app is Shared only for Dino Run
 /// (<see cref="WebBrowserSharedViewModel"/>, run by the host's copy). This is made by the seated player's own copy,
-/// whether that is the host's or a viewer's, kept in memory only, and makes no calls but the local title and, for a file
-/// address, reading the computer's files. Those are on the host only, so a viewer's copy (a client in the seat) asks the
+/// whether that is the host's or a viewer's, kept in memory only, and makes no calls but, for a file address, reading the
+/// computer's files (its title is shown by <see cref="WebBrowserTabs"/>, as the local title). Those are on the host only, so a viewer's copy (a client in the seat) asks the
 /// host for them, which reads them as this app and answers that client alone (<c>NaviComputer.ReadRemoteFiles</c>). The
 /// page is hidden while someone else uses the computer (<c>Navi.IsWatching</c>), and the only addresses opened are what this
 /// player typed, a link they followed in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
@@ -72,9 +73,6 @@ public sealed class WebBrowserViewModel
 	/// <summary>The files shown as pictures. Any other file is shown as text, if it is text.</summary>
 	static readonly string[] ImageExtensions = ["jpg", "jpeg", "png"];
 
-	/// <summary>The most a window title shows (see <c>Navi.Window.SetTitleAsync</c>).</summary>
-	const int MaxTitle = 32;
-
 	/// <summary>The computer, as this app. Every call is made through it.</summary>
 	readonly Navi navi;
 
@@ -92,8 +90,6 @@ public sealed class WebBrowserViewModel
 	/// </summary>
 	bool loading;
 
-	string reportedTitle;
-
 	/// <summary>Whether the computer is online, as the host's copy last said. Null until it has.</summary>
 	bool? online;
 
@@ -107,9 +103,10 @@ public sealed class WebBrowserViewModel
 	/// </summary>
 	public Texture Picture { get; private set; }
 
-	public WebBrowserViewModel( Navi navi )
+	public WebBrowserViewModel( Navi navi, int id )
 	{
 		this.navi = navi;
+		Id = id;
 		UiState = new WebBrowserUiState { Url = Home, LoadId = 1, AddressText = Home };
 	}
 
@@ -138,6 +135,9 @@ public sealed class WebBrowserViewModel
 	public WebBrowserUiState UiState { get; private set; }
 
 	public int Revision => UiState.Revision;
+
+	/// <summary>Which tab this is, unique among the browser's tabs. The panel keys the tab's page on it.</summary>
+	public int Id { get; }
 
 	string Current => history[position];
 
@@ -400,18 +400,13 @@ public sealed class WebBrowserViewModel
 	};
 
 	/// <summary>
-	/// The page title is the window's title bar text, and the app's name only while the page has none (the desktop lets a
-	/// pre-packaged app's title stand alone). It isn't drawn by the panel, so it isn't state. It stays on this client, like
-	/// the address: other players see "Web Browser" (<c>Navi.Window.SetLocalTitleAsync</c>).
+	/// The page title is the tab's, and the active tab's is the window's title bar text (<see cref="WebBrowserTabs"/>).
 	/// </summary>
 	void ChangeTitle( string title )
 	{
 		title = (title ?? "").Trim();
-		if ( title == reportedTitle )
-			return;
-
-		reportedTitle = title;
-		_ = navi.Window.SetLocalTitleAsync( title.Length > MaxTitle ? title[..MaxTitle] : title );
+		if ( title != UiState.Title )
+			Update( uiState => uiState with { Title = title } );
 	}
 
 	/// <summary>

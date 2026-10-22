@@ -10,10 +10,30 @@
 @* (WebBrowserSharedViewModel), and every player near the screen sees it. Browsing is the seated player's own: their *@
 @* copy has the address, the history and the page, everyone else sees a private screen, and nothing about it is *@
 @* published, so no other player can make their real browser open a site (see the remarks on WebBrowserViewModel). *@
+@* That goes for the tabs too (WebBrowserTabs): only the seated player sees the tab bar, and each tab is a browser of *@
+@* its own, with a WebPanel (WebBrowserTabPage) that stays loaded while another tab is shown. *@
 
 <root>
 	@if ( !Navi.IsWatching )
 	{
+		<div class="tabs">
+			@foreach ( var tab in Tabs.All )
+			{
+				<div @key=@tab.Id class="tab @( tab == Tabs.Active ? "active" : "" )" @onclick=@( () => Tabs.Select( tab ) )>
+					<label class="tab-title">@TabTitle( tab )</label>
+					@if ( Tabs.CanClose )
+					{
+						<div class="close" tooltip="Close tab" @onclick=@( () => Tabs.Close( tab ) )>
+							<i>close</i>
+						</div>
+					}
+				</div>
+			}
+			<div class="button @( Tabs.CanAdd ? "" : "disabled" )" tooltip="New tab" @onclick=@( () => Tabs.NewTab() )>
+				<i>add</i>
+			</div>
+		</div>
+
 		<div class="toolbar">
 			<div class="button @( UiState.CanGoBack ? "" : "disabled" )" tooltip="Back" @onclick=@( () => ViewModel.GoBack() )>
 				<i>arrow_back</i>
@@ -44,87 +64,98 @@
 
 	}
 
-	@if ( Dino != DinoView.None )
-	{
-		<div class="offline">
-			@if ( Dino == DinoView.Offline )
-			{
-				<div class="offline-text">
-					<i>wifi_off</i>
-					<label>No internet. This computer needs a network card to reach the web.</label>
-				</div>
-			}
-			<div class="dino-area" @ref="DinoArea">
-				<DinoRunBoard @ref="Board" Clicked=@( () => Navi.Act( WebBrowserSharedViewModel.ClickAction ) )></DinoRunBoard>
-			</div>
-		</div>
-	}
-	else if ( Navi.IsWatching )
-	{
-		<div class="private">
-			<i>visibility_off</i>
-			<label>This player is browsing the internet privately.</label>
-		</div>
-	}
-	else if ( UiState.LocalPage is { } localPage )
-	{
-		<div class="private">
-			<i>link_off</i>
-			<label>@localPage isn't a page of this browser. Try @WebBrowserViewModel.DinoPage.</label>
-		</div>
-	}
-	else if ( UiState.File is { } file )
-	{
-		@if ( file.Kind == WebBrowserFileKind.Text )
+	<div class="content">
+		@if ( Dino != DinoView.None )
 		{
-			@* A label holds a selection but doesn't make one: a drag is handled by an ancestor with AllowChildSelection, *@
-			@* as in the Calculator. *@
-			<div class="file-page file-text" AllowChildSelection=@true AcceptsFocus=@true>
-				<label class="text" @ref="FileText">@file.Text</label>
-			</div>
-		}
-		else if ( file.Kind == WebBrowserFileKind.Image )
-		{
-			<div class="file-page file-image">
-				<Image class="picture" Texture=@ViewModel.Picture/>
-				<label class="size">@file.Message</label>
-			</div>
-		}
-		else if ( file.Kind == WebBrowserFileKind.Folder )
-		{
-			<div class="file-page file-folder">
-				<label class="heading">Index of @file.Path</label>
-				@foreach ( var entry in file.Entries )
+			<div class="offline">
+				@if ( Dino == DinoView.Offline )
 				{
-					<div class="entry" @onclick=@( () => ViewModel.OpenFile( entry.Url ) )>
-						<i>@( entry.IsFolder ? "folder" : "description" )</i>
-						<label class="name">@entry.Name</label>
-						<label class="size">@entry.SizeText</label>
+					<div class="offline-text">
+						<i>wifi_off</i>
+						<label>No internet. This computer needs a network card to reach the web.</label>
 					</div>
 				}
+				<div class="dino-area" @ref="DinoArea">
+					<DinoRunBoard @ref="Board" Clicked=@( () => Navi.Act( WebBrowserSharedViewModel.ClickAction ) )></DinoRunBoard>
+				</div>
 			</div>
 		}
-		else
+		else if ( Navi.IsWatching )
 		{
 			<div class="private">
-				<i>@( file.Kind == WebBrowserFileKind.Loading ? "hourglass_empty" : "draft" )</i>
-				<label>@( file.Kind == WebBrowserFileKind.Loading ? $"Opening {file.Path}..." : file.Message )</label>
+				<i>visibility_off</i>
+				<label>This player is browsing the internet privately.</label>
 			</div>
 		}
-	}
-	else if ( SharedState.Online is true )
-	{
-		<WebPanel @ref="Web" class="page"/>
-	}
+		else if ( UiState.LocalPage is { } localPage )
+		{
+			<div class="private">
+				<i>link_off</i>
+				<label>@localPage isn't a page of this browser. Try @WebBrowserViewModel.DinoPage.</label>
+			</div>
+		}
+		else if ( UiState.File is { } file )
+		{
+			@if ( file.Kind == WebBrowserFileKind.Text )
+			{
+				@* A label holds a selection but doesn't make one: a drag is handled by an ancestor with AllowChildSelection, *@
+				@* as in the Calculator. *@
+				<div class="file-page file-text" AllowChildSelection=@true AcceptsFocus=@true>
+					<label class="text" @ref="FileText">@file.Text</label>
+				</div>
+			}
+			else if ( file.Kind == WebBrowserFileKind.Image )
+			{
+				<div class="file-page file-image">
+					<Image class="picture" Texture=@ViewModel.Picture/>
+					<label class="size">@file.Message</label>
+				</div>
+			}
+			else if ( file.Kind == WebBrowserFileKind.Folder )
+			{
+				<div class="file-page file-folder">
+					<label class="heading">Index of @file.Path</label>
+					@foreach ( var entry in file.Entries )
+					{
+						<div class="entry" @onclick=@( () => ViewModel.OpenFile( entry.Url ) )>
+							<i>@( entry.IsFolder ? "folder" : "description" )</i>
+							<label class="name">@entry.Name</label>
+							<label class="size">@entry.SizeText</label>
+						</div>
+					}
+				</div>
+			}
+			else
+			{
+				<div class="private">
+					<i>@( file.Kind == WebBrowserFileKind.Loading ? "hourglass_empty" : "draft" )</i>
+					<label>@( file.Kind == WebBrowserFileKind.Loading ? $"Opening {file.Path}..." : file.Message )</label>
+				</div>
+			}
+		}
+
+		@* Every tab on a web page keeps its page, shown or not: one that is hidden stays loaded in the background. *@
+		@if ( !Navi.IsWatching && SharedState.Online is true )
+		{
+			@foreach ( var tab in Tabs.All.Where( x => x.UiState.LocalPage is null && x.UiState.File is null ) )
+			{
+				<WebBrowserTabPage @key=@tab.Id Tab=@tab class="page @( tab == Tabs.Active ? "" : "background" )"/>
+			}
+		}
+	</div>
 </root>
 
 @code
 {
 	/// <summary>
-	/// Browsing, which is the seated player's own. Made on first use, on any copy, but only the seated player's copy uses
-	/// it: everyone else's draws the private screen. It makes no calls but the local title, so a viewer's copy may have it.
+	/// The tabs, and the browsing in them, which are the seated player's own. Made on first use, on any copy, but only the
+	/// seated player's copy uses them: everyone else's draws the private screen. They make no calls but the local title and
+	/// reading files, so a viewer's copy may have them.
 	/// </summary>
-	WebBrowserViewModel ViewModel => field ??= new(Navi);
+	WebBrowserTabs Tabs => field ??= new(Navi);
+
+	/// <summary>The tab shown, whose toolbar and page are drawn.</summary>
+	WebBrowserViewModel ViewModel => Tabs.Active;
 
 	/// <summary>
 	/// The browsing toolbar's state. Read only: the view model replaces it, and its revision is what makes this panel redraw.
@@ -141,8 +172,6 @@
 	/// </summary>
 	WebBrowserSharedState SharedState =>
 		Navi.IsViewer ? Navi.GetState<WebBrowserSharedState>() ?? WebBrowserSharedState.Empty : Shared.UiState;
-
-	WebPanel Web;
 
 	/// <summary>A text file's text, which the player can select and copy (<see cref="TickFileText"/>).</summary>
 	Label FileText;
@@ -188,12 +217,8 @@
 	/// <summary>What <c>Navi.Input.KeepLocalAsync</c> was last told. Null before the first tick.</summary>
 	bool? keptInputLocal;
 
-	/// <summary>The <see cref="WebBrowserUiState.LoadId"/> the page was last told to load.</summary>
-	int loadedId = -1;
-
 	/// <summary>
-	/// The page is a panel of the engine, so loading into it and reading which address it is on are done here, between it
-	/// and the view model. Neither is app state.
+	/// Each tab's web page loads itself and reports its address (<see cref="WebBrowserTabPage"/>).
 	/// </summary>
 	public override void Tick()
 	{
@@ -213,7 +238,10 @@
 		}
 
 		if ( !Navi.IsWatching && shared.Online is { } online )
-			ViewModel.NetworkChanged( online );
+			Tabs.NetworkChanged( online );
+
+		if ( !Navi.IsWatching )
+			Tabs.ShowTitle();
 
 		TickFileText();
 
@@ -236,23 +264,10 @@
 			keptInputLocal = keepLocal;
 			_ = Navi.Input.KeepLocalAsync( keepLocal );
 		}
-
-		// A local or file page is never loaded into the web page, which isn't drawn then.
-		if ( Navi.IsWatching || UiState.LocalPage is not null || UiState.File is not null || !Web.IsValid() )
-		{
-			// The page is made again when the player is back, and loads the address again.
-			loadedId = -1;
-			return;
-		}
-
-		if ( loadedId != UiState.LoadId )
-		{
-			loadedId = UiState.LoadId;
-			Load( UiState.Url );
-		}
-
-		ViewModel.PageChanged( Web.Surface?.Url, Web.Surface?.PageTitle );
 	}
+
+	/// <summary>A tab shows its page's title, and "New tab" while the page has none.</summary>
+	static string TabTitle( WebBrowserViewModel tab ) => tab.UiState.Title is { Length: > 0 } title ? title : "New tab";
 
 	/// <summary>
 	/// A text file's text is selected with the mouse (its page allows child selection), and Ctrl+C copies the selection to
@@ -296,21 +311,6 @@
 	}
 
 	/// <summary>
-	/// The engine refuses addresses it doesn't allow, and says so by throwing.
-	/// </summary>
-	void Load( string url )
-	{
-		try
-		{
-			Web.Url = url;
-		}
-		catch ( System.Exception e )
-		{
-			ViewModel.LoadFailed( e.Message );
-		}
-	}
-
-	/// <summary>
 	/// The address field reports every edit here. Typing doesn't redraw; Enter loads.
 	/// </summary>
 	void AddressEdited( string text ) => ViewModel.SetAddressText( text );
@@ -330,5 +330,5 @@
 			Shared.Act( action, args );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( ViewModel.Revision, Navi.IsWatching, SharedState.Online, SharedState.DinoShown );
+	protected override int BuildHash() => System.HashCode.Combine( Tabs.Revision, Navi.IsWatching, SharedState.Online, SharedState.DinoShown );
 }

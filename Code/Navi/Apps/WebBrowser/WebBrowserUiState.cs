@@ -31,6 +31,12 @@ public sealed record WebBrowserUiState
 	/// </summary>
 	public WebBrowserFilePage File { get; init; }
 
+	/// <summary>
+	/// The page title, or what the browser calls its own page ("Dino Run", a file's name). Empty while the page has none.
+	/// The tab shows it, and the active tab's is the window's title.
+	/// </summary>
+	public string Title { get; init; } = "";
+
 	/// <summary>What the address field holds.</summary>
 	public string AddressText { get; init; } = "";
 
