@@ -98,6 +98,20 @@ public sealed class WebBrowserTabs
 		revision++;
 	}
 
+	/// <summary>
+	/// Put a tab at another place in the tab bar, the tabs between moving up one. The player dragged it there.
+	/// </summary>
+	public void Move( WebBrowserViewModel tab, int to )
+	{
+		var from = tabs.IndexOf( tab );
+		if ( from < 0 || to < 0 || to >= tabs.Count || to == from )
+			return;
+
+		tabs.RemoveAt( from );
+		tabs.Insert( to, tab );
+		revision++;
+	}
+
 	public void Select( WebBrowserViewModel tab )
 	{
 		if ( tab == Active || !tabs.Contains( tab ) )

@@ -16,10 +16,11 @@
 <root>
 	@if ( !Navi.IsWatching )
 	{
-		<div class="tabs">
+		<div class="tabs" @ref="TabBar">
 			@foreach ( var tab in Tabs.All )
 			{
-				<div @key=@tab.Id class="tab @( tab == Tabs.Active ? "active" : "" )" @onclick=@( () => Tabs.Select( tab ) )>
+				<div @key=@tab.Id class="tab @( tab == Tabs.Active ? "active" : "" )"
+				     @onmousedown=@( ( PanelEvent e ) => PressTab( e, tab ) )>
 					<label class="tab-title">@TabTitle( tab )</label>
 					@if ( Tabs.CanClose )
 					{
@@ -243,6 +244,8 @@
 		if ( !Navi.IsWatching )
 			Tabs.ShowTitle();
 
+		UpdateTabDrag();
+
 		TickFileText();
 
 		// The host's copy runs the game, so it hears when the seated player opens or leaves browser://dino. Only the
@@ -264,6 +267,138 @@
 			keptInputLocal = keepLocal;
 			_ = Navi.Input.KeepLocalAsync( keepLocal );
 		}
+	}
+
+	/// <summary>The tab bar, along which a tab is dragged to a new place.</summary>
+	Panel TabBar;
+
+	// The tab being dragged to a new place. The drag lasts while the mouse button is held on dragHandle, its panel, and
+	// only starts once the mouse has moved TabDragThreshold; until then it is a press that picked the tab. Where the
+	// tabs are while it lasts is the panel's own, like Pac-Man's frame: the tabs move only when it is dropped.
+	Panel dragHandle;
+	WebBrowserViewModel dragTab;
+	int dragFrom;
+	float dragSlot; // From one tab's left edge to the next's, in panel pixels.
+	float dragStartMouse;
+	bool dragMoved;
+
+	/// <summary>How far the mouse moves, in panel pixels, before pressing a tab becomes dragging it.</summary>
+	const float TabDragThreshold = 6f;
+
+	List<Panel> TabPanels => TabBar.IsValid() ? TabBar.Children.Where( x => x.HasClass( "tab" ) ).ToList() : [];
+
+	float TabBarMouse => TabBar.MousePosition.x * TabBar.ScaleFromScreen;
+
+	/// <summary>
+	/// The mouse went down on a tab: it is shown, and moving the mouse far enough drags it (<see cref="UpdateTabDrag"/>).
+	/// Its close button is left to close it.
+	/// </summary>
+	void PressTab( PanelEvent e, WebBrowserViewModel tab )
+	{
+		if ( e is not MousePanelEvent { MouseButton: MouseButtons.Left } )
+			return;
+
+		for ( var panel = e.Target; panel is not null && panel != e.This; panel = panel.Parent )
+		{
+			if ( panel.HasClass( "close" ) )
+				return;
+		}
+
+		Tabs.Select( tab );
+
+		var panels = TabPanels;
+		var from = panels.IndexOf( e.This );
+		if ( from < 0 || panels.Count < 2 || panels.Count != Tabs.All.Count || Tabs.All[from] != tab )
+			return;
+
+		dragHandle = e.This;
+		dragTab = tab;
+		dragFrom = from;
+		dragSlot = (panels[1].Box.Rect.Left - panels[0].Box.Rect.Left) * TabBar.ScaleFromScreen;
+		dragStartMouse = TabBarMouse;
+		dragMoved = false;
+	}
+
+	/// <summary>
+	/// Move the dragged tab with the mouse, along the tab bar, and the tabs it passes out of its way. Letting go drops it
+	/// there. The drag is called off if the tabs change under it.
+	/// </summary>
+	void UpdateTabDrag()
+	{
+		if ( dragHandle is null )
+			return;
+
+		var panels = TabPanels;
+		var unchanged = !Navi.IsWatching && dragHandle.IsValid && panels.Count == Tabs.All.Count
+			&& panels.IndexOf( dragHandle ) == dragFrom && Tabs.All[dragFrom] == dragTab;
+
+		if ( !unchanged )
+		{
+			EndTabDrag( panels, dragFrom );
+			return;
+		}
+
+		var delta = TabBarMouse - dragStartMouse;
+		var released = !dragHandle.HasActive;
+
+		if ( !dragMoved )
+		{
+			if ( released )
+			{
+				EndTabDrag( panels, dragFrom );
+				return;
+			}
+
+			if ( System.MathF.Abs( delta ) < TabDragThreshold )
+				return;
+
+			dragMoved = true;
+		}
+
+		var offset = System.Math.Clamp( delta, -dragFrom * dragSlot, (panels.Count - 1 - dragFrom) * dragSlot );
+		var to = dragSlot > 0f ? dragFrom + (int)System.MathF.Round( offset / dragSlot ) : dragFrom;
+
+		if ( released )
+		{
+			EndTabDrag( panels, to );
+			return;
+		}
+
+		TabBar.SetClass( "reordering", true );
+
+		for ( var i = 0; i < panels.Count; i++ )
+		{
+			var shift = i == dragFrom ? offset
+				: i > dragFrom && i <= to ? -dragSlot
+				: i < dragFrom && i >= to ? dragSlot
+				: 0f;
+
+			panels[i].Style.Left = Length.Pixels( shift );
+			panels[i].SetClass( "dragging", i == dragFrom );
+		}
+	}
+
+	/// <summary>
+	/// Put the tabs back in their places and, if the dragged one was dropped somewhere new, move it there. The tab bar is
+	/// drawn again in the new order.
+	/// </summary>
+	void EndTabDrag( List<Panel> panels, int to )
+	{
+		foreach ( var panel in panels )
+		{
+			panel.Style.Left = null;
+			panel.SetClass( "dragging", false );
+		}
+
+		if ( TabBar.IsValid() )
+			TabBar.SetClass( "reordering", false );
+
+		if ( dragMoved && to != dragFrom )
+			Tabs.Move( dragTab, to );
+
+		dragHandle = null;
+		dragTab = null;
+		dragMoved = false;
 	}
 
 	/// <summary>A tab shows its page's title, and "New tab" while the page has none.</summary>

@@ -22,6 +22,7 @@
 
 	.tab
 	{
+		position: relative;
 		flex-basis: 120px;
 		flex-shrink: 1;
 		min-width: 0;
@@ -70,6 +71,23 @@
 		{
 			opacity: 1;
 			border-color: $ink-bc;
+		}
+	}
+
+	// A tab being dragged to a new place (the panel moves it). It is drawn over the tabs it passes, and no tooltips pop up
+	// as they pass under the mouse.
+	.tabs.reordering
+	{
+		.tooltip
+		{
+			opacity: 0;
+		}
+
+		.tab.dragging
+		{
+			z-index: 1;
+			opacity: 1;
+			background-color: $paper-bg;
 		}
 	}
 
