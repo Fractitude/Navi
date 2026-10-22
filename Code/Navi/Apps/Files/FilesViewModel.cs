@@ -159,6 +159,16 @@ public sealed class FilesViewModel
 	/// </summary>
 	public FilesThumbnails Thumbnails => field ??= new( navi );
 
+	/// <summary>The pictures' contents' hashes by path, which their thumbnails are made again by when they change.</summary>
+	Dictionary<string, string> pictureHashes = new();
+
+	async Task LoadHashesAsync()
+	{
+		var pictures = entries.Where( x => !x.IsFolder && IsPicture( x.Name ) ).Select( x => x.Path ).Take( MaxRows ).ToList();
+		var hashes = pictures.Count > 0 ? await navi.Files.GetHashesAsync( pictures ) : [];
+		pictureHashes = pictures.Zip( hashes ).Where( x => x.Second != "" ).ToDictionary( x => x.First, x => x.Second );
+	}
+
 	async Task PollAsync()
 	{
 		polling = true;
@@ -215,6 +225,7 @@ public sealed class FilesViewModel
 
 				realPath = info?.Path ?? "/";
 				entries = await navi.Files.ListAsync( path );
+				await LoadHashesAsync();
 			}
 		}
 		catch ( System.Exception e )
@@ -1126,7 +1137,7 @@ public sealed class FilesViewModel
 			x.Path, x.Name, IconOf( x ), DetailOf( x ), x.Modified.ToLocalTime().ToString( "yyyy-MM-dd HH:mm" ),
 			x.Kind switch { Navi.FileKind.Symlink => "link", Navi.FileKind.Alias => "alias", _ => "" },
 			selection.Contains( x.Path ), x.Name.StartsWith( '.' ), x.Path == cursor,
-			!x.IsFolder && IsPicture( x.Name ) ? $"{x.Modified.UtcTicks}-{x.Size}" : "" ) ).ToList();
+			pictureHashes.GetValueOrDefault( x.Path, "" ) ) ).ToList();
 
 		var drive = CurrentDrive;
 		var count = shown.Count == 1 ? "1 item" : $"{shown.Count} items";

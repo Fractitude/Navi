@@ -53,6 +53,7 @@ public sealed partial class NaviComputer
 		root.Label = string.IsNullOrWhiteSpace( DriveName ) ? "Navi HD" : DriveName;
 
 		Files = new NaviFileSystem( root );
+		ForgetThumbnails();
 		savedDrives.Clear();
 		savedDrives[root] = save is null ? -1 : root.Version;
 		if ( save is not null )

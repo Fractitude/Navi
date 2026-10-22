@@ -1275,6 +1275,13 @@ public sealed class Navi
 		public Task<byte[]> GetThumbnailAsync( string path ) => navi.CallAsync<byte[]>( "files.thumbnail", path );
 
 		/// <summary>
+		/// Each file's version by its contents: the SHA-256 of what is in it, as hex, which changes whenever the contents
+		/// do. Empty for a path that isn't a file, or that the app may not read. At most 1024 paths.
+		/// </summary>
+		public async Task<IReadOnlyList<string>> GetHashesAsync( IReadOnlyList<string> paths ) =>
+			await navi.CallAsync<string[]>( "files.hashes", (object)(paths?.ToArray() ?? []) );
+
+		/// <summary>
 		/// Write a binary file (a picture, say), making it or replacing what is in it. Returns its path.
 		/// </summary>
 		public Task<string> WriteBytesAsync( string path, byte[] data ) =>

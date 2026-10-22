@@ -399,8 +399,8 @@
 
 		if ( Navi.IsViewer )
 		{
-			// Only the seated player's client may read the files from the host. Anyone else watching sees the icons.
-			if ( UiState.GridView && !Navi.IsWatching )
+			// The seated player's client and anyone watching ask the host, which sends only the thumbnails of what it shows.
+			if ( UiState.GridView )
 				ViewerThumbnails.Tick( UiState.Rows );
 
 			return;

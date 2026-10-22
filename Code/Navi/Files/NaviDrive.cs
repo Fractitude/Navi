@@ -58,6 +58,12 @@ public sealed class NaviFileNode
 	public long Rev { get; set; }
 
 	/// <summary>
+	/// The SHA-256 of the contents, as hex: the file's version by what is in it. Set on every write; empty for a file
+	/// saved before there were hashes, until <see cref="NaviDrive.HashOf"/> works it out.
+	/// </summary>
+	public string Hash { get; set; } = "";
+
+	/// <summary>
 	/// A symlink's target path, absolute or relative to its folder. An alias's target path when it was made, used if
 	/// the target's drive isn't mounted or the entry is gone.
 	/// </summary>
@@ -249,10 +255,25 @@ public sealed class NaviDrive
 			x.Size = bytes.LongLength;
 			x.Binary = binary;
 			x.Rev++;
+			x.Hash = HashOf( bytes );
 		} );
 
 		pending[node.Id] = bytes;
 	}
+
+	/// <summary>
+	/// The file's <see cref="NaviFileNode.Hash"/>, worked out from its contents if it has none yet.
+	/// </summary>
+	public string HashOf( NaviFileNode node )
+	{
+		if ( string.IsNullOrEmpty( node.Hash ) && node.Kind == NaviFileKind.File )
+			node.Hash = HashOf( ReadContent( node ) );
+
+		return node.Hash ?? "";
+	}
+
+	static string HashOf( byte[] bytes ) =>
+		System.Convert.ToHexString( System.Security.Cryptography.SHA256.HashData( bytes ?? [] ) ).ToLowerInvariant();
 
 	/// <summary>
 	/// What a save has to write: the contents written since the last one.

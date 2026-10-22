@@ -56,12 +56,14 @@ public sealed partial class NaviComputer
 
 	/// <summary>
 	/// On a client: read the host's files as <paramref name="window"/>'s app, and answer <paramref name="reply"/> with what
-	/// the same call gives the host's copy. Only the seated user's client asks; any other gets
+	/// the same call gives the host's copy. Only the seated user's client reads; a client watching the screen may only ask
+	/// for the thumbnail of a picture a shared app shows (<see cref="UserWatchThumbnail"/>). Anything else gets
 	/// <see cref="NaviFileError.Unavailable"/> at once.
 	/// </summary>
 	internal void ReadRemoteFiles( NaviWindow window, string method, object[] args, TaskCompletionSource<object> reply )
 	{
-		if ( IsAuthority || !IsUser || !IsRemoteFileCall( method ) || window is null )
+		var watching = !IsUser && method == "files.thumbnail" && window is { App.Shared: true };
+		if ( IsAuthority || (!IsUser && !watching) || !IsRemoteFileCall( method ) || window is null )
 		{
 			reply.TrySetException( new NaviFileException( NaviFileError.Unavailable, "" ) );
 			return;
@@ -78,7 +80,11 @@ public sealed partial class NaviComputer
 
 		var request = ++nextRemoteRead;
 		remoteReads[request] = (reply, method, 0);
-		UserReadFiles( window.App.Id, window.Id, request, method, path, follow );
+
+		if ( watching )
+			UserWatchThumbnail( window.App.Id, window.Id, request, path );
+		else
+			UserReadFiles( window.App.Id, window.Id, request, method, path, follow );
 	}
 
 	/// <summary>
@@ -171,10 +177,6 @@ public sealed partial class NaviComputer
 			}
 
 			case byte[] bytes:
-				// A thumbnail is small, but the whole picture was decoded for it: that counts too.
-				if ( method == "files.thumbnail" && Files.TryResolve( path ) is { } source )
-					remoteBytesInWindow += NaviDrive.Size( source.Node );
-
 				return Sent( bytes.Length ) ? (RemoteOk, null, null, null, bytes) : TooBig();
 
 			case FileEntry entry:

@@ -21,9 +21,11 @@ public sealed class FilesThumbnails
 	/// <summary>Pictures that got no thumbnail, by path and key, so they aren't tried again.</summary>
 	readonly Dictionary<string, string> failed = new();
 
+	/// <summary>Pictures the host didn't send, by path, with the key asked for and when, to ask again a moment later.</summary>
+	readonly Dictionary<string, (string Key, RealTimeSince Since)> retry = new();
+
 	bool loading;
 	IReadOnlyList<FileRow> lastRows;
-	RealTimeSince sinceUnavailable = UnavailableDelay;
 
 	public FilesThumbnails( Navi navi ) => this.navi = navi;
 
@@ -47,12 +49,13 @@ public sealed class FilesThumbnails
 				made.Remove( gone );
 		}
 
-		if ( loading || sinceUnavailable < UnavailableDelay )
+		if ( loading )
 			return;
 
 		var next = rows.FirstOrDefault( x => !string.IsNullOrEmpty( x.Thumbnail )
 			&& (!made.TryGetValue( x.Path, out var thumb ) || thumb.Key != x.Thumbnail)
-			&& (!failed.TryGetValue( x.Path, out var key ) || key != x.Thumbnail) );
+			&& (!failed.TryGetValue( x.Path, out var key ) || key != x.Thumbnail)
+			&& (!retry.TryGetValue( x.Path, out var wait ) || wait.Key != x.Thumbnail || wait.Since > UnavailableDelay) );
 
 		if ( next is not null )
 			_ = LoadAsync( next.Path, next.Thumbnail );
@@ -79,8 +82,8 @@ public sealed class FilesThumbnails
 		}
 		catch ( Navi.FileException e ) when ( e.Error == Navi.FileError.Unavailable )
 		{
-			// The host didn't send it (the seat changed hands, or too much was asked at once): try again in a moment.
-			sinceUnavailable = 0;
+			// The host didn't send it (too much was asked at once, or the screen is locked): try again in a moment.
+			retry[path] = (key, 0);
 		}
 		catch ( System.Exception )
 		{

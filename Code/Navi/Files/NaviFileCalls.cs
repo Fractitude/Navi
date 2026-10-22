@@ -37,7 +37,11 @@ public static class NaviFileCalls
 			{
 				var path = Arg( args, 0, method );
 				Check( files, process, path, followLast: true );
-				return files.List( path ).Select( x => Describe( files, x ) ).ToArray();
+				var listed = files.List( path ).ToList();
+
+				// The host makes the thumbnails of the pictures in it now, for whoever shows them.
+				computer.FolderListed( process, listed );
+				return listed.Select( x => Describe( files, x ) ).ToArray();
 			}
 
 			case "files.info":
@@ -68,7 +72,29 @@ public static class NaviFileCalls
 				// that isn't a picture, or is too big to decode.
 				var path = Arg( args, 0, method );
 				Check( files, process, path, followLast: true, read: true );
-				return Thumbnail( files, path );
+				return computer.ThumbnailOf( files.Resolve( path ) );
+			}
+
+			case "files.hashes":
+			{
+				// Each file's version by its contents (SHA-256, hex), empty for one that isn't there, isn't a file, or that
+				// the app may not read. A path it can't reach gets the same as one that isn't there.
+				var paths = Opt( args, 0, System.Array.Empty<string>() );
+				if ( paths.Length > MaxHashPaths )
+					throw new System.ArgumentException( $"'{method}' takes at most {MaxHashPaths} paths." );
+
+				return paths.Select( x =>
+				{
+					try
+					{
+						Check( files, process, x, followLast: true, read: true );
+						return files.TryResolve( x ) is { Node.Kind: NaviFileKind.File } at ? at.Drive.HashOf( at.Node ) : "";
+					}
+					catch ( System.Exception )
+					{
+						return "";
+					}
+				} ).ToArray();
 			}
 
 			case "files.write-bytes":
@@ -222,33 +248,8 @@ public static class NaviFileCalls
 		throw new System.NotSupportedException( $"Navi has no call '{method}'." );
 	}
 
-	/// <summary>The longest side of a thumbnail, in pixels.</summary>
-	public const int ThumbnailSize = 128;
-
-	/// <summary>The biggest picture made into a thumbnail, in bytes. Bigger ones get none.</summary>
-	public const int MaxThumbnailSource = 8 * 1024 * 1024;
-
-	/// <summary>
-	/// The picture at <paramref name="path"/>, no bigger than <see cref="ThumbnailSize"/> on its longest side, as PNG.
-	/// </summary>
-	static byte[] Thumbnail( NaviFileSystem files, string path )
-	{
-		var at = files.Resolve( path );
-		if ( at.Node.Kind != NaviFileKind.File )
-			throw new NaviFileException( at.Node.Kind == NaviFileKind.Folder ? NaviFileError.IsAFolder : NaviFileError.NotFound, at.Path );
-
-		if ( NaviDrive.Size( at.Node ) is <= 0 or > MaxThumbnailSource )
-			return null;
-
-		using var bitmap = Bitmap.CreateFromBytes( files.ReadBytes( at.Path ) );
-		if ( bitmap is not { Width: > 0, Height: > 0 } )
-			return null;
-
-		var scale = System.Math.Min( 1f, ThumbnailSize / (float)System.Math.Max( bitmap.Width, bitmap.Height ) );
-		using var small = bitmap.Resize( System.Math.Max( 1, (int)(bitmap.Width * scale) ),
-			System.Math.Max( 1, (int)(bitmap.Height * scale) ), true );
-		return small.ToPng();
-	}
+	/// <summary>The most paths one <c>files.hashes</c> call takes.</summary>
+	const int MaxHashPaths = 1024;
 
 	/// <summary>
 	/// The app's own folder, made if it is missing. A drive too full for it leaves it missing.

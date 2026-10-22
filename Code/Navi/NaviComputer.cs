@@ -1499,6 +1499,7 @@ public sealed partial class NaviComputer : Component
 			EndPick( null, closePicker: id != NaviAppRegistry.FilePickerApp );
 
 		running.RemoveAll( x => x.App.Id == id );
+		ForgetThumbnails( id );
 
 		// Nobody is left to answer these.
 		foreach ( var request in permissionRequests.Where( x => x.App.Id == id && !x.IsReview ).ToList() )
