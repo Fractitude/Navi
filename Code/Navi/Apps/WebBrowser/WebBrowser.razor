@@ -3,33 +3,15 @@
 @namespace NaviApps
 
 @* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. The page itself is *@
-@* the engine's WebPanel. Offline it shows Dino Run instead (DinoRunGame), as Chrome does. *@
+@* the engine's WebPanel. Offline it shows Dino Run instead (DinoRunGame), as Chrome does. A local address *@
+@* (browser://, see WebBrowserViewModel.LocalScheme) is drawn here and never loaded: browser://dino is the game. *@
 @* It is shared, but only for Dino Run: the host's copy runs the game and says whether the computer is online *@
 @* (WebBrowserSharedViewModel), and every player near the screen sees it. Browsing is the seated player's own: their *@
 @* copy has the address, the history and the page, everyone else sees a private screen, and nothing about it is *@
 @* published, so no other player can make their real browser open a site (see the remarks on WebBrowserViewModel). *@
 
 <root>
-	@if ( SharedState.Online is false && Navi.IsWatching )
-	{
-		<div class="offline">
-			<div class="offline-text">
-				<i>wifi_off</i>
-				<label>No internet. This computer needs a network card to reach the web.</label>
-			</div>
-			<div class="dino-area" @ref="DinoArea">
-				<DinoRunBoard @ref="Board"></DinoRunBoard>
-			</div>
-		</div>
-	}
-	else if ( Navi.IsWatching )
-	{
-		<div class="private">
-			<i>visibility_off</i>
-			<label>This player is browsing the internet privately.</label>
-		</div>
-	}
-	else
+	@if ( !Navi.IsWatching )
 	{
 		<div class="toolbar">
 			<div class="button @( UiState.CanGoBack ? "" : "disabled" )" tooltip="Back" @onclick=@( () => ViewModel.GoBack() )>
@@ -59,22 +41,40 @@
 			</div>
 		}
 
-		@if ( SharedState.Online is false )
-		{
-			<div class="offline">
+	}
+
+	@if ( Dino != DinoView.None )
+	{
+		<div class="offline">
+			@if ( Dino == DinoView.Offline )
+			{
 				<div class="offline-text">
 					<i>wifi_off</i>
 					<label>No internet. This computer needs a network card to reach the web.</label>
 				</div>
-				<div class="dino-area" @ref="DinoArea">
-					<DinoRunBoard @ref="Board" Clicked=@( () => Navi.Act( WebBrowserSharedViewModel.ClickAction ) )></DinoRunBoard>
-				</div>
+			}
+			<div class="dino-area" @ref="DinoArea">
+				<DinoRunBoard @ref="Board" Clicked=@( () => Navi.Act( WebBrowserSharedViewModel.ClickAction ) )></DinoRunBoard>
 			</div>
-		}
-		else if ( SharedState.Online is true )
-		{
-			<WebPanel @ref="Web" class="page"/>
-		}
+		</div>
+	}
+	else if ( Navi.IsWatching )
+	{
+		<div class="private">
+			<i>visibility_off</i>
+			<label>This player is browsing the internet privately.</label>
+		</div>
+	}
+	else if ( UiState.LocalPage is { } localPage )
+	{
+		<div class="private">
+			<i>link_off</i>
+			<label>@localPage isn't a page of this browser. Try @WebBrowserViewModel.DinoPage.</label>
+		</div>
+	}
+	else if ( SharedState.Online is true )
+	{
+		<WebPanel @ref="Web" class="page"/>
 	}
 </root>
 
@@ -103,6 +103,33 @@
 		Navi.IsViewer ? Navi.GetState<WebBrowserSharedState>() ?? WebBrowserSharedState.Empty : Shared.UiState;
 
 	WebPanel Web;
+
+	enum DinoView
+	{
+		None,
+
+		/// <summary>The computer is offline, which the game sits under a notice for.</summary>
+		Offline,
+
+		/// <summary>The player opened <c>browser://dino</c>.</summary>
+		Opened,
+	}
+
+	/// <summary>
+	/// Whether this copy draws Dino Run, and how. The seated player's copy goes by their own page; everyone else's by what
+	/// the host's copy published.
+	/// </summary>
+	DinoView Dino => Navi.IsWatching ? (SharedState.DinoShown ? DinoView.Opened : OfflineView) : OwnDino;
+
+	/// <summary>Dino Run as this client's own browsing has it, whether or not this player is in the seat.</summary>
+	DinoView OwnDino => UiState.LocalPage == WebBrowserViewModel.DinoPage ? DinoView.Opened
+		: UiState.LocalPage is null ? OfflineView : DinoView.None;
+
+	DinoView OfflineView => SharedState.Online is false ? DinoView.Offline : DinoView.None;
+
+	/// <summary>What was last told the host's copy with <see cref="WebBrowserSharedViewModel.ShowAction"/>. Null while
+	/// watching, so it is told again on sitting down.</summary>
+	bool? sentShown;
 
 	/// <summary>The room below the offline message, which the game is scaled to fill.</summary>
 	Panel DinoArea;
@@ -136,7 +163,7 @@
 		}
 
 		var shared = SharedState;
-		if ( shared.Online is false && Board.IsValid() )
+		if ( Dino != DinoView.None && Board.IsValid() )
 		{
 			Board.DrawFrame( shared.Dino );
 			ScaleBoard();
@@ -145,16 +172,28 @@
 		if ( !Navi.IsWatching && shared.Online is { } online )
 			ViewModel.NetworkChanged( online );
 
+		// The host's copy runs the game, so it hears when the seated player opens or leaves browser://dino. Only the
+		// seated player may tell it.
+		if ( Navi.IsWatching )
+			sentShown = null;
+		else if ( (OwnDino == DinoView.Opened) != sentShown )
+		{
+			sentShown = OwnDino == DinoView.Opened;
+			Navi.Act( WebBrowserSharedViewModel.ShowAction, sentShown.Value ? "1" : "0" );
+		}
+
 		// Only Dino Run takes the player's keys to the host's copy. While browsing they stay here: what the player types
-		// into a page is theirs alone. Every copy says so, so a player who sits down is covered from their first frame.
-		var keepLocal = shared.Online is not false;
+		// into a page is theirs alone. Every copy goes by its own browsing, so a player who sits down is covered from
+		// their first frame.
+		var keepLocal = OwnDino == DinoView.None;
 		if ( keepLocal != keptInputLocal )
 		{
 			keptInputLocal = keepLocal;
 			_ = Navi.Input.KeepLocalAsync( keepLocal );
 		}
 
-		if ( Navi.IsWatching || !Web.IsValid() )
+		// A local page is never loaded into the web page, which isn't drawn then.
+		if ( Navi.IsWatching || UiState.LocalPage is not null || !Web.IsValid() )
 		{
 			// The page is made again when the player is back, and loads the address again.
 			loadedId = -1;
@@ -231,5 +270,5 @@
 			Shared.Act( action, args );
 	}
 
-	protected override int BuildHash() => System.HashCode.Combine( ViewModel.Revision, Navi.IsWatching, SharedState.Online );
+	protected override int BuildHash() => System.HashCode.Combine( ViewModel.Revision, Navi.IsWatching, SharedState.Online, SharedState.DinoShown );
 }

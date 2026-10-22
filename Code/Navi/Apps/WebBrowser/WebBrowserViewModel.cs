@@ -19,6 +19,11 @@ namespace NaviApps;
 /// player typed, a link they followed in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
 /// </para>
 /// <para>
+/// A local address (<see cref="LocalScheme"/>) is only ever typed: one a page reports is ignored, so no site can send the
+/// player to one. Only <see cref="DinoPage"/> is told to the host's copy (that the player is on it, never the address),
+/// because the game is shared and everyone near the screen sees it.
+/// </para>
+/// <para>
 /// Never publish the address, the history or the page title (put them in <see cref="WebBrowserSharedState"/>, or set the
 /// synced title), and never take an address from an action, a launch argument, a file or the host.
 /// </para>
@@ -30,6 +35,18 @@ public sealed class WebBrowserViewModel
 
 	/// <summary>Where an address field entry that isn't an address is searched.</summary>
 	const string SearchUrl = "https://duckduckgo.com/?q=";
+
+	/// <summary>
+	/// The start of a local address: a page the browser draws itself, never loaded into the web page. See
+	/// <see cref="IsLocal"/>.
+	/// </summary>
+	public const string LocalScheme = "browser://";
+
+	/// <summary>Dino Run, without the offline notice.</summary>
+	public const string DinoPage = LocalScheme + "dino";
+
+	/// <summary>The most a local address holds after <see cref="LocalScheme"/>.</summary>
+	const int MaxLocalName = 64;
 
 	/// <summary>The most a window title shows (see <c>Navi.Window.SetTitleAsync</c>).</summary>
 	const int MaxTitle = 32;
@@ -73,8 +90,8 @@ public sealed class WebBrowserViewModel
 
 		this.online = online;
 
-		// Offline there is no page to take the title from. Back online, the page sets it again.
-		if ( !online )
+		// Offline there is no page to take the title from. Back online, the page sets it again. A local page keeps its own.
+		if ( !online && !IsLocal( Current ) )
 			ChangeTitle( "No internet" );
 
 		Update( uiState => uiState with { LoadId = uiState.LoadId + 1, Notice = null } );
@@ -97,7 +114,7 @@ public sealed class WebBrowserViewModel
 		if ( ToUrl( UiState.AddressText ) is not { } url )
 		{
 			if ( !string.IsNullOrWhiteSpace( UiState.AddressText ) )
-				Update( uiState => uiState with { Notice = "Only http and https addresses can be opened." } );
+				Update( uiState => uiState with { Notice = "Only http, https and browser addresses can be opened." } );
 
 			return;
 		}
@@ -141,7 +158,8 @@ public sealed class WebBrowserViewModel
 		ChangeTitle( title );
 
 		// The page has none until it starts loading, and about:blank is the engine's own page.
-		if ( string.IsNullOrEmpty( url ) || url == "about:blank" || url == reportedUrl )
+		// A page can't send the player to a local address: only one they type opens.
+		if ( string.IsNullOrEmpty( url ) || url == "about:blank" || url == reportedUrl || IsLocal( url ) )
 			return;
 
 		reportedUrl = url;
@@ -204,11 +222,17 @@ public sealed class WebBrowserViewModel
 	/// </summary>
 	void Load()
 	{
-		loading = reportedUrl != Current;
+		var local = IsLocal( Current );
+		loading = !local && reportedUrl != Current;
+
+		// A local page has no web page to take the title from.
+		if ( local )
+			ChangeTitle( Current == DinoPage ? "Dino Run" : Current );
 
 		Update( uiState => uiState with
 		{
 			Url = Current,
+			LocalPage = local ? Current : null,
 			LoadId = uiState.LoadId + 1,
 			AddressText = Current,
 			CanGoBack = position > 0,
@@ -234,13 +258,21 @@ public sealed class WebBrowserViewModel
 
 	/// <summary>
 	/// The address to open for what the player typed: a web address as it is, a bare host name with https in front, and
-	/// anything else searched for. Null for an address that isn't http or https, such as <c>javascript:</c> or <c>file:</c>.
+	/// anything else searched for. A local address (<see cref="LocalScheme"/>) stays one. Null for an address that is none of
+	/// those, such as <c>javascript:</c> or <c>file:</c>.
 	/// </summary>
 	public static string ToUrl( string text )
 	{
 		text = (text ?? "").Trim();
 		if ( text.Length == 0 )
 			return null;
+
+		// A local address, made one form: lowercase, without a trailing slash.
+		if ( text.StartsWith( LocalScheme, StringComparison.OrdinalIgnoreCase ) )
+		{
+			var name = text[LocalScheme.Length..].Trim( '/' ).ToLowerInvariant();
+			return name.Length is > 0 and <= MaxLocalName && !name.Any( char.IsWhiteSpace ) ? LocalScheme + name : null;
+		}
 
 		if ( text.Contains( "://" ) )
 		{
@@ -257,6 +289,12 @@ public sealed class WebBrowserViewModel
 
 		return SearchUrl + Uri.EscapeDataString( text );
 	}
+
+	/// <summary>
+	/// Is <paramref name="url"/> a local address (<see cref="LocalScheme"/>), which the browser draws itself?
+	/// </summary>
+	public static bool IsLocal( string url ) =>
+		url is not null && url.StartsWith( LocalScheme, StringComparison.OrdinalIgnoreCase );
 
 	/// <summary>
 	/// The only setter of <see cref="UiState"/>, and the only place <see cref="Revision"/> moves.

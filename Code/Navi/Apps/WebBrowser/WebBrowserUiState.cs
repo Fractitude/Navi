@@ -21,6 +21,11 @@ public sealed record WebBrowserUiState
 	/// </summary>
 	public int LoadId { get; init; }
 
+	/// <summary>
+	/// The local address (<c>browser://</c>) the browser draws instead of the web page, or null on a web page.
+	/// </summary>
+	public string LocalPage { get; init; }
+
 	/// <summary>What the address field holds.</summary>
 	public string AddressText { get; init; } = "";
 
@@ -45,6 +50,12 @@ public sealed record WebBrowserSharedState
 	/// </summary>
 	public bool? Online { get; init; }
 
-	/// <summary>Dino Run, played while the computer is offline.</summary>
+	/// <summary>
+	/// The seated player opened <c>browser://dino</c>, so everyone sees the game without the offline notice. Set only by
+	/// their action (<see cref="WebBrowserSharedViewModel.ShowAction"/>); it never moves their own page.
+	/// </summary>
+	public bool DinoShown { get; init; }
+
+	/// <summary>Dino Run, played while the computer is offline or the seated player opened it.</summary>
 	public DinoRunFrame Dino { get; init; } = DinoRunFrame.Empty;
 }
