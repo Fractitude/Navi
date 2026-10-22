@@ -181,7 +181,10 @@ public sealed class NaviInputCapture : Component
 		if ( wanted && state is State.Idle or State.FlyingOut )
 			Begin();
 		else if ( !wanted && state is State.FlyingIn or State.Captured )
+		{
 			state = State.FlyingOut;
+			ReleaseFocus();
+		}
 
 		if ( state == State.Idle )
 			return;
@@ -347,8 +350,27 @@ public sealed class NaviInputCapture : Component
 		Current = this;
 	}
 
+	/// <summary>
+	/// Take the keyboard away from a text field on this computer's screen. Without it, a player stood up while typing (by
+	/// Escape, the host, or dying) kept typing there, and the engine kept their keys from moving them. Focus elsewhere,
+	/// like the game's chat, is left alone.
+	/// </summary>
+	void ReleaseFocus()
+	{
+		if ( Sandbox.UI.InputFocus.Current is not { } focus )
+			return;
+
+		var mine = GameObject.Components.GetAll<PanelComponent>( FindMode.EverythingInSelfAndDescendants )
+			.Any( x => x.Panel is { } panel && focus.AncestorsAndSelf.Contains( panel ) );
+
+		if ( mine )
+			Sandbox.UI.InputFocus.Clear();
+	}
+
 	void End()
 	{
+		ReleaseFocus();
+
 		if ( hidesPlayer && Scene.Camera is { } camera )
 			camera.RenderExcludeTags.Remove( PlayerTag );
 
