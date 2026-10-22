@@ -61,6 +61,9 @@
 					<div class="button close" @onclick=@(() => Computer.UserCloseWindow( app.Id, window.Id ))><i>close</i></div>
 				</div>
 
+				@* Drawn over the body while files are dragged over a window that takes them (UpdateDrop). *@
+				<div class="drop-hint"></div>
+
 				@if ( info.CanResize && !window.IsMaximized )
 				{
 					foreach ( var corner in Corners )
@@ -245,6 +248,20 @@
 		@foreach ( var window in Computer.Windows.Where( x => x.IsService ) )
 		{
 			<NaviAppHost @key=@window.Key Computer=@Computer Window=@window></NaviAppHost>
+		}
+	</div>
+
+	@* What the player is dragging between windows, at the cursor. The desktop draws it from what the computer cleaned up, so an
+	   app can't put anything else there. It takes no clicks. *@
+	<div class="drag-ghost @( Computer.CurrentDrag is null ? "" : "shown" )" @ref="Ghost">
+		@if ( Computer.CurrentDrag is { } drag )
+		{
+			<i class="glyph">@drag.Icon</i>
+			<div class="name">@drag.Label</div>
+			@if ( drag.Paths.Count > 1 )
+			{
+				<div class="count">@drag.Paths.Count</div>
+			}
 		}
 	</div>
 
@@ -478,7 +495,10 @@
 
 		var screen = Panel?.Children.FirstOrDefault( x => x.HasClass( "screen" ) );
 		if ( screen is not null )
+		{
 			UpdateWindows( screen );
+			UpdateDrop( screen );
+		}
 
 		var taskbar = Panel?.Children.FirstOrDefault( x => x.HasClass( "taskbar" ) );
 		if ( taskbar is null )
@@ -1113,6 +1133,95 @@
 		Computer.UserMoveWindow( dragging.App.Id, dragging.Id, dragging.Position, dragging.Size ?? default, dragging.Size is not null );
 	}
 
+	Panel Ghost;
+
+	/// <summary>The window panel marked as the place a drop would land.</summary>
+	Panel dropTarget;
+
+	/// <summary>
+	/// Follow the player's drag between windows (<see cref="NaviComputer.CurrentDrag"/>): the cursor's ghost, the window under it
+	/// if it takes the drop, and the drop itself when the left button is let go. It ends if the player can no longer use the
+	/// screen or the window it came from is gone. Letting go is read from <c>Input.Keyboard</c>, which game code can't fake,
+	/// so an app can't drop anything by itself. Local to this client.
+	/// </summary>
+	void UpdateDrop( Panel screen )
+	{
+		var drag = Computer.CurrentDrag;
+		var target = drag is null ? null : WindowUnderMouse( screen, drag );
+		var host = target?.Children.OfType<NaviAppHost>().FirstOrDefault();
+		var accepts = host is not null && host.AcceptsFiles;
+
+		if ( dropTarget is not null && (dropTarget != target || !accepts || !dropTarget.IsValid) )
+		{
+			if ( dropTarget.IsValid )
+				dropTarget.SetClass( "drop-target", false );
+
+			dropTarget = null;
+		}
+
+		if ( drag is null )
+		{
+			if ( Ghost.IsValid() )
+				Ghost.SetClass( "shown", false );
+
+			return;
+		}
+
+		if ( !Computer.CanUse || !Computer.IsUser || Computer.IsLocked || Computer.SecureEntryActive
+			|| !Computer.Windows.Contains( drag.Source ) )
+		{
+			Computer.EndDrag();
+			return;
+		}
+
+		if ( accepts && target != dropTarget )
+		{
+			dropTarget = target;
+			dropTarget.SetClass( "drop-target", true );
+		}
+
+		if ( Panel.IsValid() && Ghost.IsValid() )
+		{
+			var at = MousePosition( Panel );
+			Ghost.Style.Left = Length.Pixels( at.x + 14f );
+			Ghost.Style.Top = Length.Pixels( at.y + 14f );
+		}
+
+		if ( Input.Keyboard.Down( "MOUSE1" ) )
+			return;
+
+		// Let go. A window that takes it gets it, and comes to the front.
+		Computer.EndDrag();
+
+		if ( accepts && host.Window is { } window )
+		{
+			host.DeliverDrop( drag );
+			Computer.UserFocus( window.App.Id, window.Id );
+		}
+	}
+
+	/// <summary>
+	/// The top window under the mouse, other than the one the drag came out of, or null.
+	/// </summary>
+	static Panel WindowUnderMouse( Panel screen, NaviDrag drag )
+	{
+		foreach ( var panel in screen.Children.Where( x => x.HasClass( "window" ) ).Reverse() )
+		{
+			var window = panel.Children.OfType<NaviAppHost>().FirstOrDefault()?.Window;
+			if ( window is null || window.IsMinimized )
+				continue;
+
+			var at = panel.MousePosition;
+			var size = panel.Box.Rect.Size;
+			if ( at.x < 0f || at.y < 0f || at.x >= size.x || at.y >= size.y )
+				continue;
+
+			return window == drag.Source ? null : panel;
+		}
+
+		return null;
+	}
+
 	/// <summary>
 	/// The player presses Use while pointing at the free screen. Apps can raise panel events, but can't press the player's
 	/// Use action, so they can't sit the player down. A computer that doesn't <see cref="NaviComputer.RequireSeat"/> takes the
@@ -1413,6 +1522,6 @@
 		clockText = NaviClock.Text;
 
 		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion) );
+			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion, Computer?.CurrentDrag?.Serial) );
 	}
 }

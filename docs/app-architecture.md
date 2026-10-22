@@ -269,7 +269,8 @@ host's.
   `Navi.Publish( ViewModel.UiState )`. Publishing the same object again sends nothing, which is why `Update`
   replaces the record instead of changing it.
 - **A viewer's copy** (`Navi.IsViewer`) has no view model and makes no calls: `NaviAppHost` refuses them,
-  except the two that never leave the client (`Navi.Window.SetLocalTitleAsync`, `Navi.Input.KeepLocalAsync`).
+  except the three that never leave the client (`Navi.Window.SetLocalTitleAsync`, `Navi.Input.KeepLocalAsync`,
+  `Navi.Drag.BeginFilesAsync`).
   The Web Browser keeps what is the player's own in the seated player's copy, viewer or not, and shares only Dino Run.
   It draws `Navi.GetState<TUiState>()`, or an `Empty` state until the first one arrives. The class is set
   before the panel's first tick, so a viewer never creates a view model by accident.
@@ -338,3 +339,11 @@ Tray items change what the app shows, so keep them like any other state: build t
   `Flow` + `collect`. There is no BCL `StateFlow`; the `Changed` event is the cheap version, and a
   conflation channel is the faithful one. For drawing, neither is needed — the panel's hash is
   the observation.
+
+## Dragging between apps
+
+The player can drag files from one window to another. The source (Files) calls `Navi.Drag.BeginFilesAsync( label, icon, paths )` once
+the mouse has moved with the button held; it needs the Files permission. The target calls `Navi.Drag.AcceptFiles()` and overrides
+`OnDrop( Navi.Drop )` (the Web Browser opens the path as `file://`). The desktop draws the ghost at the cursor and the dashed
+target outline, and ends the drag when the real mouse button is let go. A drop is only paths: it gives the target no access, so it
+reads them with its own permissions. It never leaves the client.

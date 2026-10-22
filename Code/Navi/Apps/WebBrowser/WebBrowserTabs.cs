@@ -74,6 +74,24 @@ public sealed class WebBrowserTabs
 			Add();
 	}
 
+	/// <summary>
+	/// The player dropped files on the browser: the first opens in the tab shown, each more in a tab of its own while there is
+	/// room.
+	/// </summary>
+	public void OpenDropped( IReadOnlyList<string> paths )
+	{
+		for ( var i = 0; i < paths.Count; i++ )
+		{
+			if ( i > 0 && !CanAdd )
+				return;
+
+			if ( i > 0 )
+				Add();
+
+			Active.OpenDropped( paths[i] );
+		}
+	}
+
 	void Add()
 	{
 		var tab = new WebBrowserViewModel( navi, ++lastId );

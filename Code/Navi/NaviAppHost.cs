@@ -67,6 +67,11 @@ public static class NaviEvents
 	public const string CloseRequest = "navi.close-request";
 
 	/// <summary>
+	/// The player let go of a drag over the app's window. Raised on the app's panel. See <c>NaviApp.OnDrop</c>.
+	/// </summary>
+	public const string Drop = "navi.drop";
+
+	/// <summary>
 	/// Hardware was installed in or removed from the computer. Raised on every panel of every app. See
 	/// <c>NaviApp.OnHardwareChanged</c>.
 	/// </summary>
@@ -110,6 +115,9 @@ public sealed class NaviAppHost : Panel
 	/// <summary>The calls behind <c>Navi.Window.SetLocalTitleAsync</c> and <c>Navi.Input.KeepLocalAsync</c>, answered here and
 	/// never by the host.</summary>
 	const string LocalTitleCall = "window.local-title", KeepInputLocalCall = "input.keep-local";
+
+	/// <summary>The call behind <c>Navi.Drag.BeginFilesAsync</c>, answered here for the same reason.</summary>
+	const string DragBeginCall = "drag.begin";
 
 	public override void Tick()
 	{
@@ -342,6 +350,23 @@ public sealed class NaviAppHost : Panel
 	}
 
 	/// <summary>
+	/// The app on this window says it takes dropped files (<c>Navi.Drag.AcceptFiles</c>). Only an app that does is ever
+	/// marked as a target or given a drop.
+	/// </summary>
+	internal bool AcceptsFiles => app is not null && app.IsValid
+		&& app.GetAttribute( Navi.DragCalls.AcceptsAttribute, null ) == Navi.DragCalls.FilesKind;
+
+	/// <summary>
+	/// On this client: give the app's copy what the player dropped on its window. Every copy gets it, a shared app's viewer
+	/// too: the drop is the player's own and never leaves this client.
+	/// </summary>
+	internal void DeliverDrop( NaviDrag drag )
+	{
+		if ( app is not null && app.IsValid && AcceptsFiles )
+			app.CreateEvent( new PanelEvent( NaviEvents.Drop, app ) { Value = (drag.Kind, drag.Paths.ToArray()) } );
+	}
+
+	/// <summary>
 	/// On this client: tell the app's copy the computer's hardware changed. A viewer's copy only draws, so it isn't told.
 	/// </summary>
 	internal void DeliverHardwareChanged()
@@ -399,6 +424,14 @@ public sealed class NaviAppHost : Panel
 					&& call.Item1 == KeepInputLocalCall:
 					Window.KeepsInputLocal = call.Item2 is [bool local, ..] && local;
 					call.Item3.TrySetResult( null );
+					e.StopPropagation();
+					return;
+
+				// The player starts dragging something out of the window. Local to this client, so any copy may, a viewer's too
+				// (Files is shared, and the seated player's copy of it on a client only draws). See NaviComputer.BeginDrag.
+				case NaviEvents.Call when e.Value is System.ValueTuple<string, object[], TaskCompletionSource<object>> call
+					&& call.Item1 == DragBeginCall:
+					call.Item3.TrySetResult( Computer.BeginDrag( Window, call.Item2 ) );
 					e.StopPropagation();
 					return;
 

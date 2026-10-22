@@ -182,6 +182,7 @@
 				{
 					<div class="row @( UiState.GridView ? "tile" : "" ) @( row.Selected ? "selected" : "" ) @( row.Faded ? "faded" : "" )
 					     @( row.Cursor ? "cursor" : "" )"
+					     @onmousedown=@( ( PanelEvent e ) => PressRow( row.Path, e ) )
 					     @onclick=@( ( PanelEvent e ) => ClickRow( row.Path, e ) )
 					     @onrightclick=@( ( PanelEvent e ) => RightClick( row.Path, e ) )
 					     @ondoubleclick=@( () => Navi.Act( FilesViewModel.OpenAction, row.Path ) )>
@@ -389,12 +390,68 @@
 		Navi.Act( FilesViewModel.SelectManyAction, hit.ToArray() );
 	}
 
+	// Dragging an entry out of the window, to drop it on another app (Navi.Drag): pressing a row arms it, and moving the mouse
+	// DragThreshold with the button held starts the drag. The desktop draws and delivers it from there.
+	Panel pressedRow;
+	string pressedPath;
+	Vector2 pressedAt;
+	RealTimeSince sinceDragged = 1f;
+
+	/// <summary>How far the mouse moves, in panel pixels, before pressing an entry becomes dragging it.</summary>
+	const float DragThreshold = 6f;
+
+	/// <summary>How long after a drag a click is ignored, in seconds: the release that ends it can land on a row.</summary>
+	const float DragClickTime = 0.3f;
+
+	void PressRow( string path, PanelEvent e )
+	{
+		if ( e is not MousePanelEvent { MouseButton: MouseButtons.Left } || UiState.InTrash )
+			return;
+
+		pressedRow = e.This;
+		pressedPath = path;
+		pressedAt = MousePosition * ScaleFromScreen;
+	}
+
+	/// <summary>
+	/// Start the drag once the mouse has moved far enough with the button still held. An entry in the selection takes the
+	/// whole selection along; any other goes alone. Dropping on a window that takes files hands it the paths.
+	/// </summary>
+	void UpdateDrag()
+	{
+		if ( pressedRow is null )
+			return;
+
+		if ( !pressedRow.IsValid || !pressedRow.HasActive || Navi.IsWatching )
+		{
+			pressedRow = null;
+			return;
+		}
+
+		if ( (MousePosition * ScaleFromScreen - pressedAt).Length < DragThreshold )
+			return;
+
+		var path = pressedPath;
+		pressedRow = null;
+
+		var rows = UiState.Rows;
+		var row = rows.FirstOrDefault( x => x.Path == path );
+		if ( row is null )
+			return;
+
+		var dragged = rows.Where( x => row.Selected ? x.Selected : x == row ).ToList();
+		var label = dragged.Count == 1 ? row.Name : $"{dragged.Count} items";
+		sinceDragged = 0;
+		_ = Navi.Drag.BeginFilesAsync( label, row.Icon, dragged.Select( x => x.Path ).ToList() );
+	}
+
 	public override void Tick()
 	{
 		base.Tick();
 
 		FocusRename();
 		UpdateBand();
+		UpdateDrag();
 		crumbsClipped = TrailBox is not null && Trail is not null && Trail.Box.Rect.Width > TrailBox.Box.Rect.Width + 0.5f;
 
 		if ( Navi.IsViewer )
@@ -426,6 +483,9 @@
 	{
 		e.StopPropagation();
 		bandEnded = false;
+
+		if ( sinceDragged < DragClickTime )
+			return;
 
 		// A click on a world panel (WorldInput) comes without the modifier keys (HasCtrl and HasShift are always false
 		// there), so the keyboard is asked too.

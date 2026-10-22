@@ -93,8 +93,24 @@ public abstract class NaviApp : Panel
 	{
 	}
 
+	/// <summary>
+	/// The player dropped something on this app's window (a file from Files, say). Only comes after the app said it takes
+	/// drops (<see cref="Navi.DragCalls.AcceptFiles"/>), and only for what the player dragged themselves. It comes on the copy
+	/// of the app on the player's client, a shared app's viewer included. Treat the paths like anything the player typed.
+	/// </summary>
+	protected virtual void OnDrop( Navi.Drop drop )
+	{
+	}
+
 	protected override void OnEvent( PanelEvent e )
 	{
+		if ( Navi.TryGetDrop( e, out var drop ) )
+		{
+			OnDrop( drop );
+			e.StopPropagation();
+			return;
+		}
+
 		if ( Navi.TryGetAction( e, out var action, out var args ) )
 		{
 			OnAction( action, args );
@@ -167,6 +183,7 @@ public sealed class Navi
 		Network = new NetworkCalls( this );
 		Audio = new AudioCalls( this );
 		Input = new InputState( this );
+		Drag = new DragCalls( this );
 	}
 
 	/// <summary>
@@ -238,6 +255,11 @@ public sealed class Navi
 	/// The player's keys, while the app has them. Use it instead of the engine's Input.
 	/// </summary>
 	public InputState Input { get; }
+
+	/// <summary>
+	/// Dragging things between windows.
+	/// </summary>
+	public DragCalls Drag { get; }
 
 	/// <summary>
 	/// True while the app's window has the player's controls (it is in front while the player sits at the computer).
@@ -439,6 +461,22 @@ public sealed class Navi
 		}
 
 		online = false;
+		return false;
+	}
+
+	/// <summary>
+	/// Is this event the player dropping something on the app? See <see cref="TryGetAction"/> and <see cref="NaviApp.OnDrop"/>.
+	/// </summary>
+	public static bool TryGetDrop( PanelEvent e, out Drop drop )
+	{
+		// Plain types in the event, so a Store app's own copy of this file reads what the computer's makes.
+		if ( e.Name == "navi.drop" && e.Value is ValueTuple<string, string[]> value )
+		{
+			drop = new Drop( value.Item1, value.Item2 );
+			return true;
+		}
+
+		drop = null;
 		return false;
 	}
 
@@ -1501,5 +1539,55 @@ public sealed class Navi
 		/// call it on every copy that may be the player's. Does nothing in an app that isn't shared, whose keys stay here.
 		/// </summary>
 		public Task KeepLocalAsync( bool local ) => navi.CallAsync( "input.keep-local", local );
+	}
+
+	/// <summary>
+	/// What the player is carrying from one window to another when they let go over an app: a file dragged out of Files
+	/// into the browser, say. Only the player's own drag makes one, and the app that is dropped on gets it with
+	/// <see cref="NaviApp.OnDrop"/>.
+	/// </summary>
+	/// <param name="Kind"><see cref="DragCalls.FilesKind"/>.</param>
+	/// <param name="Paths">
+	/// The paths of the computer's files, absolute and cleaned up by the computer. A drop gives the app no access to them:
+	/// it reads them with its own permissions (<c>Navi.Files</c>).
+	/// </param>
+	public sealed record Drop( string Kind, IReadOnlyList<string> Paths );
+
+	/// <summary>
+	/// Drag and drop between windows, across the whole desktop. The app that is dragged <i>from</i> starts the drag
+	/// (<see cref="BeginFilesAsync"/>) while the player holds the mouse button down over it. The one that is dropped
+	/// <i>on</i> says it takes drops (<see cref="AcceptFiles"/>) and gets <see cref="NaviApp.OnDrop"/> when the player lets go
+	/// over its window. The desktop draws the dragged thing and the window it would land in, so an app can't fake either.
+	/// </summary>
+	public sealed class DragCalls( Navi navi )
+	{
+		/// <summary>The <see cref="Drop.Kind"/> of files of the computer.</summary>
+		public const string FilesKind = "files";
+
+		/// <summary>The most paths one drag carries, and the longest a path or a label can be.</summary>
+		public const int MaxPaths = 256, MaxPath = 1024, MaxLabel = 40;
+
+		/// <summary>The attribute the desktop reads on the app's panel to know what it takes.</summary>
+		public const string AcceptsAttribute = "navi-accepts-drop";
+
+		/// <summary>
+		/// Start dragging files of the computer. Only while the player holds the left mouse button down over this app's
+		/// window, and only an app with the Files permission may (it could not name the files otherwise). False if the drag
+		/// didn't start. <paramref name="label"/> is what the cursor carries, <paramref name="icon"/> a Material icon name.
+		/// Every copy of an app may call it, a shared app's viewer too: it never leaves this client.
+		/// </summary>
+		public Task<bool> BeginFilesAsync( string label, string icon, IReadOnlyList<string> paths ) =>
+			navi.CallAsync<bool>( "drag.begin", FilesKind, label ?? "", icon ?? "", (paths ?? []).ToArray() );
+
+		/// <summary>
+		/// Say whether this app takes dropped files. The desktop marks the window as a target while the player drags files
+		/// over it only if it does. Call it again to change.
+		/// </summary>
+		public void AcceptFiles( bool accept = true )
+		{
+			var kind = accept ? FilesKind : null;
+			if ( navi.panel.GetAttribute( AcceptsAttribute, null ) != kind )
+				navi.panel.SetAttribute( AcceptsAttribute, kind );
+		}
 	}
 }

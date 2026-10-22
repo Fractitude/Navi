@@ -225,6 +225,8 @@
 	{
 		base.Tick();
 
+		Navi.Drag.AcceptFiles( !Navi.IsWatching );
+
 		if ( !Navi.IsViewer )
 		{
 			Shared.Tick( Time.Delta, Navi.HasInput );
@@ -457,6 +459,16 @@
 	{
 		if ( !Navi.IsViewer )
 			Shared.NetworkChanged( online );
+	}
+
+	/// <summary>
+	/// Files dragged out of Files and dropped here open as <c>file://</c> pages. Only the seated player's own copy takes them:
+	/// browsing is theirs alone.
+	/// </summary>
+	protected override void OnDrop( Navi.Drop drop )
+	{
+		if ( !Navi.IsWatching && drop.Kind == Navi.DragCalls.FilesKind )
+			Tabs.OpenDropped( drop.Paths );
 	}
 
 	protected override void OnAction( string action, string[] args )

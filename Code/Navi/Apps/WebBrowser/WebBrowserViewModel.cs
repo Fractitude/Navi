@@ -305,6 +305,17 @@ public sealed class WebBrowserViewModel
 	}
 
 	/// <summary>
+	/// The player dropped a file of the computer on the browser (a drag from Files): open it as a <c>file://</c> address. The
+	/// path comes from the computer's drag and drop, which only the player's own drag makes. Like a typed file address it is
+	/// read with this app's Files permission, so the drop grants nothing.
+	/// </summary>
+	public void OpenDropped( string path )
+	{
+		if ( path is { Length: > 0 and <= 1024 } && path[0] == '/' && !path.Any( char.IsControl ) )
+			Open( FileScheme + path );
+	}
+
+	/// <summary>
 	/// Read the file or folder at a file address and show it. Asks the player for Files access the first time, on the
 	/// host's copy: a viewer's copy can't ask, so it says where to allow it.
 	/// </summary>
