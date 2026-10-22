@@ -8,6 +8,20 @@ namespace NaviApps;
 /// <c>WebPanel</c>, which shows the page. The engine's web surface can't go back or forward, so the history is kept
 /// here, and the panel tells this what address the page is on (<see cref="PageChanged"/>) so a followed link joins it.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The address and history never leave the player's own client, and nothing from outside may set them. The page loads
+/// in the player's real browser engine, on their real connection, so an address another player could choose would let
+/// them send this player to any site they like, such as an IP logger. That is why the app isn't Shared (each client
+/// makes its own copy of this, and keeps it in memory only), why the page is hidden while someone else uses the
+/// computer (<c>Navi.IsWatching</c>), and why the only addresses opened are what this player typed, a link they followed
+/// in the page, and the fixed <see cref="Home"/> and <see cref="SearchUrl"/>.
+/// </para>
+/// <para>
+/// Never publish the address as app state, take one from an action, a launch argument, a file or the host, or make the
+/// app Shared.
+/// </para>
+/// </remarks>
 public sealed class WebBrowserViewModel
 {
 	/// <summary>The page a new browser opens, and the one the Home button goes to.</summary>

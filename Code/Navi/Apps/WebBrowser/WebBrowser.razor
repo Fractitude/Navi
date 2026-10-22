@@ -5,7 +5,9 @@
 @* A built-in Navi app like any other: a plain panel, described by Assets/navi/apps/webbrowser.napp. It asks the computer *@
 @* only whether it is online, and sets the window title. The page itself is the engine's WebPanel. Offline it shows Dino *@
 @* Run instead (DinoRunGame), as Chrome does. *@
-@* It isn't shared: a web page is drawn from the client's own pixels, so each player browses on their own copy. *@
+@* It isn't shared: a web page is drawn from the client's own pixels, so each player browses on their own copy. The *@
+@* address stays on the player's client too, so no other player can make their real browser open a site (see the *@
+@* remarks on WebBrowserViewModel). *@
 
 <root>
 	@if ( Navi.IsWatching )
