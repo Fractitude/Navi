@@ -158,7 +158,16 @@ public sealed class WebBrowserViewModel
 			position++;
 		}
 
-		Update( uiState => uiState with { AddressText = url, CanGoBack = position > 0, CanGoForward = false, Notice = null } );
+		// The page isn't loaded again for this (the load id stays), but a page made again later, when the player sits back
+		// down, opens where they were.
+		Update( uiState => uiState with
+		{
+			Url = url,
+			AddressText = url,
+			CanGoBack = position > 0,
+			CanGoForward = false,
+			Notice = null,
+		} );
 	}
 
 	/// <summary>

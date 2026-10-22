@@ -10,7 +10,8 @@ public sealed record WebBrowserUiState
 
 	/// <summary>
 	/// The address the web page should be showing. The panel loads it into its <c>WebPanel</c> whenever
-	/// <see cref="LoadId"/> changes, and not otherwise, so a link the player follows inside the page doesn't fight it.
+	/// <see cref="LoadId"/> changes, and not otherwise, so a link the player follows inside the page doesn't fight it. A
+	/// followed link changes it too, without a new load, so a page made again (the player sat back down) opens there.
 	/// </summary>
 	public string Url { get; init; } = "";
 
