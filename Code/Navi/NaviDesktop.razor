@@ -711,9 +711,14 @@
 	/// can't pass for another app's. A pre-packaged app is part of the OS and can't be a stranger's, so its window's own title
 	/// stands alone (a browser says the page's title), and the app's name is what shows until it has one.
 	/// </summary>
-	static string WindowTitle( NaviWindow window ) =>
-		string.IsNullOrEmpty( window.Title ) ? window.App.Name :
-		window.App.IsPrepackaged ? window.Title : $"{window.App.Name} {window.Title}";
+	string WindowTitle( NaviWindow window )
+	{
+		// A local title is this player's own (a web page's, say), so it shows only on the user's client.
+		var title = Computer?.IsUser == true && window.LocalTitle is { } local ? local : window.Title;
+
+		return string.IsNullOrEmpty( title ) ? window.App.Name :
+			window.App.IsPrepackaged ? title : $"{window.App.Name} {title}";
+	}
 
 	/// <summary>The items of an app's taskbar menu.</summary>
 	List<NaviMenuItem> TaskbarMenu( NaviAppInfo app, NaviProcess process )
@@ -1408,6 +1413,6 @@
 		clockText = NaviClock.Text;
 
 		return System.HashCode.Combine( Computer?.Version, Computer?.InstalledApps?.Count, (MenuApp, TrayMenuApp, StartOpen), Computer?.CanUse, Computer?.UserId,
-			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline) );
+			Computer?.IsSeated, Computer?.ThemeClasses, (NotificationsOpen, NotificationMenu, toastsHash, clockText, Computer?.IsOnline, Computer?.LocalTitleVersion) );
 	}
 }

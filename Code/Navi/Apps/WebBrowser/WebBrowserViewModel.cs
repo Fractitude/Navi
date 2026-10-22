@@ -226,7 +226,8 @@ public sealed class WebBrowserViewModel
 
 	/// <summary>
 	/// The page title is the window's title bar text, and the app's name only while the page has none (the desktop lets a
-	/// pre-packaged app's title stand alone). It isn't drawn by the panel, so it isn't state.
+	/// pre-packaged app's title stand alone). It isn't drawn by the panel, so it isn't state. In multiplayer it stays on
+	/// this client, like the address: other players see "Web Browser" (<c>NaviComputer.SetTitle</c>).
 	/// </summary>
 	void ChangeTitle( string title )
 	{

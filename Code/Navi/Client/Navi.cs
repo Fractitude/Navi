@@ -509,7 +509,8 @@ public sealed class Navi
 
 		/// <summary>
 		/// Change what the title bar says after the app's name, up to 32 characters. Empty goes back to the title in the
-		/// .napp. It is safe to call every frame. In a shared app only the host's copy should call it.
+		/// .napp. It is safe to call every frame. In a shared app only the host's copy should call it. In multiplayer, an
+		/// app that isn't shared sets it for its own player only: everyone else sees the .napp's title.
 		/// </summary>
 		public Task SetTitleAsync( string title ) => navi.CallAsync( "window.title", title ?? "" );
 

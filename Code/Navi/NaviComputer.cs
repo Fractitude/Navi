@@ -96,6 +96,13 @@ public sealed class NaviWindow
 
 	string title;
 
+	/// <summary>
+	/// In multiplayer, the title this client's copy of an app that isn't shared set. Never synced or saved: each client runs
+	/// its own copy, so what it says (a web page's title, say) is only this player's. The title bar draws it only while this
+	/// client is the computer's user; everyone else sees <see cref="Title"/>. See <see cref="NaviComputer.SetTitle"/>.
+	/// </summary>
+	public string LocalTitle { get; set; }
+
 	public NaviAppInfo App => Process.App;
 
 	/// <summary>
@@ -556,6 +563,12 @@ public sealed partial class NaviComputer : Component
 	/// Goes up on every change, so UI can rebuild when it changes.
 	/// </summary>
 	public int Version { get; private set; }
+
+	/// <summary>
+	/// Goes up when a window's <see cref="NaviWindow.LocalTitle"/> changes. Not <see cref="Version"/>, which on the host
+	/// sends a snapshot: the local title is never sent.
+	/// </summary>
+	public int LocalTitleVersion { get; private set; }
 
 	readonly List<NaviProcess> running = new();
 	int topZIndex;
@@ -1584,12 +1597,32 @@ public sealed partial class NaviComputer : Component
 	/// Change what a window's title bar says after the app's name, cut to <see cref="NaviWindow.MaxTitle"/>. Empty goes back to
 	/// the manifest's title. Returns false if the window isn't open.
 	/// </summary>
+	/// <remarks>
+	/// In multiplayer an app that isn't shared runs on every client, and the copy the player sees is their own. Its title
+	/// stays on that client (<see cref="NaviWindow.LocalTitle"/>), so other players never learn it: the Web Browser's is the
+	/// page's title, and the host's would otherwise reach everyone. They see the manifest's title.
+	/// </remarks>
 	public bool SetTitle( string id, string windowId, string title )
 	{
-		if ( !IsAuthority || GetWindow( id, windowId ) is not { IsService: false } window )
+		if ( GetWindow( id, windowId ) is not { IsService: false } window )
 			return false;
 
 		title = NaviAppInfo.Cap( title?.Trim(), NaviWindow.MaxTitle );
+
+		if ( Networking.IsActive && !window.App.Shared )
+		{
+			title = string.IsNullOrEmpty( title ) ? null : title;
+			if ( window.LocalTitle != title )
+			{
+				window.LocalTitle = title;
+				LocalTitleVersion++;
+			}
+
+			return true;
+		}
+
+		if ( !IsAuthority )
+			return false;
 
 		// An app may set it every frame; only a change redraws the desktop.
 		if ( window.Title == (string.IsNullOrEmpty( title ) ? window.Info.Title : title) )
