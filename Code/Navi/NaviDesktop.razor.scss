@@ -312,7 +312,9 @@ NaviDesktop
 		}
 	}
 
-	.title
+	// The wallpaper's wordmark behind the windows (markup: `.wordmark`), never `.title`: an app's screen heading is
+	// called that, and an unscoped `.title` here would draw it at this size.
+	.wordmark
 	{
 		font-size: 64px;
 		font-weight: 700;
@@ -1508,7 +1510,8 @@ NaviDesktop
 		border-radius: 8px;
 	}
 
-	.title
+	// The wordmark of the wallpaper, never an app's `.title`.
+	.wordmark
 	{
 		color: #ffffff;
 		opacity: 0.35;

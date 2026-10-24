@@ -9,7 +9,8 @@
 			<div class="orb o2"></div>
 			<div class="orb o3"></div>
 		</div>
-		<div class="title">COPLAND OS</div>
+		@* The wallpaper's wordmark. Not `.title`: that name is an app's own (a screen's heading), and this rule would reach it. *@
+		<div class="wordmark">COPLAND OS</div>
 
 		@* Back to front: panels draw in child order, and s&box ignores z-index for that. *@
 		@foreach ( var window in Computer.Windows.Where( x => !x.IsService ).OrderBy( x => x.ZIndex ) )
